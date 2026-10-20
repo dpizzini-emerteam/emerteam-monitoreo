@@ -3,9 +3,10 @@ import { Link, useOutletContext } from "react-router-dom";
 import type { Ctx } from "../main";
 import { Barra } from "../componentes/Barra";
 import { diaLocal, fmtDia, fmtHora, supabase, type Evento, type Nivel } from "../datos";
-import { COLOR_NIVEL, NOMBRE_FASE } from "../reglas";
+import { COLOR_NIVEL, estiloNivel, NOMBRE_CORTO, NOMBRE_FASE, nombreNivel } from "../reglas";
 
-type Resumen = Record<string, Record<string, number>>; // evento -> fase -> nivel máximo vigente
+type Max = { nivel: number; variable: string; desde: string };
+type Resumen = Record<string, Record<string, Max>>; // evento -> fase -> nivel máximo vigente
 
 export function Eventos() {
   const { admin, session } = useOutletContext<Ctx>();
@@ -23,15 +24,17 @@ export function Eventos() {
       if (ids.length) {
         const { data: niv } = await supabase
           .from("mon_niveles")
-          .select("evento_id,fase,nivel")
+          .select("evento_id,fase,nivel,variable,desde")
           .in("evento_id", ids)
           .gt("hasta", new Date().toISOString())
           .gt("nivel", 0);
         const r: Resumen = {};
-        for (const n of (niv ?? []) as Pick<Nivel, "evento_id" | "fase" | "nivel">[]) {
-          const fase = n.fase === "personal" ? "armado" : n.fase;
+        for (const n of (niv ?? []) as Pick<Nivel, "evento_id" | "fase" | "nivel" | "variable" | "desde">[]) {
+          // La jornada del personal transcurre el día de carrera
+          const fase = n.fase === "personal" ? "carrera" : n.fase;
           r[n.evento_id] ??= {};
-          r[n.evento_id][fase] = Math.max(r[n.evento_id][fase] ?? 0, n.nivel);
+          const prev = r[n.evento_id][fase];
+          if (!prev || n.nivel > prev.nivel || (n.nivel === prev.nivel && n.desde < prev.desde)) r[n.evento_id][fase] = n;
         }
         setResumen(r);
       }
@@ -73,7 +76,7 @@ export function Eventos() {
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {evs.map((e) => {
                 const r = resumen[e.id] ?? {};
-                const max = Math.max(0, ...Object.values(r));
+                const max = Math.max(0, ...Object.values(r).map((m) => m.nivel));
                 return (
                   <article key={e.id} className="tarjeta" style={{ display: "grid", gridTemplateColumns: "minmax(240px,2fr) repeat(auto-fit,minmax(130px,1fr))", gap: 14, alignItems: "center" }}>
                     <div style={{ borderLeft: `5px solid ${COLOR_NIVEL[max]}`, paddingLeft: 12 }}>
@@ -83,12 +86,16 @@ export function Eventos() {
                         {e.estado === "cerrado" && " · cerrado"}
                       </div>
                     </div>
-                    {(["armado", "carrera", "desarme"] as const).map((f) => (
-                      <div key={f}>
-                        <div className="chico">{NOMBRE_FASE[f]}</div>
-                        <span className="badge" style={{ background: COLOR_NIVEL[r[f] ?? 0], fontSize: 13 }}>{["Sin riesgo", "Vigilancia", "Acción", "Retiro", "Suspensión"][r[f] ?? 0]}</span>
-                      </div>
-                    ))}
+                    {(["armado", "carrera", "desarme"] as const).map((f) => {
+                      const m = r[f];
+                      return (
+                        <div key={f} className="fase-estado">
+                          <div className="rotulo">{NOMBRE_FASE[f]}</div>
+                          <span className="badge" style={estiloNivel(m?.nivel ?? 0)}>{m ? nombreNivel(m.variable, m.nivel) : "Sin riesgo"}</span>
+                          {m && <div className="chico">{NOMBRE_CORTO[m.variable] ?? m.variable} · {fmtDia(m.desde)} {fmtHora(m.desde)}</div>}
+                        </div>
+                      );
+                    })}
                     <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                       {admin && (
                         <Link className="boton" to={`/evento/${e.id}/editar`}>

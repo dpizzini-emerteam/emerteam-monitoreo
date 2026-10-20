@@ -38,6 +38,9 @@ export const REGLAS: Record<string, { tipo: TipoFuente; fuente: string }> = {
 };
 
 export const COLOR_NIVEL = ["#2FA34C", "#C79000", "#FF6A1A", "#FF3B30", "#7A1610"];
+/** Texto con contraste WCAG AA (≥ 4,5:1) sobre cada color de nivel */
+export const TEXTO_NIVEL = ["#111111", "#111111", "#111111", "#111111", "#FFFFFF"];
+export const estiloNivel = (n: number) => ({ background: COLOR_NIVEL[n] ?? COLOR_NIVEL[0], color: TEXTO_NIVEL[n] ?? "#111111" });
 
 export const NOMBRE_WA = ["Casi seguro", "Precaución", "Advertencia", "Advertencia severa", "Peligro"];
 
@@ -47,6 +50,16 @@ export const NOMBRE_VARIABLE: Record<string, string> = {
   viento_A: "Viento · estructuras ultralivianas",
   viento_B: "Viento · superficies de vela",
   viento_C: "Viento · estructuras ingenieriles",
+  tormenta: "Tormenta",
+  lluvia: "Lluvia y suelo",
+};
+
+export const NOMBRE_CORTO: Record<string, string> = {
+  wbgt: "Calor · corredores",
+  calor_personal: "Calor · personal",
+  viento_A: "Viento · ultralivianas",
+  viento_B: "Viento · superficies de vela",
+  viento_C: "Viento · estructuras",
   tormenta: "Tormenta",
   lluvia: "Lluvia y suelo",
 };

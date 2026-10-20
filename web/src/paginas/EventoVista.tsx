@@ -8,7 +8,7 @@ import {
   diaLocal, fmtDia, fmtFechaHora, fmtHora, num, supabase,
   type AlertaSMN, type Evento, type Nivel, type Pronostico,
 } from "../datos";
-import { COLOR_NIVEL, NOMBRE_FASE, NOMBRE_VARIABLE, NOMBRE_WA, REGLAS, TIPO_FUENTE, nombreNivel, recomendacion } from "../reglas";
+import { estiloNivel, NOMBRE_CORTO, NOMBRE_FASE, NOMBRE_VARIABLE, NOMBRE_WA, REGLAS, TIPO_FUENTE, nombreNivel, recomendacion } from "../reglas";
 import { calcular } from "../ventanas";
 
 const PRIORIDAD = ["ecmwf", "gfs", "icon"];
@@ -125,7 +125,7 @@ export function EventoVista() {
   return (
     <>
       <Barra titulo={ev.nombre} subtitulo={`${fmtFechaHora(ev.largada)} · ${cuenta}`}>
-        <span className="badge" style={{ background: COLOR_NIVEL[maxCarreraWbgt] }}>{NOMBRE_WA[maxCarreraWbgt]} WA</span>
+        <span className="badge" style={{ ...estiloNivel(maxCarreraWbgt) }}>{NOMBRE_WA[maxCarreraWbgt]} WA</span>
         {alertas.length > 0 && <a href="#alerta-smn" className="boton-osc alerta" style={{ background: COLOR_SMN[alertas[0].color], color: "#111", borderColor: "#fff", fontWeight: 800 }}>Alerta SMN</a>}
         {admin && <Link className="boton-osc" to={`/evento/${ev.id}/editar`}>Editar</Link>}
         <Link className="boton-osc" to="/">Eventos</Link>
@@ -202,7 +202,7 @@ function Indicadores({ vigentes, ultimaCorrida, procesado }: { vigentes: Nivel[]
             <span className="rotulo">{t.label}</span>
             <Icono tipo={t.icono} size={36} />
           </div>
-          <span className="badge" style={{ background: COLOR_NIVEL[t.n?.nivel ?? 0], alignSelf: "flex-start" }}>
+          <span className="badge" style={{ ...estiloNivel(t.n?.nivel ?? 0), alignSelf: "flex-start" }}>
             {t.n ? nombreNivel(t.n.variable, t.n.nivel) : "Sin datos"}
           </span>
           {t.n && t.n.nivel > 0 && <span className="chico">{NOMBRE_FASE[t.n.fase]} · {fmtFechaHora(t.n.desde)}</span>}
@@ -246,7 +246,9 @@ function Dias({ ev, serie, niveles, armado, desarme, largada }: {
           const t = ps.map((p) => p.t2m).filter((x): x is number => x != null);
           const raf = Math.max(...ps.map((p) => p.rafaga10 ?? 0));
           const lluvia = ps.reduce((a, p) => a + (p.precip ?? 0) * (horasPaso.get(new Date(p.valido).getTime()) ?? 1), 0);
-          const nivelDia = Math.max(0, ...niveles.filter((n) => diaLocal(n.desde) === d || diaLocal(n.hasta) === d).map((n) => n.nivel));
+          const delDia = niveles.filter((n) => diaLocal(n.desde) <= d && diaLocal(n.hasta) >= d);
+          const peorDia = delDia.reduce<Nivel | null>((m, n) => (!m || n.nivel > m.nivel ? n : m), null);
+          const nivelDia = peorDia?.nivel ?? 0;
           const fase = d === diaCarrera ? "Carrera" : d < diaCarrera ? "Armado" : "Desarme";
           const media = ps[Math.floor(ps.length / 2)];
           const peor = ps.reduce((a, p) => ((p.precip ?? 0) > (a.precip ?? 0) ? p : a), media);
@@ -265,7 +267,8 @@ function Dias({ ev, serie, niveles, armado, desarme, largada }: {
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600 }}><Icono tipo="viento" size={20} />ráf. {num(raf)} km/h</div>
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600 }}><Icono tipo="gota" size={20} />{num(lluvia, 1)} mm</div>
-              <span className="badge" style={{ background: COLOR_NIVEL[nivelDia], alignSelf: "flex-start", fontSize: 13 }}>{["Sin riesgo", "Vigilancia", "Acción", "Retiro", "Suspensión"][nivelDia]}</span>
+              <span className="badge" style={{ ...estiloNivel(nivelDia), alignSelf: "flex-start", fontSize: 13 }}>{peorDia && nivelDia > 0 ? nombreNivel(peorDia.variable, nivelDia) : "Sin riesgo"}</span>
+              {peorDia && nivelDia > 0 && <span className="chico" style={{ marginTop: -4 }}>{NOMBRE_CORTO[peorDia.variable]}</span>}
               {lejano(ps[0].valido) && <span className="chico">Tendencia · confianza baja</span>}
             </article>
           );
@@ -310,7 +313,7 @@ function DiaCarrera({ serie, v }: { serie: Map<number, Pronostico & { n: number 
                     <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "#4A4A4A" }}>{fase(t)}</span>
                     <Icono tipo={iconoTiempo(p, noche)} size={48} />
                     <b className="condensada" style={{ fontSize: 24 }}>{num(p.t2m)}°</b>
-                    <span style={{ alignSelf: "stretch", background: COLOR_NIVEL[n], fontWeight: 700, fontSize: 14, padding: "4px 6px", borderRadius: 4 }}>WBGT {num(p.wbgt_est, 1)}°</span>
+                    <span style={{ alignSelf: "stretch", ...estiloNivel(n), fontWeight: 700, fontSize: 14, padding: "4px 6px", borderRadius: 4 }}>WBGT {num(p.wbgt_est, 1)}°</span>
                     <span style={{ fontSize: 14, fontWeight: 600 }}>
                       <span style={{ display: "inline-block", transform: `rotate(${(p.dir_viento ?? 0) + 180}deg)` }}>↑</span> {num(p.viento10)}/{num(p.rafaga10)}
                     </span>
@@ -324,7 +327,7 @@ function DiaCarrera({ serie, v }: { serie: Map<number, Pronostico & { n: number 
         )}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0,1fr))", gap: 4, fontSize: 13 }}>
           {["< 21 °C", "21–25 °C", "25–28 °C", "28–30 °C", "> 30 °C"].map((r, i) => (
-            <div key={r} style={{ background: COLOR_NIVEL[i], color: i === 4 ? "#fff" : "#111", padding: 8, borderRadius: i === 0 ? "6px 0 0 6px" : i === 4 ? "0 6px 6px 0" : 0 }}>
+            <div key={r} style={{ ...estiloNivel(i), padding: 8, borderRadius: i === 0 ? "6px 0 0 6px" : i === 4 ? "0 6px 6px 0" : 0 }}>
               <b>{NOMBRE_WA[i]}</b><br />{r}
             </div>
           ))}
@@ -354,7 +357,7 @@ function Recomendaciones({ vigentes }: { vigentes: Nivel[] }) {
           return (
             <article key={`${n.fase}${n.variable}${n.nivel}`} className="tarjeta" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-                <span className="badge" style={{ background: COLOR_NIVEL[n.nivel] }}>{nombreNivel(n.variable, n.nivel)}</span>
+                <span className="badge" style={{ ...estiloNivel(n.nivel) }}>{nombreNivel(n.variable, n.nivel)}</span>
                 <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", border: "1px solid #111", padding: "2px 7px", borderRadius: 4 }}>{NOMBRE_FASE[n.fase]}</span>
                 {n.confianza && <span className="chico">confianza {n.confianza}</span>}
               </div>

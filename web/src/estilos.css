@@ -13,6 +13,8 @@
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; }
+#root { min-height: 100vh; display: flex; flex-direction: column; }
+#root > .pie { margin-top: auto; }
 body {
   font-family: "Barlow", Arial, sans-serif;
   font-variant-numeric: tabular-nums;
@@ -22,7 +24,7 @@ body {
 a { color: var(--negro); }
 a:hover { color: var(--naranja); }
 h1, h2, h3, .condensada { font-family: "Barlow Condensed", Arial, sans-serif; }
-.contenedor { max-width: 1240px; margin: 0 auto; padding: 0 24px; }
+.contenedor { width: 100%; max-width: 1240px; margin: 0 auto; padding: 0 24px; }
 @media (max-width: 600px) { .contenedor { padding: 0 16px; } }
 
 /* Barra superior fija */
@@ -51,7 +53,9 @@ h1, h2, h3, .condensada { font-family: "Barlow Condensed", Arial, sans-serif; }
 .banda { background: var(--negro); color: #fff; padding: 12px 20px; border-left: 6px solid var(--naranja); border-radius: 10px 10px 0 0; }
 .banda h2 { margin: 0; font-size: 20px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; }
 .rotulo { font-family: "Barlow Condensed"; font-size: 13px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--texto2); }
-.badge { display: inline-block; font-family: "Barlow Condensed"; font-weight: 800; font-size: 15px; text-transform: uppercase; letter-spacing: 0.03em; padding: 3px 10px; border-radius: 4px; color: var(--negro); }
+.badge { display: inline-block; font-family: "Barlow Condensed"; font-weight: 800; font-size: 15px; line-height: 1.15; text-transform: uppercase; letter-spacing: 0.04em; padding: 4px 10px; border-radius: 4px; color: var(--negro); }
+.fase-estado { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; }
+.fase-estado .chico { font-size: 12px; line-height: 1.3; }
 .grilla { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
 @media (max-width: 600px) {
   .grilla { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
@@ -83,3 +87,8 @@ thead th { background: var(--fondo); border-top: none; }
 .pie .firma img { height: 84px; display: block; }
 .pie .firma div { border-left: 1px solid #3a3a3a; padding-left: 40px; padding-top: 56px; display: flex; flex-direction: column; gap: 7px; }
 .pie .linea { border-top: 1px solid #2a2a2a; padding-top: 16px; display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; font-size: 13px; color: #9a9a9a; }
+
+/* Evita que un rótulo largo ensanche la grilla en celular */
+.grilla > * { min-width: 0; }
+.tarjeta .rotulo { min-width: 0; overflow-wrap: break-word; hyphens: auto; }
+@media (max-width: 600px) { .tarjeta .rotulo { letter-spacing: 0.06em; } }
