@@ -80,7 +80,7 @@ export function Eventos() {
         {Object.entries(porDia).map(([dia, evs]) => (
           <section key={dia} className="seccion" style={{ marginTop: 18 }}>
             <h2 style={{ fontSize: 28 }}>
-              {fmtDia(evs[0].largada)} <span className="chico" style={{ fontFamily: "Barlow", textTransform: "none" }}>{evs.length > 1 ? `${evs.length} eventos` : ""}</span>
+              {fmtDia(evs[0].largada)} <span className="chico" style={{ fontFamily: "inherit", textTransform: "none" }}>{evs.length > 1 ? `${evs.length} eventos` : ""}</span>
             </h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {evs.map((e) => {

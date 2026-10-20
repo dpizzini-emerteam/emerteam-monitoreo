@@ -479,7 +479,7 @@ function TarjetaReco({ n }: { n: Nivel }) {
         {n.fase === "personal" && <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", border: "1px solid var(--texto)", padding: "2px 7px", borderRadius: 4 }}>{NOMBRE_FASE[n.fase]}</span>}
         {n.confianza === "baja" && <span className="chico">tendencia</span>}
       </div>
-      <h3 style={{ margin: 0, fontFamily: "Barlow", fontSize: 18 }}>{NOMBRE_VARIABLE[n.variable] ?? n.variable}</h3>
+      <h3 style={{ margin: 0, fontFamily: "inherit", fontSize: 18 }}>{NOMBRE_VARIABLE[n.variable] ?? n.variable}</h3>
       <div className="chico">Desde {fmtFechaHora(n.desde)} · valor {num(n.valor, 1)}{n.umbral != null && ` · umbral ${num(n.umbral, 1)}`}</div>
       {texto && <p style={{ margin: 0, lineHeight: 1.5 }}>{texto}</p>}
       {r && (
