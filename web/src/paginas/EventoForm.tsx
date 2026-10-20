@@ -23,6 +23,7 @@ type Form = {
   organizador_email: string;
   participantes: string;
   armado_dias: string;
+  cupo_equipo: string;
   duracion_propia_min: string;
   demora_largada_min: string;
   portico: "estructural" | "inflable";
@@ -31,7 +32,7 @@ type Form = {
 
 const VACIO: Form = {
   nombre: "", largada: "", ubicacion: "", lat: "", lon: "", organizador_email: "",
-  participantes: "", armado_dias: "3", duracion_propia_min: "", demora_largada_min: "",
+  participantes: "", armado_dias: "3", cupo_equipo: "3", duracion_propia_min: "", demora_largada_min: "",
   portico: "estructural", estado: "activo",
 };
 
@@ -54,7 +55,7 @@ export function EventoForm() {
       const e = data as Evento;
       setF({
         nombre: e.nombre, largada: aLocal(e.largada), ubicacion: e.ubicacion, lat: String(e.lat), lon: String(e.lon),
-        organizador_email: e.organizador_email, participantes: String(e.participantes), armado_dias: String(e.armado_dias),
+        organizador_email: e.organizador_email, participantes: String(e.participantes), armado_dias: String(e.armado_dias), cupo_equipo: String(e.cupo_equipo ?? 3),
         duracion_propia_min: e.duracion_propia_min ? String(e.duracion_propia_min) : "",
         demora_largada_min: e.demora_largada_min != null ? String(e.demora_largada_min) : "",
         portico: e.portico, estado: e.estado,
@@ -96,7 +97,7 @@ export function EventoForm() {
     const fila = {
       nombre: f.nombre.trim(), largada: largada.toISOString(), ubicacion: f.ubicacion.trim(),
       lat: parseFloat(f.lat), lon: parseFloat(f.lon), organizador_email: f.organizador_email.trim().toLowerCase(),
-      participantes: parseInt(f.participantes, 10), armado_dias: parseInt(f.armado_dias, 10),
+      participantes: parseInt(f.participantes, 10), armado_dias: parseInt(f.armado_dias, 10), cupo_equipo: parseInt(f.cupo_equipo, 10),
       duracion_propia_min: f.duracion_propia_min ? parseInt(f.duracion_propia_min, 10) : null,
       demora_largada_min: f.demora_largada_min ? parseInt(f.demora_largada_min, 10) : null,
       portico: f.portico, estado: f.estado, actualizado_en: new Date().toISOString(),
@@ -132,6 +133,7 @@ export function EventoForm() {
             <label>Participantes (total)<input type="number" min={0} required value={f.participantes} onChange={set("participantes")} /></label>
             <label>Correo del organizador<input type="email" required value={f.organizador_email} onChange={set("organizador_email")} /></label>
             <label>Días de armado<input type="number" min={1} max={10} required value={f.armado_dias} onChange={set("armado_dias")} /></label>
+            <label>Cupo del equipo del organizador<input type="number" min={0} max={200} required value={f.cupo_equipo} onChange={set("cupo_equipo")} /></label>
             <label>Pórtico<select value={f.portico} onChange={set("portico")}><option value="estructural">Estructural</option><option value="inflable">Inflable</option></select></label>
             <label>Duración propia (min, opcional)<input type="number" min={1} value={f.duracion_propia_min} onChange={set("duracion_propia_min")} placeholder="estimada por distancia" /></label>
             <label>Demora de largada (min, opcional)<input type="number" min={0} value={f.demora_largada_min} onChange={set("demora_largada_min")} placeholder="1 min cada 1.000" /></label>

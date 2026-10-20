@@ -14,7 +14,7 @@ const RANGO: Record<string, string> = { sin: "Sin actividad", ">24": "Rayos a m�
 const VIGENCIA_MEDICION = 60 * 60_000; // una medición vale como "actual" durante 60 min
 const VIGENCIA_RAYO = 30 * 60_000; // y una de rayos, 30 min (regla de reanudación)
 
-/** Pantalla de comando: lo que pasa ahora y en las próximas horas, para proyectar el día del evento */
+/** Dashboard del día del evento: lo que pasa ahora y en las próximas horas, para proyectar el día del evento */
 export function Comando() {
   const { id } = useParams();
   const [ev, setEv] = useState<Evento | null>(null);

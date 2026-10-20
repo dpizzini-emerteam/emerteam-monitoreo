@@ -1,6 +1,6 @@
 import { lazy, StrictMode, Suspense, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { createHashRouter, Navigate, Outlet, RouterProvider, useLocation, useRouteError } from "react-router-dom";
+import { createHashRouter, Navigate, Outlet, RouterProvider, useLocation, useParams, useRouteError } from "react-router-dom";
 import type { Session } from "@supabase/supabase-js";
 import "./estilos.css";
 import { miRol, supabase, type RolEquipo } from "./datos";
@@ -35,6 +35,11 @@ const EventoForm = lazy(() =>
     throw e;
   }));
 
+function RedirDashboard() {
+  const { id } = useParams();
+  return <Navigate to={`/evento/${id}/dashboard`} replace />;
+}
+
 function ErrorPagina() {
   const error = useRouteError();
   const vieja = esVersionVieja(error);
@@ -59,7 +64,7 @@ function ErrorPagina() {
 export type Ctx = { session: Session; admin: boolean; editor: boolean };
 
 function Raiz() {
-  const enComando = useLocation().pathname.endsWith("/comando");
+  const enComando = useLocation().pathname.endsWith("/dashboard");
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [rol, setRol] = useState<RolEquipo | null | undefined>(undefined); // undefined: cargando
 
@@ -102,7 +107,8 @@ const router = createHashRouter([
       { index: true, element: <Eventos /> },
       { path: "evento/nuevo", element: <EventoForm /> },
       { path: "evento/:id/editar", element: <EventoForm /> },
-      { path: "evento/:id/comando", element: <Comando /> },
+      { path: "evento/:id/dashboard", element: <Comando /> },
+      { path: "evento/:id/comando", element: <RedirDashboard /> },
       { path: "evento/:id/informe", element: <Informe /> },
       { path: "evento/:id/:pestana?", element: <EventoVista /> },
       { path: "equipo", element: <Equipo /> },

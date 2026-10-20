@@ -3,8 +3,11 @@ import { supabase, type Acceso } from "../datos";
 
 const VACIO = { nombre: "", apellido: "", email: "", rol: "", recibe_alertas: true };
 
-/** Equipo con acceso al evento. Gestionan EMERTEAM y el organizador; el resto solo ve. */
-export function Accesos({ eventoId, puedeGestionar, miEmail }: { eventoId: string; puedeGestionar: boolean; miEmail: string }) {
+/** Equipo con acceso al evento. Gestionan EMERTEAM y el organizador; el resto solo ve.
+ *  El organizador tiene un cupo (por defecto 3); ampliarlo lo hace solo un editor EMERTEAM. */
+export function Accesos({ eventoId, eventoNombre, cupo, puedeGestionar, esEditor, miEmail }: {
+  eventoId: string; eventoNombre: string; cupo: number; puedeGestionar: boolean; esEditor: boolean; miEmail: string;
+}) {
   const [lista, setLista] = useState<Acceso[]>([]);
   const [f, setF] = useState(VACIO);
   const [error, setError] = useState("");
@@ -25,7 +28,9 @@ export function Accesos({ eventoId, puedeGestionar, miEmail }: { eventoId: strin
       evento_id: eventoId, email, nombre: f.nombre.trim(), apellido: f.apellido.trim(),
       rol: f.rol.trim() || null, recibe_alertas: f.recibe_alertas, habilitado_por: miEmail,
     });
-    if (error) return setError(error.message);
+    if (error) return setError(error.message.includes("CUPO_EQUIPO")
+      ? `El equipo ya tiene las ${cupo} personas del cupo. Para sumar más, solicitá la ampliación a EMERTEAM.`
+      : error.message);
     setF(VACIO);
     void cargar();
   }
@@ -41,11 +46,19 @@ export function Accesos({ eventoId, puedeGestionar, miEmail }: { eventoId: strin
   }
 
   if (!puedeGestionar && lista.length === 0) return null;
+  const completo = lista.length >= cupo;
+  const puedeSumar = puedeGestionar && (esEditor || !completo);
+  const solicitud = `mailto:info@emerteam.com.ar?subject=${encodeURIComponent(`${eventoNombre} · Solicitud de ampliación del equipo`)}&body=${encodeURIComponent(
+    `Solicito ampliar el equipo con acceso al monitoreo de ${eventoNombre}.\n\nPersonas a sumar (nombre, apellido, correo y rol):\n\n`)}`;
 
   return (
     <section className="seccion tarjeta" aria-labelledby="accesos-t">
       <div className="rotulo" id="accesos-t">Equipo con acceso</div>
       <p className="chico" style={{ marginTop: 4 }}>Ingresan sin contraseña con el correo habilitado. Quienes reciben alertas son notificados por correo ante cambios de nivel y alertas del SMN.</p>
+      <p className="chico" style={{ marginTop: 4, fontWeight: 600 }}>
+        {lista.length} de {cupo} {cupo === 1 ? "persona habilitada" : "personas habilitadas"}
+        {esEditor && lista.length > cupo ? " · por encima del cupo, habilitadas por EMERTEAM" : ""}
+      </p>
       {lista.length > 0 && (
         <div className="desplaza">
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
@@ -80,7 +93,13 @@ export function Accesos({ eventoId, puedeGestionar, miEmail }: { eventoId: strin
           </table>
         </div>
       )}
-      {puedeGestionar && (
+      {puedeGestionar && !puedeSumar && (
+        <div className="tarjeta" style={{ marginTop: 14, borderLeft: "4px solid var(--naranja)", display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
+          <span>El cupo del equipo está completo. Para sumar más personas, solicitá la ampliación a EMERTEAM.</span>
+          <a className="boton primario" href={solicitud}>Solicitar ampliación</a>
+        </div>
+      )}
+      {puedeSumar && (
         <form onSubmit={agregar} className="form" style={{ marginTop: 14, alignItems: "end" }}>
           <label>Nombre<input required value={f.nombre} onChange={(e) => setF({ ...f, nombre: e.target.value })} /></label>
           <label>Apellido<input required value={f.apellido} onChange={(e) => setF({ ...f, apellido: e.target.value })} /></label>

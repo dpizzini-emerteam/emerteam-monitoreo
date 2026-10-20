@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, Navigate, useOutletContext, useParams } from "react-router-dom";
+import { Link, Navigate, useOutletContext, useParams, useLocation } from "react-router-dom";
 import type { Ctx } from "../main";
 import { Barra } from "../componentes/Barra";
 import { Icono, iconoTiempo, type TipoIcono } from "../componentes/Icono";
 import { Accesos } from "../componentes/Accesos";
+import { Comunicacion } from "../componentes/Comunicacion";
+import { armarComunicado } from "../comunicacion";
 import { Introduccion } from "../componentes/Introduccion";
 import { Resumen } from "../componentes/Resumen";
 import { Mediciones } from "../componentes/Mediciones";
@@ -85,6 +87,14 @@ export function EventoVista() {
     return () => { clearInterval(t); void supabase.removeChannel(canal); };
   }, [cargar, id, miEmail]);
 
+  // Enlace directo a una sección (por ejemplo, los textos para corredores)
+  const ancla = useLocation().hash.replace("#", "");
+  useEffect(() => {
+    if (!ancla || !ev) return;
+    const t = setTimeout(() => document.getElementById(ancla)?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
+    return () => clearTimeout(t);
+  }, [ancla, ev, pestana]);
+
   // En celular, la pestaña activa queda a la vista
   useEffect(() => {
     document.querySelector(".pestana[aria-current='page']")?.scrollIntoView({ inline: "center", block: "nearest" });
@@ -123,6 +133,7 @@ export function EventoVista() {
   const nivelFase = (fases: string[]) => Math.max(0, ...vigentes.filter((n) => fases.includes(n.fase)).map((n) => n.nivel));
   const delaFase = (p: Pestana) => vigentes.filter((n) => FASES_DE[p].includes(n.fase));
   const nivelesFase = (p: Pestana) => niveles.filter((n) => FASES_DE[p].includes(n.fase));
+  const comunicado = armarComunicado(ev, vigentes.filter((n) => n.fase === "carrera"), alertas, v.exposicion);
 
   const pestanas = (
     <nav className="pestanas" aria-label="Secciones del evento">
@@ -141,7 +152,7 @@ export function EventoVista() {
     <>
       <Barra titulo={ev.nombre} subtitulo={`${fmtFechaHora(ev.largada)} · ${cuenta}`} abajo={pestanas}>
         {alertas.length > 0 && <a href="#alerta-smn" className="boton-osc alerta" style={{ background: COLOR_SMN[alertas[0].color], color: "#111", borderColor: "#fff", fontWeight: 800 }}>Alerta SMN</a>}
-        {admin && <Link className="boton-osc" to={`/evento/${ev.id}/comando`}>Comando</Link>}
+        {admin && <Link className="boton-osc" to={`/evento/${ev.id}/dashboard`}>Dashboard</Link>}
         {(admin || informeAprobado) && <Link className="boton-osc" to={`/evento/${ev.id}/informe`}>Informe</Link>}
         {editor && <Link className="boton-osc" to={`/evento/${ev.id}/editar`}>Editar</Link>}
         <Link className="boton-osc" to="/">Eventos</Link>
@@ -199,6 +210,12 @@ export function EventoVista() {
           <>
             <Introduccion />
             <Resumen vigentes={vigentes} alertas={alertas} eventoId={ev.id} />
+            {comunicado && (
+              <section className="seccion tarjeta" style={{ borderLeft: "4px solid var(--naranja)", display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
+                <span><b>Aviso preventivo para corredores</b> por {comunicado.motivos.join(", ").toLowerCase()}. Hay un texto sugerido para redes sociales, WhatsApp y mail.</span>
+                <Link className="boton primario" to={`/evento/${ev.id}/carrera#comunicacion`}>Ver textos</Link>
+              </section>
+            )}
             <DatosVigentes ultimaCorrida={ultimaCorrida} procesado={procesado} />
           </>
         )}
@@ -213,6 +230,7 @@ export function EventoVista() {
           <>
             <DiaCarrera serie={serie} v={v} />
             <Recomendaciones lista={delaFase("carrera")} vacio="Con el pronóstico actual no hay recomendaciones para el día de carrera." />
+            {comunicado && <Comunicacion c={comunicado} />}
           </>
         )}
         {actual === "desarme" && (
@@ -225,7 +243,7 @@ export function EventoVista() {
         {actual === "mediciones" && <Mediciones eventoId={ev.id} puedeCargar={admin} miEmail={miEmail} />}
         {actual === "equipo" && (
           <>
-            <Accesos eventoId={ev.id} puedeGestionar={editor || ev.organizador_email.toLowerCase() === miEmail} miEmail={miEmail} />
+            <Accesos eventoId={ev.id} eventoNombre={ev.nombre} cupo={ev.cupo_equipo ?? 3} puedeGestionar={editor || ev.organizador_email.toLowerCase() === miEmail} esEditor={editor} miEmail={miEmail} />
             <DatosVigentes ultimaCorrida={ultimaCorrida} procesado={procesado} />
             <section className="seccion tarjeta" id="fuentes">
               <div className="rotulo">Fuentes y metodología</div>

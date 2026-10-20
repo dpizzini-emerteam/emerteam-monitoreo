@@ -278,3 +278,12 @@ textarea { font: inherit; font-size: 15px; padding: 10px; border: 1px solid var(
   .inf-sub, .inf-recuadro, .inf-texto { margin-left: 16px; margin-right: 16px; }
   .inf-tabla { margin: 0 16px; width: calc(100% - 32px); }
 }
+
+/* Texto sugerido para corredores */
+.comunicacion { border-left: 4px solid var(--naranja); }
+.comunicacion .formatos { display: flex; gap: 6px; flex-wrap: wrap; margin: 12px 0 10px; }
+.comunicacion .formato { font: inherit; font-weight: 700; font-size: 14px; min-height: 40px; padding: 0 14px; border-radius: 20px; border: 1px solid var(--borde-input); background: var(--superficie); color: var(--texto); cursor: pointer; }
+.comunicacion .formato.activo { background: var(--fuerte-fondo); border-color: var(--fuerte-fondo); color: var(--fuerte-texto); }
+.comunicacion .texto-asunto { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
+.comunicacion .texto-sugerido { white-space: pre-wrap; word-break: break-word; font-family: inherit; font-size: 15px; line-height: 1.5; background: var(--fondo); border: 1px solid var(--borde); border-radius: 6px; padding: 14px 16px; margin: 0 0 12px; max-height: 420px; overflow: auto; }
+.comunicacion { scroll-margin-top: 140px; }
