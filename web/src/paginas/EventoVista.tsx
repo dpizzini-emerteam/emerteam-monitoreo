@@ -113,7 +113,12 @@ export function EventoVista() {
   const v = useMemo(() => (ev ? calcular(ev) : null), [ev]);
   const serie = useMemo(() => consenso(pron), [pron]);
   const ahora = Date.now();
-  const vigentes = niveles.filter((n) => new Date(n.hasta).getTime() > ahora);
+  // Solo cuentan los niveles que caen dentro de las fases del evento (si se cambió la fecha o el lugar,
+  // lo calculado para la fecha anterior no se muestra mientras se recalcula)
+  const nivelesEv = v
+    ? niveles.filter((n) => new Date(n.hasta).getTime() > v.armado[0].getTime() && new Date(n.desde).getTime() < v.desarme[1].getTime())
+    : [];
+  const vigentes = nivelesEv.filter((n) => new Date(n.hasta).getTime() > ahora);
 
   if (error) return (<><Barra titulo="Evento" /><p className="contenedor">{error}</p></>);
   if (!ev || !v) return (<><Barra titulo="Cargando…" /></>);
@@ -132,7 +137,7 @@ export function EventoVista() {
 
   const nivelFase = (fases: string[]) => Math.max(0, ...vigentes.filter((n) => fases.includes(n.fase)).map((n) => n.nivel));
   const delaFase = (p: Pestana) => vigentes.filter((n) => FASES_DE[p].includes(n.fase));
-  const nivelesFase = (p: Pestana) => niveles.filter((n) => FASES_DE[p].includes(n.fase));
+  const nivelesFase = (p: Pestana) => nivelesEv.filter((n) => FASES_DE[p].includes(n.fase));
   const comunicado = armarComunicado(ev, vigentes.filter((n) => n.fase === "carrera"), alertas, v.exposicion);
 
   const pestanas = (
