@@ -13,16 +13,15 @@ export function Login() {
     setEstado("enviando");
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim().toLowerCase(),
-      options: { emailRedirectTo: redirect },
+      // No se crean usuarios desde esta web: solo ingresan cuentas ya habilitadas
+      options: { emailRedirectTo: redirect, shouldCreateUser: false },
     });
     if (error) {
-      setError(error.message);
+      setError(/signup|not allowed|not found/i.test(error.message)
+        ? "Ese correo no tiene acceso habilitado. Pedile acceso a EMERTEAM."
+        : error.message);
       setEstado("error");
     } else setEstado("enviado");
-  }
-
-  async function google() {
-    await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: redirect } });
   }
 
   return (
@@ -39,11 +38,7 @@ export function Login() {
       <main className="contenedor" style={{ paddingTop: 48, paddingBottom: 48 }}>
         <div className="tarjeta" style={{ maxWidth: 440, margin: "0 auto", padding: 28 }}>
           <h1 style={{ margin: "0 0 6px", fontSize: 30, fontWeight: 800, textTransform: "uppercase" }}>Ingresar</h1>
-          <p className="chico" style={{ marginTop: 0 }}>Sin contraseña: con tu cuenta de Google o con un enlace a tu correo.</p>
-          <button className="boton" style={{ width: "100%", justifyContent: "center" }} onClick={google}>
-            Continuar con Google
-          </button>
-          <div className="chico" style={{ textAlign: "center", margin: "16px 0" }}>o</div>
+          <p className="chico" style={{ marginTop: 0 }}>Sin contraseña: te enviamos un enlace de ingreso a tu correo.</p>
           {estado === "enviado" ? (
             <p>
               Te enviamos un enlace a <b>{email}</b>. Abrilo desde este dispositivo para ingresar.
