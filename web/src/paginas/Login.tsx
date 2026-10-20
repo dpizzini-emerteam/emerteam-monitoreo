@@ -13,8 +13,8 @@ export function Login() {
     setEstado("enviando");
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim().toLowerCase(),
-      // No se crean usuarios desde esta web: solo ingresan cuentas ya habilitadas
-      options: { emailRedirectTo: redirect, shouldCreateUser: false },
+      // Cualquier correo puede pedir el enlace; lo que ve cada uno lo define RLS (mon_accesos / organizador).
+      options: { emailRedirectTo: redirect },
     });
     if (error) {
       setError(/signup|not allowed|not found/i.test(error.message)

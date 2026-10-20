@@ -5,6 +5,7 @@
   - Solo tablas con prefijo `mon_` en public; funciones de permiso en el esquema `mon_priv`.
   - RLS activo en toda tabla nueva desde su creación.
   - No modificar tablas, políticas, triggers ni plantillas de correo existentes de SUITE. No crear triggers en auth.users.
+  - Excepción aprobada por Diego (20/10/2026): las políticas de SUITE exigen `suite_priv.es_equipo()` (lista `suite_priv.equipo`), porque la autenticación es compartida con los organizadores de Monitoreo. Ver supabase/suite/.
 - Escala WBGT oficial: World Athletics (2020). Ningún otro umbral se rotula como World Athletics.
 - Cada recomendación cita su fuente y su tipo (norma/legislación, guía internacional, consenso científico, especificación de fabricante, criterio interno EMERTEAM).
 - Costo mensual cero: no usar Open-Meteo gratuito (uso no comercial). Fuentes como conectores configurables.
