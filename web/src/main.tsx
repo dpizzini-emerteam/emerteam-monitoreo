@@ -10,6 +10,7 @@ import { EventoVista } from "./paginas/EventoVista";
 import { Equipo } from "./paginas/Equipo";
 import { Comando } from "./paginas/Comando";
 import { Informe } from "./paginas/Informe";
+import { GuiaPagina } from "./paginas/GuiaPagina";
 import { Pie } from "./componentes/Pie";
 
 // Una pestaña abierta desde antes de una actualización pide archivos de la versión anterior, que ya no existen:
@@ -119,6 +120,7 @@ const router = createHashRouter([
       { path: "evento/:id/informe", element: <Informe /> },
       { path: "evento/:id/:pestana?", element: <EventoVista /> },
       { path: "equipo", element: <Equipo /> },
+      { path: "guia", element: <GuiaPagina /> },
       { path: "*", element: <Navigate to="/" replace /> },
     ],
   },

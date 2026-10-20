@@ -1,0 +1,91 @@
+{
+  "_comentario": "Fuente única de umbrales y ventanas. La leen el procesamiento (pipeline/mon) y la web (guía y textos). Cambiar acá cambia el cálculo y la guía a la vez.",
+  "wbgt_wa": {
+    "cortes": [
+      21.0,
+      25.0,
+      28.0,
+      30.0
+    ],
+    "regla": "wa2020_wbgt"
+  },
+  "calor_personal": {
+    "pesada": 23.0,
+    "moderada": 25.0,
+    "regla": "srt30_2023_tgbh"
+  },
+  "viento": {
+    "A": [
+      25.0,
+      30.0,
+      38.0,
+      45.0
+    ],
+    "B": [
+      35.0,
+      40.0,
+      45.0,
+      55.0
+    ],
+    "C": [
+      35.0,
+      45.0,
+      55.0,
+      65.0
+    ]
+  },
+  "tormenta": {
+    "posible": {
+      "cape": 1000,
+      "precip": 1
+    },
+    "probable": {
+      "cape": 2000,
+      "precip": 5
+    }
+  },
+  "rayos": {
+    "alerta_km": 24,
+    "demora_km": 19,
+    "suspension_km": 13,
+    "reanudar_min": 30
+  },
+  "lluvia": {
+    "intensa_mm_h": 20,
+    "suelo_saturado_mm": 30,
+    "suelo_horas": 72
+  },
+  "ventanas": {
+    "exposicion_antes_min": 60,
+    "exposicion_despues_min": 60,
+    "personal_antes_min": 240,
+    "personal_despues_min": 300,
+    "desarme_min": 1440,
+    "ultimo_cuarto": 0.75,
+    "demora_cada_1000": 1,
+    "armado_hasta_antes_largada_min": 240
+  },
+  "confianza": {
+    "horizonte_niveles_h": 144,
+    "un_modelo_baja_h": 72,
+    "alta_hasta_h": 96,
+    "wbgt": [
+      1.0,
+      2.0
+    ],
+    "rafaga": [
+      10.0,
+      20.0
+    ],
+    "viento": [
+      8.0,
+      15.0
+    ]
+  },
+  "correccion": {
+    "distancia_max_km": 40,
+    "pares_min": 12,
+    "ventana_h": 72,
+    "vida_media_h": 36
+  }
+}

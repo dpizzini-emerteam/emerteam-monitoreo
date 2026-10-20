@@ -34,11 +34,13 @@ class Ventanas:
 
 
 def calcular(ev: dict) -> Ventanas:
+    from .reglas import U
+    w = U["ventanas"]
     largada = datetime.fromisoformat(ev["largada"]).astimezone(timezone.utc)
     modalidades = ev.get("mon_modalidades") or []
     demora = ev.get("demora_largada_min")
     if demora is None:
-        demora = (ev.get("participantes") or 0) / 1000.0  # 1 min cada 1.000 participantes
+        demora = (ev.get("participantes") or 0) / 1000.0 * w["demora_cada_1000"]  # min cada 1.000 participantes
     if ev.get("duracion_propia_min"):
         duracion = float(ev["duracion_propia_min"])
         fin = largada + timedelta(minutes=demora + duracion)
@@ -49,7 +51,7 @@ def calcular(ev: dict) -> Ventanas:
             f = ini + timedelta(minutes=demora + duracion_estimada_min(float(m["distancia_km"])))
             fin = max(fin, f)
         duracion = (fin - largada).total_seconds() / 60 - demora
-    ini_uc = largada + timedelta(minutes=demora + 0.75 * duracion)
+    ini_uc = largada + timedelta(minutes=demora + w["ultimo_cuarto"] * duracion)
     local = largada.astimezone(TZ)
     dia0 = local.replace(hour=0, minute=0, second=0, microsecond=0)
     armado_ini = (dia0 - timedelta(days=int(ev.get("armado_dias") or 3))).astimezone(timezone.utc)
@@ -57,8 +59,8 @@ def calcular(ev: dict) -> Ventanas:
         largada=largada,
         fin_carrera=fin,
         inicio_ultimo_cuarto=ini_uc,
-        exposicion=(largada - timedelta(minutes=60), fin + timedelta(minutes=60)),
-        personal=(largada - timedelta(hours=4), fin + timedelta(hours=5)),
-        armado=(armado_ini, largada - timedelta(hours=4)),
-        desarme=(fin, fin + timedelta(hours=24)),
+        exposicion=(largada - timedelta(minutes=w["exposicion_antes_min"]), fin + timedelta(minutes=w["exposicion_despues_min"])),
+        personal=(largada - timedelta(minutes=w["personal_antes_min"]), fin + timedelta(minutes=w["personal_despues_min"])),
+        armado=(armado_ini, largada - timedelta(minutes=w["armado_hasta_antes_largada_min"])),
+        desarme=(fin, fin + timedelta(minutes=w["desarme_min"])),
     )

@@ -6,6 +6,7 @@ import { Icono, iconoTiempo, type TipoIcono } from "../componentes/Icono";
 import { Accesos } from "../componentes/Accesos";
 import { Comunicacion } from "../componentes/Comunicacion";
 import { TiraDias } from "../componentes/TiraDias";
+import { Guia } from "../componentes/Guia";
 import { armarComunicado } from "../comunicacion";
 import { Introduccion } from "../componentes/Introduccion";
 import { Resumen } from "../componentes/Resumen";
@@ -265,6 +266,7 @@ export function EventoVista() {
             <Recomendaciones lista={delaFase("desarme")} vacio="Con el pronóstico actual no hay recomendaciones para el desarme." />
           </>
         )}
+        {actual === "guia" && <Guia ctx={{ niveles: vigentes, alertas }} />}
         {actual === "mediciones" && <Mediciones eventoId={ev.id} puedeCargar={admin} miEmail={miEmail} />}
         {actual === "equipo" && (
           <>
@@ -287,7 +289,7 @@ export function EventoVista() {
   );
 }
 
-type Pestana = "general" | "armado" | "carrera" | "desarme" | "mediciones" | "equipo";
+type Pestana = "general" | "armado" | "carrera" | "desarme" | "mediciones" | "equipo" | "guia";
 const PESTANAS: { clave: Pestana; titulo: string }[] = [
   { clave: "general", titulo: "General" },
   { clave: "armado", titulo: "Armado" },
@@ -295,9 +297,10 @@ const PESTANAS: { clave: Pestana; titulo: string }[] = [
   { clave: "desarme", titulo: "Desarme" },
   { clave: "mediciones", titulo: "Mediciones" },
   { clave: "equipo", titulo: "Equipo y fuentes" },
+  { clave: "guia", titulo: "Guía" },
 ];
 const FASES_DE: Record<Pestana, string[]> = {
-  general: ["armado", "carrera", "personal", "desarme"], armado: ["armado"], carrera: ["carrera", "personal"], desarme: ["desarme"], mediciones: [], equipo: [],
+  general: ["armado", "carrera", "personal", "desarme"], armado: ["armado"], carrera: ["carrera", "personal"], desarme: ["desarme"], mediciones: [], equipo: [], guia: [],
 };
 
 function DatosVigentes({ ultimaCorrida, procesado, ajuste }: { ultimaCorrida: string[]; procesado?: string; ajuste?: Sesgo }) {

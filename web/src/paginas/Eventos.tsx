@@ -53,6 +53,7 @@ export function Eventos() {
   return (
     <>
       <Barra titulo={admin ? "Administración" : "Mis eventos"} subtitulo={session.user.email ?? ""}>
+        <Link className="boton-osc" to="/guia">Guía</Link>
         {admin && (
           <Link className="boton-osc" to="/equipo">
             Equipo EMERTEAM

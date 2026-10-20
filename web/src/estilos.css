@@ -326,3 +326,36 @@ input, select, textarea, button { font-family: inherit; }
 .tira-sin { height: 46px; display: flex; align-items: center; font-size: 22px; color: var(--borde-input); }
 /* Las tres fases del listado alineadas arriba aunque una no tenga detalle */
 .fase-estado { align-self: start; }
+
+/* Guía de criterios */
+.guia h3 { font-family: "Barlow Condensed", Arial, sans-serif; text-transform: uppercase; letter-spacing: 0.04em; font-size: 17px; margin: 20px 0 8px; }
+.guia-indice { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.guia-indice a { font-size: 14px; font-weight: 600; text-decoration: none; color: var(--texto); border: 1px solid var(--borde-input); border-radius: 16px; padding: 6px 12px; background: var(--superficie); }
+.guia-indice a:hover { border-color: var(--naranja); }
+.guia-seccion { background: var(--superficie); border: 1px solid var(--borde); border-radius: 10px; scroll-margin-top: 130px; }
+.guia-banda { display: flex; align-items: center; gap: 10px; }
+.guia-banda svg { background: #fff; border-radius: 8px; padding: 2px; }
+.guia-cuerpo { padding: 16px 20px 18px; }
+.guia-organizador { font-size: 16px; line-height: 1.55; border-left: 4px solid var(--naranja); padding-left: 14px; margin-bottom: 8px; }
+.guia-organizador p { margin: 0; }
+.guia-ahora { font-size: 14px; background: var(--uc-fondo); border-radius: 6px; padding: 8px 12px; margin: 10px 0; }
+.guia-ahora.ok { background: color-mix(in srgb, var(--verde) 12%, transparent); }
+.guia-ahora.sin { background: transparent; border: 1px dashed var(--borde-input); color: var(--texto2, #666); }
+.guia-tabla td, .guia-tabla th { padding: 8px 10px; vertical-align: top; text-align: left; }
+.guia-tabla tbody tr { border-bottom: 1px solid var(--borde); }
+.guia-tabla .badge { white-space: nowrap; }
+.guia-fuente { margin: 8px 0 0; }
+.guia-tecnico { margin-top: 14px; border-top: 1px solid var(--borde); padding-top: 10px; }
+.guia-tecnico summary { cursor: pointer; font-weight: 700; font-size: 15px; }
+.guia-tecnico > div { font-size: 15px; line-height: 1.55; }
+.guia-lista { margin: 0; padding-left: 22px; line-height: 1.6; }
+.guia-dos { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.guia-dos > div { background: var(--fondo); border-radius: 8px; padding: 4px 14px; }
+.guia-escalera { list-style: none; padding: 0; margin: 10px 0; display: flex; flex-direction: column; gap: 8px; }
+.guia-escalera li { display: flex; gap: 12px; align-items: stretch; }
+.guia-escalera p { margin: 2px 0 0; font-size: 15px; }
+.guia-paso { width: 8px; border-radius: 4px; flex: 0 0 8px; }
+.guia-glosario { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px 24px; margin: 0; }
+.guia-glosario dt { font-weight: 700; }
+.guia-glosario dd { margin: 2px 0 0; font-size: 15px; color: var(--texto2, #444); }
+@media (max-width: 640px) { .guia-tabla { min-width: 600px; } }

@@ -6,6 +6,12 @@ CC (consenso científico), EF (especificación de fabricante), CI (criterio inte
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
+# Fuente única de umbrales, compartida con la web (guía): config/umbrales.json
+U = json.loads((Path(__file__).resolve().parents[2] / "config" / "umbrales.json").read_text(encoding="utf-8"))
+
 REGLAS = {
     "wa2020_wbgt": {"tipo": "GI", "fuente": "World Athletics (2020). Competition Medical Guidelines, 2.ª ed., tabla 1."},
     "srt30_2023_tgbh": {"tipo": "NT", "fuente": "Res. SRT 30/2023 (valor límite de acción, no aclimatados)."},
@@ -18,17 +24,13 @@ REGLAS = {
 }
 
 # Escala World Athletics (2020): <21, 21–25, 25–28, 28–30, >30 °C
-WA_CORTES = [21.0, 25.0, 28.0, 30.0]
+WA_CORTES = [float(x) for x in U["wbgt_wa"]["cortes"]]
 
 # Viento por categoría (ráfaga, km/h): vigilancia, reforzar, retirar, despejar/suspender
-VIENTO = {
-    "A": [25.0, 30.0, 38.0, 45.0],
-    "B": [35.0, 40.0, 45.0, 55.0],
-    "C": [35.0, 45.0, 55.0, 65.0],
-}
+VIENTO = {k: [float(x) for x in U["viento"][k]] for k in ("A", "B", "C")}
 
 # Personal (Res. SRT 30/2023, VLA no aclimatados): carga pesada 23,0 °C; moderada 25,0 °C
-PERSONAL = [23.0, 25.0]
+PERSONAL = [float(U["calor_personal"]["pesada"]), float(U["calor_personal"]["moderada"])]
 
 
 def _escalon(valor: float, cortes: list[float], inclusivo: bool = False) -> int:
@@ -67,13 +69,14 @@ def nivel_tormenta(cape, precip):
     if cape is None or precip is None:
         return None, None, None, None
     c, p = float(cape), float(precip)
-    if c >= 2000 and p >= 5:
+    t = U["tormenta"]
+    if c >= t["probable"]["cape"] and p >= t["probable"]["precip"]:
         n = 2
-    elif c >= 1000 and p >= 1:
+    elif c >= t["posible"]["cape"] and p >= t["posible"]["precip"]:
         n = 1
     else:
         n = 0
-    return n, c, (2000.0 if n == 2 else 1000.0 if n == 1 else None), "emt_tormenta_cape"
+    return n, c, (float(t["probable"]["cape"]) if n == 2 else float(t["posible"]["cape"]) if n == 1 else None), "emt_tormenta_cape"
 
 
 def nivel_lluvia(precip, lluvia72):
@@ -81,8 +84,9 @@ def nivel_lluvia(precip, lluvia72):
     if precip is None:
         return None, None, None, None
     p = float(precip)
-    if p > 20:
-        return 2, p, 20.0, "emt_lluvia_intensidad"
-    if lluvia72 >= 30:
-        return 1, round(lluvia72, 1), 30.0, "emt_suelo_saturado"
+    ll = U["lluvia"]
+    if p > ll["intensa_mm_h"]:
+        return 2, p, float(ll["intensa_mm_h"]), "emt_lluvia_intensidad"
+    if lluvia72 >= ll["suelo_saturado_mm"]:
+        return 1, round(lluvia72, 1), float(ll["suelo_saturado_mm"]), "emt_suelo_saturado"
     return 0, p, None, "emt_lluvia_intensidad"

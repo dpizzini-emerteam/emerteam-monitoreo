@@ -11,7 +11,9 @@ from datetime import datetime, timedelta, timezone
 from . import ventanas as vt
 from .reglas import nivel_calor_personal, nivel_lluvia, nivel_tormenta, nivel_viento, nivel_wbgt_wa
 
-HORIZONTE_H = 144          # más allá del día 6 solo tendencia, sin niveles
+from .reglas import U
+
+HORIZONTE_H = U["confianza"]["horizonte_niveles_h"]  # más allá: solo tendencia, sin niveles
 PRIORIDAD = ["ecmwf", "gfs", "icon"]
 
 
@@ -82,15 +84,16 @@ def serie_consenso(pron: list[dict]) -> dict[datetime, dict]:
 
 
 def confianza(fila: dict, horas_adelante: float) -> str:
+    c = U["confianza"]
     if fila.get("n_fuentes", 1) < 2:
-        return "baja" if horas_adelante > 72 else "media"
+        return "baja" if horas_adelante > c["un_modelo_baja_h"] else "media"
     dw, dr, dv = fila.get("disp_wbgt"), fila.get("disp_rafaga"), fila.get("disp_viento")
     peor = "alta"
-    if (dw is not None and dw >= 2) or (dr is not None and dr >= 20) or (dv is not None and dv >= 15):
+    if (dw is not None and dw >= c["wbgt"][1]) or (dr is not None and dr >= c["rafaga"][1]) or (dv is not None and dv >= c["viento"][1]):
         peor = "baja"
-    elif (dw is not None and dw >= 1) or (dr is not None and dr >= 10) or (dv is not None and dv >= 8):
+    elif (dw is not None and dw >= c["wbgt"][0]) or (dr is not None and dr >= c["rafaga"][0]) or (dv is not None and dv >= c["viento"][0]):
         peor = "media"
-    if horas_adelante > 96 and peor == "alta":
+    if horas_adelante > c["alta_hasta_h"] and peor == "alta":
         peor = "media"
     return peor
 

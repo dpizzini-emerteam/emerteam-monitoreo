@@ -1,5 +1,8 @@
 // Réplica del cálculo de ventanas del procesamiento (pipeline/mon/ventanas.py).
 import type { Evento } from "./datos";
+import U from "../../config/umbrales.json";
+
+const W = U.ventanas;
 
 const ANCLAS: [number, number][] = [[0, 0], [3, 54], [5, 75], [10, 120], [21.0975, 180], [42.195, 360]];
 
@@ -28,7 +31,7 @@ const min = (d: Date, m: number) => new Date(d.getTime() + m * 60_000);
 
 export function calcular(ev: Evento): Ventanas {
   const largada = new Date(ev.largada);
-  const demora = ev.demora_largada_min ?? (ev.participantes ?? 0) / 1000;
+  const demora = ev.demora_largada_min ?? ((ev.participantes ?? 0) / 1000) * W.demora_cada_1000;
   let fin = largada;
   let duracion: number;
   if (ev.duracion_propia_min) {
@@ -48,11 +51,11 @@ export function calcular(ev: Evento): Ventanas {
   return {
     largada,
     finCarrera: fin,
-    inicioUltimoCuarto: min(largada, demora + 0.75 * duracion),
-    exposicion: [min(largada, -60), min(fin, 60)],
-    personal: [min(largada, -240), min(fin, 300)],
-    armado: [new Date(dia0.getTime() - (ev.armado_dias || 3) * 86400_000), min(largada, -240)],
-    desarme: [fin, min(fin, 1440)],
+    inicioUltimoCuarto: min(largada, demora + W.ultimo_cuarto * duracion),
+    exposicion: [min(largada, -W.exposicion_antes_min), min(fin, W.exposicion_despues_min)],
+    personal: [min(largada, -W.personal_antes_min), min(fin, W.personal_despues_min)],
+    armado: [new Date(dia0.getTime() - (ev.armado_dias || 3) * 86400_000), min(largada, -W.armado_hasta_antes_largada_min)],
+    desarme: [fin, min(fin, W.desarme_min)],
     duracionMin: duracion,
     demoraMin: demora,
   };
