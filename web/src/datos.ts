@@ -72,7 +72,18 @@ export type AlertaSMN = {
   emitida: string | null;
   estado: string;
   zona: string | null;
+  tipo: "alerta" | "aviso_corto_plazo";
+  severidad: string | null;
+  fuente_url: string | null;
 };
+
+const PESO_SMN: Record<string, number> = { rojo: 3, naranja: 2, amarillo: 1 };
+/** Alertas SMN vigentes, de la más grave a la menos grave; los avisos a corto plazo primero a igual color */
+export function ordenarAlertas(a: AlertaSMN[]): AlertaSMN[] {
+  return [...a].sort((x, y) => (PESO_SMN[y.color] ?? 0) - (PESO_SMN[x.color] ?? 0) || (x.tipo === y.tipo ? 0 : x.tipo === "aviso_corto_plazo" ? -1 : 1));
+}
+export const tituloAlerta = (a: AlertaSMN) =>
+  `${a.tipo === "aviso_corto_plazo" ? "Aviso a corto plazo" : "Alerta"} ${a.color} SMN · ${a.fenomeno.replace(/\s*\(aviso a corto plazo\)$/, "")}`;
 
 export type Acceso = {
   id: string;

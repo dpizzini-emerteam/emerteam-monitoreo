@@ -7,7 +7,7 @@ import { Accesos } from "../componentes/Accesos";
 import { Introduccion } from "../componentes/Introduccion";
 import { Resumen } from "../componentes/Resumen";
 import {
-  diaLocal, fmtDia, fmtFechaHora, fmtHora, num, supabase,
+  ordenarAlertas, tituloAlerta, diaLocal, fmtDia, fmtFechaHora, fmtHora, num, supabase,
   type AlertaSMN, type Evento, type Nivel, type Pronostico,
 } from "../datos";
 import { estiloNivel, estiloVariable, estiloWA, NOMBRE_CORTO, NOMBRE_FASE, NOMBRE_VARIABLE, NOMBRE_WA, REGLAS, TIPO_FUENTE, nombreNivel, recomendacion } from "../reglas";
@@ -87,7 +87,7 @@ export function EventoVista() {
     setEv(e.data as Evento);
     setPron((p.data as Pronostico[]) ?? []);
     setNiveles((n.data as Nivel[]) ?? []);
-    setAlertas(((a.data as AlertaSMN[]) ?? []).filter((x) => !x.hasta || new Date(x.hasta) > new Date()));
+    setAlertas(ordenarAlertas(((a.data as AlertaSMN[]) ?? []).filter((x) => !x.hasta || new Date(x.hasta) > new Date())));
   }, [id]);
 
   useEffect(() => {
@@ -172,13 +172,17 @@ export function EventoVista() {
         </div>
       )}
 
-      {alertas.map((a) => (
-        <section key={a.id} id="alerta-smn" role="alert" className="alerta" style={{ background: COLOR_SMN[a.color], scrollMarginTop: 130 }}>
+      {alertas.map((a, i) => (
+        <section key={a.id} id={i === 0 ? "alerta-smn" : undefined} role="alert" className="alerta" style={{ background: COLOR_SMN[a.color], scrollMarginTop: 130 }}>
           <div className="contenedor" style={{ display: "flex", flexWrap: "wrap", gap: "14px 24px", alignItems: "center", padding: "16px 24px" }}>
             <div className="icono-pulso"><Icono tipo={iconoAlerta(a.fenomeno)} size={52} /></div>
             <div style={{ flex: "1 1 300px" }}>
-              <div className="condensada" style={{ fontSize: 24, fontWeight: 800, textTransform: "uppercase" }}>Alerta {a.color} SMN · {a.fenomeno}</div>
-              <div style={{ fontSize: 14 }}>{a.zona ?? ""} {a.desde && `· ${fmtFechaHora(a.desde)}`} {a.hasta && `→ ${fmtFechaHora(a.hasta)}`}</div>
+              <div className="condensada" style={{ fontSize: 24, fontWeight: 800, textTransform: "uppercase" }}>{tituloAlerta(a)}</div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>
+                Vigencia {a.desde ? fmtFechaHora(a.desde) : "desde ahora"} → {a.hasta ? fmtFechaHora(a.hasta) : "sin fin informado"}
+                {" · "}<a href="https://www.smn.gob.ar/alertas" target="_blank" rel="noreferrer" style={{ color: "#111" }}>Ver en el SMN</a>
+              </div>
+              {a.zona && <div style={{ fontSize: 13, opacity: 0.85 }} title={a.zona}>{a.zona.length > 140 ? a.zona.slice(0, 140) + "…" : a.zona}</div>}
             </div>
             <button className="boton negro" onClick={() => (sonido.habilitado ? sonido.setActivo(!sonido.activo) : sonido.setHabilitado(true))}>
               {sonido.habilitado && sonido.activo ? "Silenciar alerta" : "Activar sonido"}
