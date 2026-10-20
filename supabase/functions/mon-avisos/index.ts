@@ -8,7 +8,8 @@
 // el estado no avanza y los cambios quedan pendientes para la próxima corrida.
 
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+// nodemailer codifica bien asuntos largos con acentos (denomailer los partía y el correo llegaba como texto crudo)
+import nodemailer from "npm:nodemailer@6.9.16";
 
 const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
   auth: { persistSession: false },
@@ -195,8 +196,23 @@ Deno.serve(async (req) => {
     supabase.from("mon_admins").select("email").eq("rol", "editor"),
     supabase.rpc("mon_credencial_smtp"),
   ]);
-  const estadoDe = new Map((estados ?? []).map((e) => [e.clave as string, JSON.parse(String(e.valor)) as Estado]));
   const smtp = cred as { usuario: string | null; clave: string | null; remitente: string } | null;
+  // Envío de prueba: un correo de muestra (con acentos y asunto largo) solo a los editores de EMERTEAM, sin tocar el estado
+  if (new URL(req.url).searchParams.get("envio_prueba") === "1") {
+    if (!smtp?.usuario || !smtp?.clave) return json({ ok: false, error: "sin credencial" });
+    const ev = eventos[0];
+    const muestra: Cambio[] = [{ tipo: "sube", fase: "desarme", variable: "calor_personal", antes: 0, ahora: 2, desde: new Date(ahora + 86400_000).toISOString(), confianza: "media" }];
+    const correo = armarCorreo(ev, muestra);
+    const t = nodemailer.createTransport({ host: "smtp.gmail.com", port: 465, secure: true, auth: { user: smtp.usuario, pass: smtp.clave } });
+    const envios: Record<string, string> = {};
+    for (const d of (equipo ?? []).map((e) => String(e.email).trim().toLowerCase())) {
+      try { await t.sendMail({ from: { name: "EMERTEAM Monitoreo", address: smtp.remitente }, to: d, subject: `PRUEBA · ${correo.asunto}`, text: correo.texto, html: correo.html }); envios[d] = "enviado"; }
+      catch (e) { envios[d] = String(e).slice(0, 300); }
+    }
+    t.close();
+    return json({ ok: true, envio_prueba: envios });
+  }
+  const estadoDe = new Map((estados ?? []).map((e) => [e.clave as string, JSON.parse(String(e.valor)) as Estado]));
   const puedeEnviar = !!(smtp?.usuario && smtp?.clave);
 
   const resultado: Record<string, unknown>[] = [];
@@ -257,16 +273,16 @@ Deno.serve(async (req) => {
         ...((equipo ?? []).map((e) => e.email as string))].map((e) => e.trim().toLowerCase()).filter(Boolean))];
       const correo = armarCorreo(ev, cambios);
       const registros: Record<string, unknown>[] = [];
-      let cliente: SMTPClient | null = null;
+      let cliente: ReturnType<typeof nodemailer.createTransport> | null = null;
       if (puedeEnviar) {
-        cliente = new SMTPClient({ connection: { hostname: "smtp.gmail.com", port: 465, tls: true, auth: { username: smtp!.usuario!, password: smtp!.clave! } } });
+        cliente = nodemailer.createTransport({ host: "smtp.gmail.com", port: 465, secure: true, pool: true, maxConnections: 1, auth: { user: smtp!.usuario!, pass: smtp!.clave! } });
       }
       for (const d of destinatarios) {
         let estado = "sin_credencial";
         let error: string | null = null;
         if (cliente) {
           try {
-            await cliente.send({ from: `EMERTEAM Monitoreo <${smtp!.remitente}>`, to: d, subject: correo.asunto, content: correo.texto, html: correo.html });
+            await cliente.sendMail({ from: { name: "EMERTEAM Monitoreo", address: smtp!.remitente }, to: d, subject: correo.asunto, text: correo.texto, html: correo.html });
             estado = "enviado";
             enviados++;
           } catch (e) {
@@ -276,7 +292,7 @@ Deno.serve(async (req) => {
         }
         registros.push({ evento_id: ev.id, tipo: cambios.map((c) => c.tipo).join(","), destinatario: d, asunto: correo.asunto, estado, error, detalle: { cambios } });
       }
-      if (cliente) { try { await cliente.close(); } catch { /* conexión ya cerrada */ } }
+      if (cliente) { try { cliente.close(); } catch { /* conexión ya cerrada */ } }
       if (cliente && destinatarios.length && enviados === 0) avanzar = false; // fallaron todos: se reintenta en la próxima corrida
       if (registros.length) {
         const { error: eReg } = await supabase.from("mon_envios").insert(registros);

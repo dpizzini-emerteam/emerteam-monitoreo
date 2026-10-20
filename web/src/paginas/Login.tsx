@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "../datos";
 import { Pie } from "../componentes/Pie";
 import { BotonTema } from "../componentes/BotonTema";
@@ -7,20 +7,29 @@ export function Login() {
   const [email, setEmail] = useState("");
   const [estado, setEstado] = useState<"" | "enviando" | "enviado" | "error">("");
   const [error, setError] = useState("");
+  const [espera, setEspera] = useState(() => restante());
   const redirect = window.location.origin + window.location.pathname;
+
+  // Cuenta regresiva entre pedidos: evita que los toques repetidos agoten el cupo de correos
+  useEffect(() => {
+    if (espera <= 0) return;
+    const t = setTimeout(() => setEspera(restante()), 1000);
+    return () => clearTimeout(t);
+  }, [espera]);
 
   async function enlace(e: React.FormEvent) {
     e.preventDefault();
+    if (restante() > 0) return;
     setEstado("enviando");
+    marcarPedido();
+    setEspera(restante());
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim().toLowerCase(),
       // Cualquier correo puede pedir el enlace; lo que ve cada uno lo define RLS (mon_accesos / organizador).
       options: { emailRedirectTo: redirect },
     });
     if (error) {
-      setError(/signup|not allowed|not found/i.test(error.message)
-        ? "Ese correo no tiene acceso habilitado. Pedile acceso a EMERTEAM."
-        : error.message);
+      setError(mensajeError(error.message, (error as { code?: string }).code));
       setEstado("error");
     } else setEstado("enviado");
   }
@@ -42,17 +51,24 @@ export function Login() {
           <h1 style={{ margin: "0 0 6px", fontSize: 30, fontWeight: 800, textTransform: "uppercase" }}>Ingresar</h1>
           <p className="chico" style={{ marginTop: 0 }}>Sin contraseña: te enviamos un enlace de ingreso a tu correo.</p>
           {estado === "enviado" ? (
-            <p>
-              Te enviamos un enlace a <b>{email}</b>. Abrilo desde este dispositivo para ingresar.
-            </p>
+            <>
+              <p>
+                Te enviamos un enlace a <b>{email}</b>. Abrilo desde este dispositivo para ingresar. Puede tardar unos minutos;
+                revisá también la carpeta de correo no deseado.
+              </p>
+              <button className="boton" style={{ justifyContent: "center", width: "100%" }} disabled={espera > 0}
+                onClick={() => { setEstado(""); setError(""); }}>
+                {espera > 0 ? `Podés pedir otro enlace en ${espera} s` : "No me llegó: pedir otro enlace"}
+              </button>
+            </>
           ) : (
             <form onSubmit={enlace} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <label>
                 Correo electrónico
                 <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
               </label>
-              <button className="boton primario" style={{ justifyContent: "center" }} disabled={estado === "enviando"}>
-                {estado === "enviando" ? "Enviando…" : "Enviarme el enlace"}
+              <button className="boton primario" style={{ justifyContent: "center" }} disabled={estado === "enviando" || espera > 0}>
+                {estado === "enviando" ? "Enviando…" : espera > 0 ? `Esperá ${espera} s para pedir otro enlace` : "Enviarme el enlace"}
               </button>
               {estado === "error" && <p style={{ color: "var(--rojo)", margin: 0 }}>{error}</p>}
             </form>
@@ -62,4 +78,30 @@ export function Login() {
       <Pie />
     </>
   );
+}
+
+const CLAVE_PEDIDO = "mon_login_ultimo_pedido";
+const ESPERA_S = 60;
+let ultimoEnMemoria = 0;
+
+function marcarPedido() {
+  ultimoEnMemoria = Date.now();
+  try { localStorage.setItem(CLAVE_PEDIDO, String(ultimoEnMemoria)); } catch { /* sin almacenamiento: queda en memoria */ }
+}
+
+function restante(): number {
+  let ultimo = ultimoEnMemoria;
+  try { ultimo = Math.max(ultimo, Number(localStorage.getItem(CLAVE_PEDIDO) ?? 0)); } catch { /* idem */ }
+  return Math.max(0, Math.ceil((ultimo + ESPERA_S * 1000 - Date.now()) / 1000));
+}
+
+function mensajeError(mensaje: string, codigo?: string): string {
+  if (codigo === "over_email_send_rate_limit" || /email rate limit/i.test(mensaje))
+    return "Se alcanzó el límite de envíos de enlaces por hora. Esperá unos minutos y pedilo una sola vez; si ya pediste uno, revisá tu correo.";
+  if (codigo === "over_request_rate_limit" || /only request this after|rate limit/i.test(mensaje))
+    return "Pediste un enlace hace muy poco. Esperá un minuto antes de pedir otro.";
+  if (/signup|not allowed|not found/i.test(mensaje)) return "Ese correo no tiene acceso habilitado. Pedile acceso a EMERTEAM.";
+  if (/invalid.*email|email.*invalid/i.test(mensaje)) return "El correo no es válido. Revisalo y probá de nuevo.";
+  if (/fetch|network/i.test(mensaje)) return "No hay conexión. Revisá internet y probá de nuevo.";
+  return "No se pudo enviar el enlace. Probá de nuevo en unos minutos.";
 }
