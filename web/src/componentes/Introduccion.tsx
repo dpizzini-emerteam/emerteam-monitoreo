@@ -51,13 +51,13 @@ export function Introduccion() {
           oficiales del Servicio Meteorológico Nacional para el lugar y la fecha de tu evento. No hace falta actualizar la página.
         </p>
         <p>
-          Se evalúan tres momentos: el <b>armado</b>, el <b>día de carrera</b> (corredores y jornada del personal) y el <b>desarme</b>.
+          Se evalúan tres momentos: el armado, el día de carrera (corredores y jornada del personal) y el desarme.
           El calor, el viento sobre las estructuras, la tormenta eléctrica y la lluvia se comparan con umbrales de normas y guías
           internacionales, y cada caso se traduce en un nivel y una recomendación concreta, con su fuente.
         </p>
         <p>
-          Cuanto más lejos está la fecha, más incierto es el pronóstico: esos casos se marcan como <b>tendencia</b>. Si el SMN emite una
-          alerta, aparece arriba de todo y suena un aviso. <b>EMERTEAM recomienda; la decisión final es del organizador.</b>
+          Cuanto más lejos está la fecha, más incierto es el pronóstico: esos casos se marcan como tendencia. Si el SMN emite una
+          alerta, aparece arriba de todo y suena un aviso. EMERTEAM recomienda; la decisión final es del organizador.
         </p>
       </div>
       <div className="intro-niveles" role="list" aria-label="Niveles">

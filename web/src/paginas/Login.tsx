@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { supabase } from "../datos";
 import { Pie } from "../componentes/Pie";
+import { BotonTema } from "../componentes/BotonTema";
 
 export function Login() {
   const [email, setEmail] = useState("");
@@ -33,6 +34,7 @@ export function Login() {
             <b>Monitoreo ambiental</b>
             <span>Carrera · Armado · Desarme</span>
           </div>
+          <BotonTema />
         </div>
       </header>
       <main className="contenedor" style={{ paddingTop: 48, paddingBottom: 48 }}>

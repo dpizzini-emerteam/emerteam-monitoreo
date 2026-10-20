@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../datos";
+import { BotonTema } from "./BotonTema";
 
 export function Barra({ titulo, subtitulo, children }: { titulo: string; subtitulo?: string; children?: ReactNode }) {
   return (
@@ -17,6 +18,7 @@ export function Barra({ titulo, subtitulo, children }: { titulo: string; subtitu
         </div>
         <nav aria-label="Acciones">
           {children}
+          <BotonTema />
           <button className="boton-osc" onClick={() => supabase.auth.signOut()}>
             Salir
           </button>

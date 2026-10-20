@@ -50,7 +50,7 @@ export function Accesos({ eventoId, puedeGestionar, miEmail }: { eventoId: strin
         <div className="desplaza">
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
             <thead>
-              <tr style={{ textAlign: "left", borderBottom: "2px solid #111" }}>
+              <tr style={{ textAlign: "left", borderBottom: "2px solid var(--texto)" }}>
                 <th style={{ padding: "6px 8px" }}>Apellido y nombre</th>
                 <th style={{ padding: "6px 8px" }}>Correo</th>
                 <th style={{ padding: "6px 8px" }}>Rol</th>

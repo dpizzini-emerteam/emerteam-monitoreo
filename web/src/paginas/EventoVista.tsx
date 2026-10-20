@@ -134,7 +134,7 @@ export function EventoVista() {
       </Barra>
 
       {!sonido.habilitado && !descarteSonido && (
-        <div style={{ background: "#fff", borderBottom: "1px solid var(--borde)" }}>
+        <div style={{ background: "var(--superficie)", borderBottom: "1px solid var(--borde)" }}>
           <div className="contenedor" style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between", padding: "12px 24px" }}>
             <span><b>Activá el sonido de alertas</b> para escuchar un aviso cuando llegue una alerta del SMN.</span>
             <span style={{ display: "flex", gap: 8 }}>
@@ -217,7 +217,7 @@ function Indicadores({ vigentes, ultimaCorrida, procesado }: { vigentes: Nivel[]
         <div className="chico" style={{ marginTop: 8, lineHeight: 1.6 }}>
           {ultimaCorrida.length ? ultimaCorrida.map((c) => <div key={c}>Corrida {fmtFechaHora(c)}</div>) : "Esperando la primera corrida"}
           {procesado && <div>Procesado {fmtFechaHora(procesado)}</div>}
-          <div style={{ color: "#1F6B33" }}>● Se actualiza sola</div>
+          <div style={{ color: "var(--ok-texto)" }}>● Se actualiza sola</div>
         </div>
       </div>
     </section>
@@ -257,7 +257,7 @@ function Dias({ ev, serie, niveles, armado, desarme, largada }: {
           const media = ps[Math.floor(ps.length / 2)];
           const peor = ps.reduce((a, p) => ((p.precip ?? 0) > (a.precip ?? 0) ? p : a), media);
           return (
-            <article key={d} className="tarjeta" style={{ display: "flex", flexDirection: "column", gap: 8, ...(d === diaCarrera ? { border: "2px solid #111", boxShadow: "0 0 0 4px #FF6A1A" } : {}) }}>
+            <article key={d} className="tarjeta" style={{ display: "flex", flexDirection: "column", gap: 8, ...(d === diaCarrera ? { border: "2px solid var(--texto)", boxShadow: "0 0 0 4px #FF6A1A" } : {}) }}>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span className="condensada" style={{ fontSize: 20, fontWeight: 800, textTransform: "uppercase" }}>{fmtDia(ps[0].valido)}</span>
                 <span className="chico" style={{ fontWeight: 700 }}>{fase}</span>
@@ -266,7 +266,7 @@ function Dias({ ev, serie, niveles, armado, desarme, largada }: {
                 <Icono tipo={iconoTiempo(peor)} size={60} />
                 <div style={{ textAlign: "right", lineHeight: 1 }}>
                   <div className="condensada" style={{ fontSize: 32, fontWeight: 800 }}>{num(Math.max(...t))}°</div>
-                  <div className="condensada" style={{ fontSize: 22, color: "#6A6A6A" }}>{num(Math.min(...t))}°</div>
+                  <div className="condensada" style={{ fontSize: 22, color: "var(--texto3)" }}>{num(Math.min(...t))}°</div>
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600 }}><Icono tipo="viento" size={20} />ráf. {num(raf)} km/h</div>
@@ -291,7 +291,7 @@ function DiaCarrera({ serie, v }: { serie: Map<number, Pronostico & { n: number 
     t < v.largada.getTime() ? "Convocatoria" : t <= v.inicioUltimoCuarto.getTime() ? "Carrera" : t <= v.finCarrera.getTime() + 3600_000 ? "Último cuarto" : "Desconcentración";
   const nivelWA = (w: number | null) => (w == null ? 0 : w >= 30 ? 4 : w >= 28 ? 3 : w >= 25 ? 2 : w >= 21 ? 1 : 0);
   return (
-    <section className="seccion" style={{ background: "#fff", border: "1px solid var(--borde)", borderRadius: 10 }}>
+    <section className="seccion" style={{ background: "var(--superficie)", border: "1px solid var(--borde)", borderRadius: 10 }}>
       <div className="banda" style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 8 }}>
         <h2>Día de carrera · {fmtDia(v.largada.toISOString())}</h2>
         <span className="chico" style={{ color: "#cfcfcf" }}>Duración estimada {Math.floor(v.duracionMin / 60)} h {Math.round(v.duracionMin % 60)} min · demora de largada {Math.round(v.demoraMin)} min</span>
@@ -312,9 +312,9 @@ function DiaCarrera({ serie, v }: { serie: Map<number, Pronostico & { n: number 
                 const n = nivelWA(p.wbgt_est);
                 const noche = (p.radiacion ?? 0) < 5;
                 return (
-                  <div key={t} style={{ borderRadius: 10, padding: "12px 8px", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, textAlign: "center", background: uc(t) ? "#FFF4EC" : "#F4F3F1", border: `2px solid ${uc(t) ? "#FF6A1A" : "transparent"}` }}>
+                  <div key={t} style={{ borderRadius: 10, padding: "12px 8px", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, textAlign: "center", background: uc(t) ? "var(--uc-fondo)" : "var(--superficie2)", border: `2px solid ${uc(t) ? "#FF6A1A" : "transparent"}` }}>
                     <b className="condensada" style={{ fontSize: 22 }}>{fmtHora(p.valido)}</b>
-                    <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "#4A4A4A" }}>{fase(t)}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--texto2)" }}>{fase(t)}</span>
                     <Icono tipo={iconoTiempo(p, noche)} size={48} />
                     <b className="condensada" style={{ fontSize: 24 }}>{num(p.t2m)}°</b>
                     <span style={{ alignSelf: "stretch", ...estiloNivel(n), fontWeight: 700, fontSize: 14, padding: "4px 6px", borderRadius: 4 }}>WBGT {num(p.wbgt_est, 1)}°</span>
@@ -362,7 +362,7 @@ function Recomendaciones({ vigentes }: { vigentes: Nivel[] }) {
             <article key={`${n.fase}${n.variable}${n.nivel}`} className="tarjeta" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
                 <span className="badge" style={{ ...estiloNivel(n.nivel) }}>{nombreNivel(n.variable, n.nivel)}</span>
-                <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", border: "1px solid #111", padding: "2px 7px", borderRadius: 4 }}>{NOMBRE_FASE[n.fase]}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", border: "1px solid var(--texto)", padding: "2px 7px", borderRadius: 4 }}>{NOMBRE_FASE[n.fase]}</span>
                 {n.confianza && <span className="chico">confianza {n.confianza}</span>}
               </div>
               <h3 style={{ margin: 0, fontFamily: "Barlow", fontSize: 18 }}>{NOMBRE_VARIABLE[n.variable] ?? n.variable}</h3>

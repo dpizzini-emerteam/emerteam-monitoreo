@@ -4,7 +4,7 @@ export type TipoIcono =
 
 export function Icono({ tipo, size = 40 }: { tipo: TipoIcono; size?: number }) {
   return (
-    <svg viewBox="0 0 64 64" width={size} height={size} aria-hidden="true" style={{ flex: "0 0 auto" }}>
+    <svg viewBox="0 0 64 64" width={size} height={size} aria-hidden="true" style={{ flex: "0 0 auto", color: "var(--tinta)" }}>
       {tipo === "sol" && (
         <>
           <g stroke="#F5B400" strokeWidth="4" strokeLinecap="round">
@@ -34,7 +34,7 @@ export function Icono({ tipo, size = 40 }: { tipo: TipoIcono; size?: number }) {
       {tipo === "tormenta" && (
         <>
           <path d="M18 38h28a11 11 0 0 0 1-22 15 15 0 0 0-29-4 13 13 0 0 0 0 26z" fill="#5F656E" />
-          <path d="M34 34l-10 15h8l-4 12 13-17h-8l5-10z" fill="#FFC20E" stroke="#111111" strokeWidth="1.5" strokeLinejoin="round" />
+          <path d="M34 34l-10 15h8l-4 12 13-17h-8l5-10z" fill="#FFC20E" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
           <g stroke="#2F80ED" strokeWidth="3.5" strokeLinecap="round">
             <path d="M18 45l-2 6M50 45l-2 6" />
           </g>
@@ -47,9 +47,9 @@ export function Icono({ tipo, size = 40 }: { tipo: TipoIcono; size?: number }) {
       )}
       {tipo === "termometro" && (
         <>
-          <rect x="26" y="6" width="12" height="38" rx="6" fill="#FFFFFF" stroke="#111111" strokeWidth="3" />
+          <rect x="26" y="6" width="12" height="38" rx="6" fill="#FFFFFF" stroke="currentColor" strokeWidth="3" />
           <rect x="30" y="20" width="4" height="26" fill="#FF3B30" />
-          <circle cx="32" cy="48" r="10" fill="#FF3B30" stroke="#111111" strokeWidth="3" />
+          <circle cx="32" cy="48" r="10" fill="#FF3B30" stroke="currentColor" strokeWidth="3" />
         </>
       )}
       {tipo === "gota" && (
@@ -58,11 +58,11 @@ export function Icono({ tipo, size = 40 }: { tipo: TipoIcono; size?: number }) {
           <path d="M25 40a7 7 0 0 0 7 7" fill="none" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" />
         </>
       )}
-      {tipo === "rayo" && <path d="M38 4L14 36h14l-6 24 28-34H35l7-22z" fill="#FFC20E" stroke="#111111" strokeWidth="2.5" strokeLinejoin="round" />}
+      {tipo === "rayo" && <path d="M38 4L14 36h14l-6 24 28-34H35l7-22z" fill="#FFC20E" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" />}
       {tipo === "luna" && <path d="M40 10a22 22 0 1 0 14 34A18 18 0 1 1 40 10z" fill="#9AA0A8" />}
       {tipo === "estructura" && (
         <>
-          <g fill="none" stroke="#111111" strokeWidth="4" strokeLinejoin="round" strokeLinecap="round">
+          <g fill="none" stroke="currentColor" strokeWidth="4" strokeLinejoin="round" strokeLinecap="round">
             <path d="M10 58V14h44v44M10 24h44M10 14l10 10 10-10 10 10 10-10" />
           </g>
           <rect x="18" y="30" width="28" height="10" rx="2" fill="#FF6A1A" />
@@ -70,8 +70,8 @@ export function Icono({ tipo, size = 40 }: { tipo: TipoIcono; size?: number }) {
       )}
       {tipo === "corredor" && (
         <>
-          <circle cx="38" cy="10" r="6" fill="#111111" />
-          <g fill="none" stroke="#111111" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="38" cy="10" r="6" fill="currentColor" />
+          <g fill="none" stroke="currentColor" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M22 26l10-6 10 6 6 10M32 20l-4 18 10 8 2 14M28 38l-8 10-10 2" />
           </g>
         </>
