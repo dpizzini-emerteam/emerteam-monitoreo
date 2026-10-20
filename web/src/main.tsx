@@ -9,6 +9,7 @@ import { Eventos } from "./paginas/Eventos";
 import { EventoVista } from "./paginas/EventoVista";
 import { Equipo } from "./paginas/Equipo";
 import { Comando } from "./paginas/Comando";
+import { Informe } from "./paginas/Informe";
 import { Pie } from "./componentes/Pie";
 
 // El formulario carga el mapa: se descarga solo cuando se usa
@@ -61,6 +62,7 @@ const router = createHashRouter([
       { path: "evento/nuevo", element: <EventoForm /> },
       { path: "evento/:id/editar", element: <EventoForm /> },
       { path: "evento/:id/comando", element: <Comando /> },
+      { path: "evento/:id/informe", element: <Informe /> },
       { path: "evento/:id/:pestana?", element: <EventoVista /> },
       { path: "equipo", element: <Equipo /> },
       { path: "*", element: <Navigate to="/" replace /> },

@@ -231,3 +231,50 @@ a.resumen-fase:hover .resumen-ver { color: var(--naranja); }
   .cmd-alerta { font-size: 16px; }
   .cmd-badge { font-size: 14px; white-space: normal; }
 }
+
+textarea { font: inherit; font-size: 15px; padding: 10px; border: 1px solid var(--borde-input); border-radius: 6px; background: var(--superficie); color: var(--texto); resize: vertical; }
+
+/* Informe post-evento: identidad de documentos EMERTEAM (siempre en papel claro) */
+.inf-doc { --d-negro: #111111; --d-naranja: #FF6A1A; --d-gris: #7C7C7C; background: #fff; color: #111; max-width: 900px; margin: 0 auto 40px; border: 1px solid #e2e0dc; font-family: "Barlow", Arial, sans-serif; }
+.inf-cab { background: var(--d-negro); color: #fff; display: flex; align-items: center; gap: 22px; padding: 22px 28px; border-bottom: 5px solid var(--d-naranja); }
+.inf-cab img { height: 52px; }
+.inf-cab h1 { margin: 0; font-family: "Barlow Condensed"; font-weight: 800; font-size: 30px; text-transform: uppercase; letter-spacing: 0.02em; }
+.inf-cab p { margin: 2px 0 0; color: var(--d-naranja); font-weight: 600; font-size: 15px; }
+.inf-datos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 24px; padding: 18px 28px 6px; font-size: 14px; }
+.inf-datos span { display: block; font-family: "Barlow Condensed"; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--d-gris); font-weight: 700; }
+.inf-banda { margin: 22px 0 10px; background: var(--d-negro); color: #fff; font-family: "Barlow Condensed"; font-weight: 800; font-size: 17px; letter-spacing: 0.06em; text-transform: uppercase; padding: 7px 28px; border-left: 8px solid var(--d-naranja); }
+.inf-sub { margin: 16px 28px 8px; font-family: "Barlow Condensed"; font-weight: 800; font-size: 16px; text-transform: uppercase; letter-spacing: 0.04em; }
+.inf-recuadro { margin: 0 28px; border-left: 4px solid var(--d-naranja); background: #f7f6f4; padding: 10px 16px; }
+.inf-recuadro p { margin: 6px 0; line-height: 1.5; font-size: 14.5px; }
+.inf-notas { border-left-color: var(--d-negro); margin-top: 12px; }
+.inf-chico p { font-size: 12.5px; color: #333; }
+.inf-texto { margin: 0 28px; font-size: 14px; }
+.inf-tabla { width: calc(100% - 56px); margin: 0 28px; border-collapse: collapse; font-size: 13.5px; }
+.inf-tabla th, .inf-tabla td { border-top: none; padding: 7px 10px; border-bottom: 1px solid #e2e0dc; text-align: left; vertical-align: top; background: none; }
+.inf-tabla thead th { border-bottom: 2px solid var(--d-negro); font-family: "Barlow Condensed"; font-size: 12.5px; letter-spacing: 0.08em; text-transform: uppercase; }
+.inf-tabla tbody th { width: 34%; font-weight: 600; color: #333; }
+.inf-nivel { display: inline-block; font-family: "Barlow Condensed"; font-weight: 800; text-transform: uppercase; font-size: 13px; padding: 2px 8px; border-radius: 3px; }
+.inf-fase { break-inside: avoid; }
+.inf-pie { margin-top: 26px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 20px; border-top: 3px solid var(--d-naranja); background: var(--d-negro); color: #cfcfcf; font-size: 12px; padding: 10px 28px; }
+@media (max-width: 600px) { .inf-datos { grid-template-columns: 1fr; } .inf-cab { flex-direction: column; align-items: flex-start; } }
+@media print {
+  @page { size: A4; margin: 12mm 0 12mm 0; }
+  @page :first { margin-top: 0; }
+  body { background: #fff !important; }
+  .no-imprimir, .pie, .barra { display: none !important; }
+  #root > main, main.contenedor { padding: 0 !important; max-width: none !important; }
+  .inf-doc { border: none; max-width: none; margin: 0; }
+  .inf-cab, .inf-banda, .inf-pie, .inf-nivel { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .inf-recuadro { -webkit-print-color-adjust: exact; print-color-adjust: exact; break-inside: avoid; }
+  .inf-banda, .inf-sub { break-after: avoid; page-break-after: avoid; }
+  .inf-tabla tr { break-inside: avoid; }
+  .inf-final { break-inside: avoid; page-break-inside: avoid; }
+}
+@media (max-width: 600px) {
+  .inf-doc { overflow-x: auto; }
+  .inf-tabla { font-size: 12.5px; }
+  .inf-tabla tbody th { width: 40%; }
+  .inf-banda, .inf-cab, .inf-datos, .inf-pie { padding-left: 16px; padding-right: 16px; }
+  .inf-sub, .inf-recuadro, .inf-texto { margin-left: 16px; margin-right: 16px; }
+  .inf-tabla { margin: 0 16px; width: calc(100% - 32px); }
+}

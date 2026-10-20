@@ -129,7 +129,8 @@ Deno.serve(async (req) => {
     if (error) return json({ error: error.message }, 500);
   }
   await supabase.from("mon_estado").upsert({ clave: CLAVE_ESTADO, valor: claves[claves.length - 1], actualizado_en: new Date().toISOString() });
-  await supabase.from("mon_rayos").delete().lt("ocurrido_en", new Date(ahora - 3 * 86400_000).toISOString());
+  // Se conservan 30 días para el informe post-evento
+  await supabase.from("mon_rayos").delete().lt("ocurrido_en", new Date(ahora - 30 * 86400_000).toISOString());
 
   return json({ ok: true, activos: activos.length, archivos: procesados, rayos_cercanos: filas.length, ultimo: claves[claves.length - 1] });
 });

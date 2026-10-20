@@ -48,24 +48,27 @@ export function EventoVista() {
   const [niveles, setNiveles] = useState<Nivel[]>([]);
   const [alertas, setAlertas] = useState<AlertaSMN[]>([]);
   const [rayos, setRayos] = useState<Rayo[]>([]);
+  const [informeAprobado, setInformeAprobado] = useState(false);
   const [error, setError] = useState("");
   const [descarteSonido, setDescarteSonido] = useState(false);
   const sonido = useSonido();
 
   const cargar = useCallback(async () => {
     if (!id) return;
-    const [e, p, n, a, r] = await Promise.all([
+    const [e, p, n, a, r, inf] = await Promise.all([
       supabase.from("mon_eventos").select("*, mon_modalidades(*)").eq("id", id).single(),
       supabase.from("mon_pronosticos").select("*").eq("evento_id", id).order("valido").limit(5000),
       supabase.from("mon_niveles").select("*").eq("evento_id", id).order("desde").limit(5000),
       supabase.from("mon_alertas_smn").select("*").eq("evento_id", id).neq("estado", "levantada"),
       supabase.from("mon_rayos").select("*").eq("evento_id", id).gte("ocurrido_en", new Date(Date.now() - 60 * 60_000).toISOString()).limit(2000),
+      supabase.from("mon_informes").select("estado").eq("evento_id", id).maybeSingle(),
     ]);
     if (e.error) return setError("No tenés acceso a este evento o no existe.");
     setEv(e.data as Evento);
     setPron((p.data as Pronostico[]) ?? []);
     setNiveles((n.data as Nivel[]) ?? []);
     setRayos((r.data as Rayo[]) ?? []);
+    setInformeAprobado(inf.data?.estado === "aprobado");
     setAlertas(ordenarAlertas(((a.data as AlertaSMN[]) ?? []).filter((x) => !x.hasta || new Date(x.hasta) > new Date())));
   }, [id]);
 
@@ -139,6 +142,7 @@ export function EventoVista() {
       <Barra titulo={ev.nombre} subtitulo={`${fmtFechaHora(ev.largada)} · ${cuenta}`} abajo={pestanas}>
         {alertas.length > 0 && <a href="#alerta-smn" className="boton-osc alerta" style={{ background: COLOR_SMN[alertas[0].color], color: "#111", borderColor: "#fff", fontWeight: 800 }}>Alerta SMN</a>}
         {admin && <Link className="boton-osc" to={`/evento/${ev.id}/comando`}>Comando</Link>}
+        {(admin || informeAprobado) && <Link className="boton-osc" to={`/evento/${ev.id}/informe`}>Informe</Link>}
         {editor && <Link className="boton-osc" to={`/evento/${ev.id}/editar`}>Editar</Link>}
         <Link className="boton-osc" to="/">Eventos</Link>
       </Barra>

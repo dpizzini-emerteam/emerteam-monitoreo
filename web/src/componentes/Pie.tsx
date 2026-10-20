@@ -1,6 +1,6 @@
 export function Pie() {
   return (
-    <footer className="pie">
+    <footer className="pie no-imprimir">
       <div className="contenedor">
         <div className="firma">
           <img src="/logo-emerteam.png" alt="EMERTEAM · Sports Risks & Emergency Management" />
