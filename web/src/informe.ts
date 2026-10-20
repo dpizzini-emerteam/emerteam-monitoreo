@@ -124,7 +124,7 @@ export function armarInforme(ev: Evento, pron: Pronostico[], hist: FilaHistorial
       rayosTerreno: {
         nivelMax: peorRayo ? nivelRayoMedido(peorRayo) ?? 0 : 0,
         detalle: peorRayo
-          ? `${peorRayo.trueno ? "trueno audible" : peorRayo.rayo_rango ? `detector: ${peorRayo.rayo_rango} km` : ""}${peorRayo.relampago_trueno_s != null ? ` · relámpago-trueno ≈ ${(kmPorTrueno(peorRayo.relampago_trueno_s) ?? 0).toFixed(1)} km` : ""} (${peorRayo.sector})`
+          ? `${peorRayo.trueno ? "trueno audible" : peorRayo.rayo_km != null ? `detector: ${Math.round(Number(peorRayo.rayo_km))} km` : peorRayo.rayo_rango ? `detector: ${peorRayo.rayo_rango} km` : ""}${peorRayo.relampago_trueno_s != null ? ` · relámpago-trueno ≈ ${(kmPorTrueno(peorRayo.relampago_trueno_s) ?? 0).toFixed(1)} km` : ""} (${peorRayo.sector})`
           : null,
       },
       recos: recosDe(hist, ["carrera"]),

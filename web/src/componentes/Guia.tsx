@@ -10,7 +10,7 @@ import {
 import { Icono, type TipoIcono } from "./Icono";
 
 const coma = (x: number, d = 0) => num(x, d);
-const SEG_POR_KM = 1000 / 343; // conteo relámpago-trueno: velocidad del sonido ≈ 343 m/s
+const KM_MI = 1 / 1.609344; // detector configurado en millas
 
 const SECCIONES: { id: string; titulo: string; icono: TipoIcono }[] = [
   { id: "g-leer", titulo: "Cómo leer la web", icono: "solnube" },
@@ -242,15 +242,19 @@ export function Guia({ ctx }: { ctx: Contexto }) {
         <EnEsteEvento ctx={ctx} variables={["tormenta"]} />
         <div className="desplaza">
           <table className="tabla guia-tabla">
-            <thead><tr><th>Actividad eléctrica a</th><th>Conteo relámpago-trueno</th><th>Nivel</th><th>Carrera</th><th>Armado y desarme</th></tr></thead>
+            <thead><tr><th>Detector (frente de tormenta)</th><th>Si está en millas</th><th>Nivel</th><th>Carrera</th><th>Armado y desarme</th></tr></thead>
             <tbody>
-              <tr><td><b>&lt; {r.alerta_km} km</b></td><td>&lt; {Math.round(r.alerta_km * SEG_POR_KM)} s</td><td><span className="badge" style={estiloNivel(2)}>Alerta</span></td><td>Avisar al equipo y a la organización; preparar la demora y los refugios.</td><td>Avisar al personal; preparar el descenso de trabajos en altura.</td></tr>
-              <tr><td><b>&lt; {r.demora_km} km</b></td><td>&lt; {Math.round(r.demora_km * SEG_POR_KM)} s</td><td><span className="badge" style={estiloNivel(3)}>Demora / preparación</span></td><td>Demorar la largada; preparar la evacuación del recorrido.</td><td>Bajar al personal de altura; asegurar estructuras.</td></tr>
-              <tr><td><b>&lt; {r.suspension_km} km o trueno audible</b></td><td>&lt; {Math.round(r.suspension_km * SEG_POR_KM)} s</td><td><span className="badge" style={estiloNivel(4)}>Suspensión</span></td><td>Suspender y evacuar a refugio.</td><td>Suspender el trabajo y evacuar a refugio.</td></tr>
+              <tr><td><b>{r.alerta_km} km o menos</b></td><td>{Math.round(r.alerta_km * KM_MI)} mi o menos</td><td><span className="badge" style={estiloNivel(2)}>Alerta</span></td><td>Avisar al equipo y a la organización; preparar la demora y los refugios.</td><td>Avisar al personal; preparar el descenso de trabajos en altura.</td></tr>
+              <tr><td><b>{r.demora_km} km o menos</b></td><td>{Math.round(r.demora_km * KM_MI)} mi o menos</td><td><span className="badge" style={estiloNivel(3)}>Demora / preparación</span></td><td>Demorar la largada; preparar la evacuación del recorrido.</td><td>Bajar al personal de altura; asegurar estructuras.</td></tr>
+              <tr><td><b>{r.suspension_km} km o menos, o trueno audible</b></td><td>{Math.round(r.suspension_km * KM_MI)} mi o menos</td><td><span className="badge" style={estiloNivel(4)}>Suspensión</span></td><td>Suspender y evacuar a refugio.</td><td>Suspender el trabajo y evacuar a refugio.</td></tr>
             </tbody>
           </table>
         </div>
-        <p><b>Reanudar</b> recién cuando pasan <b>{r.reanudar_min} minutos sin actividad</b> a menos de {r.suspension_km} km. Cada nuevo rayo cercano reinicia la cuenta.</p>
+        <p><b>Reanudar</b> recién cuando pasan <b>{r.reanudar_min} minutos sin actividad</b> a {r.suspension_km} km o menos. Cada nuevo rayo cercano reinicia la cuenta.</p>
+        <h3>Cómo usar el detector</h3>
+        <p>El detector portátil muestra la <b>distancia estimada al frente de la tormenta</b> (el borde más cercano), no la del rayo puntual, y el contador acumulado de rayos (COUNT). Con actividad, cargá una lectura cada 5 minutos en Mediciones: con dos o más lecturas la web calcula si la tormenta <b>se acerca o se aleja</b>, a qué velocidad, <b>cuántos minutos faltan</b> para los {r.demora_km} y los {r.suspension_km} km, y la hora a partir de la cual se puede reanudar. Decidí por la tendencia de varias lecturas, no por una sola, y cruzala con el satélite.</p>
+        <p>Cuando vuelve a «LISTENING» pasaron 30 minutos sin rayos a cualquier distancia (hasta 40 km): si eso ocurre, también se cumple la regla de reanudación. La regla puede cumplirse antes si siguen cayendo rayos lejos.</p>
+        <p><b>Respaldo sin detector:</b> contá los segundos entre el relámpago y el trueno y dividí por 3 para obtener los kilómetros. Sirve sobre todo para confirmar el último tramo: el trueno se oye hasta unos 15 km, menos con el ruido del evento, así que <b>si se oye trueno, se suspende</b> sin importar los segundos.</p>
         <div className="guia-dos">
           <div><h3>Refugios aptos</h3><p>Edificios cerrados con instalación eléctrica y cañerías; vehículos de techo metálico con ventanillas cerradas.</p></div>
           <div><h3>No son refugio</h3><p>Carpas, gazebos, pórticos, estructuras metálicas abiertas, baños químicos, árboles, paradas de colectivo.</p></div>
@@ -267,7 +271,7 @@ export function Guia({ ctx }: { ctx: Contexto }) {
         </div>
         <Fuente regla="emt_tormenta_cape" />
         <Tecnico>
-          <p>Detección: el satélite GOES-19 (sensor GLM) informa rayos cada pocos minutos en un radio de 50 km, con una precisión de ubicación del orden de 8 a 10 km y sin detectar todos los rayos. En terreno se suman el detector portátil y el conteo relámpago-trueno (segundos × 0,343 = km). <b>Manda la lectura más conservadora.</b></p>
+          <p>Detección: el satélite GOES-19 (sensor GLM) informa rayos cada pocos minutos en un radio de 50 km, con una precisión de ubicación del orden de 8 a 10 km y sin detectar todos los rayos. En terreno se suman el detector portátil (AcuRite: alcance de 1 a 40 km; el fabricante advierte que puede haber detecciones falsas y que no debe ser la única fuente de aviso) y el conteo relámpago-trueno (segundos × 0,343 = km). <b>Manda la lectura más conservadora.</b> La tendencia se calcula con una recta de mínimos cuadrados sobre las lecturas de los últimos 45 minutos.</p>
           <p>El pronóstico de tormenta indica que la atmósfera es favorable a tormentas, no dónde ni a qué hora va a caer un rayo. Sirve para preparar el protocolo, no para decidir la demora o la suspensión.</p>
         </Tecnico>
       </Seccion>

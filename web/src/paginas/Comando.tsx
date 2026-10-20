@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Icono, iconoTiempo } from "../componentes/Icono";
 import {
+  analizarDetector,
   COLOR_SMN, estadoRayosGLM, fmtFechaHora, fmtHora, kmPorTrueno, nivelRayoMedido, nivelWBGT, num, ordenarAlertas, supabase, tituloAlerta,
   type AlertaSMN, type Evento, type Medicion, type Nivel, type Pronostico, type Uv, type Rayo,
 } from "../datos";
@@ -66,6 +67,7 @@ export function Comando() {
   const serie = useMemo(() => consenso(pron, uv), [pron, uv]);
   if (!ev) return <div className="comando"><p style={{ padding: 40 }}>Cargando…</p></div>;
   const v = calcular(ev);
+  const det = analizarDetector(meds, ahora);
 
   // Fase y reloj de carrera
   const t = ahora;
@@ -161,7 +163,9 @@ export function Comando() {
           <span className="badge cmd-badge" style={estiloNivel(nR ?? tormentaPron)}>{nR != null ? fuenteR : "Pronóstico"}</span>
           <div className="cmd-nota">
             {glm.cantidad > 0 && <div>Satélite: {glm.cantidad} rayos en 30 min, el más cercano a {num(glm.km, 0)} km ({glm.ultimo ? fmtHora(glm.ultimo) : ""})</div>}
-            {medR && <div>Terreno: {medR.trueno ? "trueno audible" : RANGO[medR.rayo_rango ?? ""] ?? ""}{medR.relampago_trueno_s != null ? ` · ≈ ${num(kmPorTrueno(medR.relampago_trueno_s), 1)} km` : ""} · {fmtHora(medR.tomada_en)}</div>}
+            {medR && <div>Terreno: {medR.trueno ? "trueno audible" : medR.rayo_km != null ? `detector ${num(medR.rayo_km, 0)} km` : RANGO[medR.rayo_rango ?? ""] ?? ""}{medR.relampago_trueno_s != null ? ` · ≈ ${num(kmPorTrueno(medR.relampago_trueno_s), 1)} km` : ""} · {fmtHora(medR.tomada_en)}</div>}
+            {det.tendencia && det.tendencia !== "estable" && <div><b>{det.tendencia === "acerca" ? "Se acerca" : "Se aleja"}</b> a ≈ {num(Math.abs(det.velocidad ?? 0))} km/h{det.minutosA19 != null ? ` · 19 km en ≈ ${det.minutosA19} min` : ""}{det.minutosA13 != null ? ` · 13 km en ≈ ${det.minutosA13} min` : ""}</div>}
+            {det.reanudar && new Date(det.reanudar).getTime() > ahora && <div><b>Reanudar no antes de las {fmtHora(det.reanudar)}</b></div>}
             {!medR && glm.cantidad === 0 && "24 km alerta · 19 km demorar · 13 km o trueno: suspender"}
           </div>
         </div>

@@ -189,6 +189,7 @@ export type Medicion = {
   rayo_detector: string | null;
   rayo_rango: string | null;
   rayo_conteo: number | null;
+  rayo_km?: number | null;
   rayo_tendencia: string | null;
   trueno: boolean | null;
   relampago_trueno_s: number | null;
@@ -202,14 +203,68 @@ export const nivelWBGT = (w: number | null | undefined) => (w == null ? null : w
 export const kmPorTrueno = (s: number | null | undefined) => (s == null ? null : (s * 343) / 1000);
 
 /** Nivel de tormenta por medición en terreno, escalera NWS: 24 / 19 / 13 km; trueno audible = suspensión */
-export function nivelRayoMedido(m: Pick<Medicion, "trueno" | "rayo_rango" | "relampago_trueno_s">): number | null {
+export function nivelRayoMedido(m: Pick<Medicion, "trueno" | "rayo_rango" | "relampago_trueno_s"> & { rayo_km?: number | null }): number | null {
   if (m.trueno) return 4;
+  // Lectura del detector (distancia al frente de tormenta): el umbral incluye el valor exacto, por prudencia
+  if (m.rayo_km != null) {
+    const k = Number(m.rayo_km);
+    const desdeDetector = k <= 13 ? 4 : k <= 19 ? 3 : k <= 24 ? 2 : 1;
+    const km2 = kmPorTrueno(m.relampago_trueno_s);
+    return Math.max(desdeDetector, km2 == null ? 0 : km2 < 13 ? 4 : km2 < 19 ? 3 : km2 < 24 ? 2 : 1);
+  }
   const km = kmPorTrueno(m.relampago_trueno_s);
   const rango = m.rayo_rango;
   const desdeRango = rango === "<13" ? 4 : rango === "13-19" ? 3 : rango === "19-24" ? 2 : rango === ">24" ? 1 : rango === "sin" ? 0 : null;
   const desdeKm = km == null ? null : km < 13 ? 4 : km < 19 ? 3 : km < 24 ? 2 : 1;
   if (desdeRango == null && desdeKm == null) return null;
   return Math.max(desdeRango ?? 0, desdeKm ?? 0);
+}
+
+export type AnalisisDetector = {
+  ultima: Medicion | null;            // última lectura con distancia del detector
+  velocidad: number | null;           // km/h; positiva = se acerca
+  tendencia: "acerca" | "aleja" | "estable" | null;
+  minutosA19: number | null;          // minutos estimados hasta 19 km (si se acerca y está más lejos)
+  minutosA13: number | null;
+  rayosPorMin: number | null;         // según la diferencia del contador entre las dos últimas lecturas
+  ultimoCercano: string | null;       // última lectura que ubicó actividad a 13 km o menos (o trueno)
+  reanudar: string | null;            // ultimoCercano + 30 min
+};
+
+/**
+ * Tendencia de la tormenta con las lecturas del detector portátil de los últimos 45 min:
+ * recta de mínimos cuadrados distancia-tiempo (al menos 2 lecturas separadas 4 min o más).
+ */
+export function analizarDetector(meds: Medicion[], ahora = Date.now(), reanudarMin = 30): AnalisisDetector {
+  const conKm = meds.filter((m) => m.rayo_km != null).sort((a, b) => a.tomada_en.localeCompare(b.tomada_en));
+  const ultima = conKm.at(-1) ?? null;
+  const ventana = conKm.filter((m) => ahora - new Date(m.tomada_en).getTime() <= 45 * 60_000);
+  let velocidad: number | null = null;
+  if (ventana.length >= 2) {
+    const xs = ventana.map((m) => new Date(m.tomada_en).getTime() / 3600_000);
+    const ys = ventana.map((m) => Number(m.rayo_km));
+    if (xs.at(-1)! - xs[0] >= 4 / 60) {
+      const mx = xs.reduce((a, b) => a + b, 0) / xs.length, my = ys.reduce((a, b) => a + b, 0) / ys.length;
+      const den = xs.reduce((a, x) => a + (x - mx) ** 2, 0);
+      if (den > 0) velocidad = -xs.reduce((a, x, i) => a + (x - mx) * (ys[i] - my), 0) / den;
+    }
+  }
+  const tendencia = velocidad == null ? null : velocidad > 3 ? "acerca" : velocidad < -3 ? "aleja" : "estable";
+  const km = ultima ? Number(ultima.rayo_km) : null;
+  const minutosHasta = (umbral: number) =>
+    velocidad != null && velocidad > 3 && km != null && km > umbral ? Math.round(((km - umbral) / velocidad) * 60) : null;
+  let rayosPorMin: number | null = null;
+  const conConteo = meds.filter((m) => m.rayo_conteo != null).sort((a, b) => a.tomada_en.localeCompare(b.tomada_en));
+  if (conConteo.length >= 2) {
+    const [a, b] = conConteo.slice(-2);
+    const min = (new Date(b.tomada_en).getTime() - new Date(a.tomada_en).getTime()) / 60_000;
+    const d = Number(b.rayo_conteo) - Number(a.rayo_conteo);
+    if (min > 0 && d >= 0) rayosPorMin = Math.round((d / min) * 10) / 10; // si bajó, el detector se reinició
+  }
+  const cercanos = meds.filter((m) => (nivelRayoMedido(m) ?? 0) >= 4).map((m) => m.tomada_en).sort();
+  const ultimoCercano = cercanos.at(-1) ?? null;
+  const reanudar = ultimoCercano ? new Date(new Date(ultimoCercano).getTime() + reanudarMin * 60_000).toISOString() : null;
+  return { ultima, velocidad, tendencia, minutosA19: minutosHasta(19), minutosA13: minutosHasta(13), rayosPorMin, ultimoCercano, reanudar };
 }
 
 /** Colores de las alertas del SMN */
