@@ -109,7 +109,10 @@ export function Eventos() {
                           {cub?.has(f)
                             ? <span className="badge" style={m ? estiloVariable(m.variable, m.nivel) : estiloNivel(0)}>{m ? nombreNivel(m.variable, m.nivel) : "Bajo umbral"}</span>
                             : <span className="badge" style={ESTILO_SIN_DATOS}>{SIN_PRONOSTICO}</span>}
-                          {m && <div className="chico">{NOMBRE_CORTO[m.variable] ?? m.variable} · {fmtDia(m.desde)} {fmtHora(m.desde)}</div>}
+                          <div className="chico">
+                            {m ? `${NOMBRE_CORTO[m.variable] ?? m.variable} · ${fmtDia(m.desde)} ${fmtHora(m.desde)}`
+                              : cub?.has(f) ? "Ninguna variable supera su umbral" : "Fuera del alcance de los modelos"}
+                          </div>
                         </div>
                       );
                     })}
