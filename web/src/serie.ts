@@ -47,11 +47,11 @@ export function consenso(pron: Pronostico[], uv: Uv[] = []): Map<number, Pronost
 
 /** Categorías del índice UV: OMS (2002), Global Solar UV Index: A Practical Guide */
 export const UV_CATEGORIAS = [
-  { desde: 0, nombre: "Bajo", fondo: "#2FA34C", texto: "#111111" },
-  { desde: 3, nombre: "Moderado", fondo: "#C79000", texto: "#111111" },
-  { desde: 6, nombre: "Alto", fondo: "#FF6A1A", texto: "#111111" },
-  { desde: 8, nombre: "Muy alto", fondo: "#FF3B30", texto: "#111111" },
-  { desde: 11, nombre: "Extremo", fondo: "#6B3FA0", texto: "#FFFFFF" },
+  { desde: 0, nombre: "Bajo", fondo: "#2FA34C", texto: "#111111", oms: "#4EB400" },
+  { desde: 3, nombre: "Moderado", fondo: "#C79000", texto: "#111111", oms: "#F7E400" },
+  { desde: 6, nombre: "Alto", fondo: "#FF6A1A", texto: "#111111", oms: "#F85900" },
+  { desde: 8, nombre: "Muy alto", fondo: "#FF3B30", texto: "#111111", oms: "#D8001D" },
+  { desde: 11, nombre: "Extremo", fondo: "#6B3FA0", texto: "#FFFFFF", oms: "#6B49C8" },
 ];
 export function categoriaUv(uv: number) {
   const r = Math.round(uv);

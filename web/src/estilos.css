@@ -364,3 +364,37 @@ input, select, textarea, button { font-family: inherit; }
 
 .humedad { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .unidad { font-size: .5em; font-weight: 700; margin-left: 2px; vertical-align: super; }
+
+/* Tarjeta de pronóstico por día */
+.grilla.grilla-dias { grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); }
+.grilla .tarjeta.dia-tarjeta, .tarjeta.dia-tarjeta { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+@media (max-width: 600px) { .grilla.grilla-dias { grid-template-columns: 1fr; } }
+.dia-franja { height: 6px; }
+.dia-cab { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 14px 18px 0; }
+.dia-fecha { font-family: "Barlow Condensed", Arial, sans-serif; font-size: 22px; font-weight: 800; text-transform: uppercase; }
+.dia-cab .badge { font-size: 14px; }
+.dia-clima { display: flex; align-items: center; gap: 14px; padding: 8px 18px 14px; }
+.dia-temps { line-height: 1; }
+.dia-max { font-size: 40px; font-weight: 700; }
+.dia-max small, .dia-min small { font-size: 15px; font-weight: 600; color: var(--texto2); margin-left: 2px; vertical-align: top; position: relative; top: 4px; }
+.dia-min { font-size: 20px; color: var(--texto2); margin-top: 4px; }
+.dia-min b { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; margin-right: 4px; }
+.dia-cond { font-size: 14px; color: var(--texto2); margin-top: 6px; }
+.dia-datos { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--borde); border-bottom: 1px solid var(--borde); }
+.dia-dato { display: flex; gap: 10px; align-items: center; padding: 11px 16px; min-width: 0; }
+.dia-dato:nth-child(odd) { border-right: 1px solid var(--borde); }
+.dia-dato:nth-child(-n+2) { border-bottom: 1px solid var(--borde); }
+.dia-dato .v, .uv-dato .v { display: block; font-weight: 700; font-size: 19px; line-height: 1.05; white-space: nowrap; }
+.dia-dato .v small { font-size: 13px; color: var(--texto2); font-weight: 600; margin-left: 2px; }
+.dia-dato .e, .uv-dato .e { display: block; font-size: 12px; color: var(--texto2); text-transform: uppercase; letter-spacing: .05em; margin-top: 2px; }
+.dia-op { padding: 13px 18px 15px; display: flex; flex-direction: column; gap: 8px; margin-top: auto; }
+.dia-accion { border-left: 4px solid; padding-left: 10px; font-size: 14px; line-height: 1.4; display: flex; flex-direction: column; }
+.dia-op .franja-segura b { font-weight: 700; }
+.uv-dato { display: inline-flex; align-items: center; gap: 10px; }
+.uv-dato.compacto { gap: 5px; }
+.uv-dato.compacto .v { font-size: 15px; }
+.uv-escala { display: flex; gap: 2px; margin-top: 5px; }
+.uv-escala i { display: block; width: 12px; height: 5px; border-radius: 2px; background: var(--borde); }
+.uv-dato.compacto .uv-escala i { width: 7px; height: 4px; }
+.tira-dia { position: relative; overflow: hidden; }
+.tira-nivel { position: absolute; top: 0; left: 0; right: 0; height: 5px; }

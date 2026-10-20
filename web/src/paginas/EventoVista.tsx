@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useOutletContext, useParams, useLocation } from "react-router-dom";
 import type { Ctx } from "../main";
 import { Barra } from "../componentes/Barra";
-import { Icono, iconoTiempo, type TipoIcono } from "../componentes/Icono";
+import { CONDICION, Icono, iconoTiempo, type TipoIcono } from "../componentes/Icono";
 import { Accesos } from "../componentes/Accesos";
 import { Comunicacion } from "../componentes/Comunicacion";
 import { TiraDias } from "../componentes/TiraDias";
@@ -12,7 +12,7 @@ import { Introduccion } from "../componentes/Introduccion";
 import { Resumen } from "../componentes/Resumen";
 import { Mediciones } from "../componentes/Mediciones";
 import { consenso, FUENTE_UV, PRIORIDAD, uvMaxPorDia } from "../serie";
-import { Humedad, UvChip } from "../componentes/Uv";
+import { Humedad, UvDato } from "../componentes/Uv";
 import {
   COLOR_SMN, estadoRayosGLM, ordenarAlertas, tituloAlerta, diaLocal, fmtDia, fmtFechaHora, fmtHora, num, supabase,
   type AlertaSMN, type Evento, type Rayo, type Nivel, type Pronostico, type Sesgo, type Uv,
@@ -238,7 +238,7 @@ export function EventoVista() {
         })()}
         {actual === "general" && (
           <>
-            <TiraDias serie={serie} uvDia={uvDia} desde={v.armado[0]} hasta={v.desarme[1]} largada={v.largada} eventoId={ev.id} />
+            <TiraDias serie={serie} uvDia={uvDia} niveles={niveles} desde={v.armado[0]} hasta={v.desarme[1]} largada={v.largada} eventoId={ev.id} />
             <Introduccion />
             <Resumen vigentes={vigentes} alertas={alertas} eventoId={ev.id} />
             {comunicado && (
@@ -349,7 +349,7 @@ function Dias({ titulo, serie, uvDia, niveles, desde, hasta, nota, franjaSegura 
     <section className="seccion" aria-labelledby="dias-t">
       <h2 id="dias-t">{titulo} · pronóstico por día</h2>
       {dias.size === 0 && <div className="tarjeta">Todavía no hay pronóstico para estos días. El sistema lo completa cuando entran en el horizonte de los modelos.</div>}
-      <div className="grilla">
+      <div className="grilla grilla-dias">
         {[...dias.entries()].map(([d, ps]) => {
           const t = ps.map((p) => p.t2m).filter((x): x is number => x != null);
           const raf = Math.max(...ps.map((p) => p.rafaga10 ?? 0));
@@ -363,36 +363,53 @@ function Dias({ titulo, serie, uvDia, niveles, desde, hasta, nota, franjaSegura 
           const peor = ps.reduce((a, p) => ((p.precip ?? 0) > (a.precip ?? 0) ? p : a), media);
           const franja = franjaSegura ? franjaFavorable(d, delDia, desde, hasta) : null;
           if (franjaSegura && !franja) return null; // la fase no ocupa horario diurno ese día
+          const estiloDia = peorDia && nivelDia > 0 ? estiloVariable(peorDia.variable, nivelDia) : estiloNivel(0);
+          const colorNivel = String(estiloDia.background);
+          const nombreDia = peorDia && nivelDia > 0 ? nombreNivel(peorDia.variable, nivelDia) : "Bajo umbral";
+          const tipoCielo = iconoTiempo(peor);
           return (
-            <article key={d} className="tarjeta" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <span className="condensada" style={{ fontSize: 20, fontWeight: 800, textTransform: "uppercase" }}>{fmtDia(ps[0].valido)}</span>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <Icono tipo={iconoTiempo(peor)} size={60} />
-                <div style={{ textAlign: "right", lineHeight: 1 }}>
-                  <div className="condensada" style={{ fontSize: 32, fontWeight: 800 }}>{num(Math.max(...t))}<small className="unidad">°C</small></div>
-                  <div className="condensada" style={{ fontSize: 22, color: "var(--texto3)" }}>{num(Math.min(...t))}<small className="unidad">°C</small></div>
+            <article key={d} className="tarjeta dia-tarjeta">
+              <div className="dia-franja" style={{ background: colorNivel }} aria-hidden />
+              <div className="dia-cab">
+                <span className="dia-fecha">{fmtDia(ps[0].valido)}</span>
+                <span className="badge" style={estiloDia}>{nombreDia}</span>
+              </div>
+              <div className="dia-clima">
+                <Icono tipo={tipoCielo} size={72} />
+                <div className="dia-temps">
+                  <div className="dia-max">{num(Math.max(...t))}<small>°C</small></div>
+                  <div className="dia-min"><b>mín</b>{num(Math.min(...t))}<small>°C</small></div>
+                  <div className="dia-cond">{CONDICION[tipoCielo] ?? ""}</div>
                 </div>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600 }}><Icono tipo="viento" size={20} />ráf. {num(raf)} km/h</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600 }}><Icono tipo="gota" size={20} />{num(lluvia, 1)} mm</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", fontWeight: 600 }}>
-                <Humedad texto={hrs.length ? `${num(Math.min(...hrs))}–${num(Math.max(...hrs))} %` : "—"} />
-                <UvChip uv={uvMax} />
+              <div className="dia-datos">
+                <div className="dia-dato"><Icono tipo="viento" size={30} /><div><div className="v">{num(raf)}<small>km/h</small></div><div className="e">Ráfaga máx.</div></div></div>
+                <div className="dia-dato"><Icono tipo="gota" size={30} /><div><div className="v">{num(lluvia, 1)}<small>mm</small></div><div className="e">Lluvia</div></div></div>
+                <div className="dia-dato"><Icono tipo="humedad" size={30} /><div><div className="v">{hrs.length ? `${num(Math.min(...hrs))}–${num(Math.max(...hrs))}` : "—"}<small>%</small></div><div className="e">Humedad</div></div></div>
+                <div className="dia-dato"><UvDato uv={uvMax} /></div>
               </div>
-              <span className="badge" style={{ ...(peorDia && nivelDia > 0 ? estiloVariable(peorDia.variable, nivelDia) : estiloNivel(0)), alignSelf: "flex-start", fontSize: 13 }}>{peorDia && nivelDia > 0 ? nombreNivel(peorDia.variable, nivelDia) : "Bajo umbral"}</span>
-              {peorDia && nivelDia > 0 && <span className="chico" style={{ marginTop: -4 }}>{NOMBRE_CORTO[peorDia.variable]}</span>}
-              {franja && (
-                <div className="franja-segura" title="Tramo continuo entre las 6 y las 21 h con el nivel más bajo del día">
-                  <span className="punto" style={{ background: estiloNivel(franja.nivel).background, marginTop: 0 }} aria-hidden />
-                  Mejor franja: {franja.texto}
-                </div>
-              )}
-              {lejano(ps[0].valido) && <span className="chico">Tendencia · confianza baja</span>}
+              <div className="dia-op">
+                {peorDia && nivelDia > 0 ? (
+                  <div className="dia-accion" style={{ borderColor: colorNivel }}>
+                    <b>{NOMBRE_VARIABLE[peorDia.variable] ?? NOMBRE_CORTO[peorDia.variable]}</b>
+                    <span>{nombreDia} desde las {fmtHora(new Date(Math.max(new Date(peorDia.desde).getTime(), new Date(`${d}T00:00:00-03:00`).getTime())).toISOString())}</span>
+                  </div>
+                ) : (
+                  <div className="dia-accion" style={{ borderColor: colorNivel }}><span>Sin variables por encima del umbral.</span></div>
+                )}
+                {franja && (
+                  <div className="franja-segura" title="Tramo continuo entre las 6 y las 21 h con el nivel más bajo del día">
+                    <span className="punto" style={{ background: estiloNivel(franja.nivel).background, marginTop: 0 }} aria-hidden />
+                    Mejor franja para trabajar: <b>{franja.texto}</b>
+                  </div>
+                )}
+                {lejano(ps[0].valido) && <span className="chico">Tendencia · confianza baja</span>}
+              </div>
             </article>
           );
         })}
       </div>
-      <p className="chico">{nota} · Gota con %: humedad relativa mínima y máxima del día · UV: máximo del día. {FUENTE_UV}</p>
+      <p className="chico">{nota} · Humedad: mínima y máxima del día · UV: máximo del día. {FUENTE_UV}</p>
     </section>
   );
 }
@@ -462,7 +479,7 @@ function DiaCarrera({ serie, v }: { serie: Map<number, Pronostico & { n: number 
                       <span style={{ display: "inline-block", transform: `rotate(${(p.dir_viento ?? 0) + 180}deg)` }}>↑</span> {num(p.viento10)}/{num(p.rafaga10)}
                     </span>
                     <span className="chico"><Humedad texto={`${num(p.hr)} %`} size={16} /></span>
-                    {(p.uv ?? 0) >= 0.5 ? <UvChip uv={p.uv} compacto /> : <span className="chico">UV {p.uv == null ? "—" : "0"}</span>}
+                    <UvDato uv={p.uv} compacto />
                     <span className="chico">{num(p.precip, 1)} mm/h</span>
                   </div>
                 );

@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
-import { diaLocal, type Pronostico } from "../datos";
+import { diaLocal, type Nivel, type Pronostico } from "../datos";
 import { Icono, type TipoIcono } from "./Icono";
-import { Humedad, UvChip } from "./Uv";
+import { Humedad, UvDato } from "./Uv";
+import { estiloNivel, estiloVariable } from "../reglas";
 
 type Fila = Pronostico & { n: number };
 const DIA = new Intl.DateTimeFormat("es-AR", { timeZone: "America/Argentina/Buenos_Aires", weekday: "short" });
@@ -19,8 +20,8 @@ function iconoDia(ps: { t: number; p: Fila; h: number }[]): TipoIcono {
 }
 
 /** Tira de días del evento (armado → desarme) con ícono, temperaturas máxima y mínima, humedad y UV máximo */
-export function TiraDias({ serie, uvDia, desde, hasta, largada, eventoId }: {
-  serie: Map<number, Fila>; uvDia: Map<string, number>; desde: Date; hasta: Date; largada: Date; eventoId: string;
+export function TiraDias({ serie, uvDia, niveles, desde, hasta, largada, eventoId }: {
+  serie: Map<number, Fila>; uvDia: Map<string, number>; niveles: Nivel[]; desde: Date; hasta: Date; largada: Date; eventoId: string;
 }) {
   const claves: string[] = [];
   for (let t = desde.getTime(); t <= hasta.getTime() + 3600_000; t += 3600_000) {
@@ -39,9 +40,13 @@ export function TiraDias({ serie, uvDia, desde, hasta, largada, eventoId }: {
         const hrs = ps.map(({ p }) => p.hr).filter((x): x is number => x != null);
         const mediodia = new Date(`${d}T12:00:00-03:00`);
         const carrera = d === diaCarrera;
+        // Nivel operativo más alto del día (cualquier fase y variable): borde superior de la tarjeta
+        const peor = niveles.filter((n) => diaLocal(n.desde) <= d && diaLocal(n.hasta) >= d).reduce<Nivel | null>((m, n) => (!m || n.nivel > m.nivel ? n : m), null);
+        const colorDia = peor && peor.nivel > 0 ? String(estiloVariable(peor.variable, peor.nivel).background) : String(estiloNivel(0).background);
         const fase = d < diaCarrera ? "armado" : carrera ? "carrera" : "desarme";
         return (
           <Link key={d} to={`/evento/${eventoId}/${fase}`} className={`tira-dia${carrera ? " carrera" : ""}`} title={carrera ? "Día de carrera" : undefined}>
+            {ps.length > 0 && <span className="tira-nivel" style={{ background: colorDia }} aria-hidden />}
             <span className="tira-nombre">{DIA.format(mediodia).replace(".", "")}</span>
             <span className="tira-fecha">{FECHA.format(mediodia)}</span>
             {ps.length && temps.length ? (
@@ -49,7 +54,7 @@ export function TiraDias({ serie, uvDia, desde, hasta, largada, eventoId }: {
                 <Icono tipo={iconoDia(ps)} size={46} />
                 <span className="tira-temp"><b>{Math.round(Math.max(...temps))} °C</b> {Math.round(Math.min(...temps))} °C</span>
                 <span className="tira-hr"><Humedad texto={hrs.length ? `${Math.round(Math.min(...hrs))}–${Math.round(Math.max(...hrs))} %` : "—"} size={15} /></span>
-                <UvChip uv={uvDia.get(d)} compacto />
+                <UvDato uv={uvDia.get(d)} compacto />
               </>
             ) : (
               <>

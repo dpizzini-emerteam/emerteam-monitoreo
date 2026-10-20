@@ -1,6 +1,6 @@
 export type TipoIcono =
   | "sol" | "solnube" | "nube" | "lluvia" | "tormenta" | "viento" | "termometro"
-  | "gota" | "rayo" | "luna" | "estructura" | "corredor" | "humedad";
+  | "gota" | "rayo" | "luna" | "estructura" | "corredor" | "humedad" | "uv";
 
 export function Icono({ tipo, size = 40 }: { tipo: TipoIcono; size?: number }) {
   return (
@@ -88,6 +88,18 @@ export function Icono({ tipo, size = 40 }: { tipo: TipoIcono; size?: number }) {
           <path d="M40 31L24 50" stroke="#1F8A80" strokeWidth="3.6" strokeLinecap="round" />
         </>
       )}
+      {tipo === "uv" && (
+        <>
+          {/* Índice UV: sol con rayos separados (distinto del sol de condición del cielo) */}
+          <g stroke="#F28C00" strokeWidth="4.5" strokeLinecap="round">
+            {Array.from({ length: 8 }, (_, i) => {
+              const a = (i * Math.PI) / 4;
+              return <path key={i} d={`M${(32 + 21 * Math.cos(a)).toFixed(1)} ${(32 + 21 * Math.sin(a)).toFixed(1)}L${(32 + 28 * Math.cos(a)).toFixed(1)} ${(32 + 28 * Math.sin(a)).toFixed(1)}`} />;
+            })}
+          </g>
+          <circle cx="32" cy="32" r="15" fill="url(#ic-sol)" />
+        </>
+      )}
       {tipo === "rayo" && <path d="M38 4L14 36h14l-6 24 28-34H35l7-22z" fill="#FFC20E" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" />}
       {tipo === "luna" && <path d="M40 10a22 22 0 1 0 14 34A18 18 0 1 1 40 10z" fill="#9AA0A8" />}
       {tipo === "estructura" && (
@@ -137,3 +149,8 @@ export function iconoTiempo(p: { precip: number | null; cape: number | null; nub
   if (nub >= 30) return "solnube";
   return "sol";
 }
+
+/** Condición del cielo en palabras, para acompañar al ícono */
+export const CONDICION: Partial<Record<TipoIcono, string>> = {
+  sol: "Despejado", luna: "Despejado", solnube: "Parcialmente nublado", nube: "Nublado", lluvia: "Lluvia", tormenta: "Tormenta",
+};
