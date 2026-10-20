@@ -4,7 +4,8 @@
 //  · sube el nivel de alguna variable en alguna fase (dentro del horizonte confiable de 5 días);
 //  · el satélite detecta rayos a menos de 24 km;
 //  · una variable que estaba por encima del umbral vuelve a quedar por debajo (un único aviso de normalización).
-// Histéresis: las bajadas parciales no generan correo. Sin credencial de envío, registra sin enviar.
+// Histéresis: las bajadas parciales no generan correo. Sin credencial de envío (o si fallan todos los envíos)
+// el estado no avanza y los cambios quedan pendientes para la próxima corrida.
 
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
@@ -106,6 +107,7 @@ function etiqueta(texto: string, fondo: string, color: string) {
 }
 
 function armarCorreo(ev: Evento, cambios: Cambio[]): { asunto: string; html: string; texto: string } {
+  const enlace = `${WEB}/#/evento/${ev.id}`;
   const partes: string[] = [];
   const lineas: string[] = [];
   const corredores = new Set<string>();
@@ -160,11 +162,11 @@ function armarCorreo(ev: Evento, cambios: Cambio[]): { asunto: string; html: str
       <div style="font:800 22px Arial,sans-serif;color:#ffffff;text-transform:uppercase;margin-top:4px">${esc(ev.nombre)}</div>
       <div style="font:13px Arial,sans-serif;color:#cfcfcf;margin-top:2px">Largada ${esc(fmt(ev.largada))}</div></td></tr>
     <tr><td style="padding:18px 22px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${partes.join("")}${bloqueCorredores}</table>
-      <a href="${WEB}" style="display:inline-block;background:#FF6A1A;color:#111;font:700 15px Arial,sans-serif;text-decoration:none;padding:11px 18px;border-radius:6px;margin-top:6px">Ver el monitoreo del evento</a>
+      <a href="${enlace}" style="display:inline-block;background:#FF6A1A;color:#111;font:700 15px Arial,sans-serif;text-decoration:none;padding:11px 18px;border-radius:6px;margin-top:6px">Ver el monitoreo del evento</a>
       <p style="font:12px/1.5 Arial,sans-serif;color:#666;margin:16px 0 0">EMERTEAM recomienda; la decisión final corresponde al organizador. Recibís este aviso porque tu correo está habilitado para el evento.</p></td></tr>
     <tr><td style="background:#111111;color:#cfcfcf;font:12px Arial,sans-serif;padding:10px 22px;border-top:3px solid #FF6A1A">EMERTEAM | Sports Risks &amp; Emergency Management</td></tr>
   </table></td></tr></table></body></html>`;
-  const texto = `${ev.nombre}\nLargada ${fmt(ev.largada)}\n\n${lineas.join("\n\n")}${corredores.size ? `\n\nTexto sugerido para los corredores:\n${[...corredores].join("\n")}` : ""}\n\nVer el monitoreo: ${WEB}\n\nEMERTEAM | Sports Risks & Emergency Management`;
+  const texto = `${ev.nombre}\nLargada ${fmt(ev.largada)}\n\n${lineas.join("\n\n")}${corredores.size ? `\n\nTexto sugerido para los corredores:\n${[...corredores].join("\n")}` : ""}\n\nVer el monitoreo: ${enlace}\n\nEMERTEAM | Sports Risks & Emergency Management`;
   return { asunto, html, texto };
 }
 
@@ -246,7 +248,11 @@ Deno.serve(async (req) => {
     cambios.sort((a, b) => peso(b) - peso(a));
 
     let enviados = 0;
-    if (cambios.length && !prueba) {
+    let avanzar = true;
+    if (cambios.length && !prueba && !puedeEnviar) {
+      // Sin credencial no se registra ni se avanza el estado: los cambios salen juntos cuando se cargue la clave
+      avanzar = false;
+    } else if (cambios.length && !prueba) {
       const destinatarios = [...new Set([ev.organizador_email, ...((accesos ?? []).filter((a) => a.evento_id === ev.id).map((a) => a.email as string)),
         ...((equipo ?? []).map((e) => e.email as string))].map((e) => e.trim().toLowerCase()).filter(Boolean))];
       const correo = armarCorreo(ev, cambios);
@@ -271,12 +277,16 @@ Deno.serve(async (req) => {
         registros.push({ evento_id: ev.id, tipo: cambios.map((c) => c.tipo).join(","), destinatario: d, asunto: correo.asunto, estado, error, detalle: { cambios } });
       }
       if (cliente) await cliente.close().catch(() => undefined);
-      if (registros.length) await supabase.from("mon_envios").insert(registros);
+      if (cliente && destinatarios.length && enviados === 0) avanzar = false; // fallaron todos: se reintenta en la próxima corrida
+      if (registros.length) {
+        const { error: eReg } = await supabase.from("mon_envios").insert(registros);
+        if (eReg) console.error("mon_envios", eReg.message);
+      }
     }
-    if (!prueba) {
+    if (!prueba && (avanzar || !previo)) {
       await supabase.from("mon_estado").upsert({ clave: `avisos:${ev.id}`, valor: JSON.stringify(actual), actualizado_en: new Date().toISOString() });
     }
-    resultado.push({ evento: ev.nombre, cambios: cambios.length, enviados, primera_vez: !previo, ...(prueba && cambios.length ? { asunto: armarCorreo(ev, cambios).asunto } : {}) });
+    resultado.push({ evento: ev.nombre, cambios: cambios.length, enviados, primera_vez: !previo, pendientes: !avanzar, ...(prueba && cambios.length ? { asunto: armarCorreo(ev, cambios).asunto } : {}) });
   }
   return json({ ok: true, credencial: puedeEnviar, resultado });
 });
