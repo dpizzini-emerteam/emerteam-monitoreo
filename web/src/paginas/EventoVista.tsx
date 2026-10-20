@@ -12,6 +12,7 @@ import { COLOR_NIVEL, NOMBRE_FASE, NOMBRE_VARIABLE, NOMBRE_WA, REGLAS, TIPO_FUEN
 import { calcular } from "../ventanas";
 
 const PRIORIDAD = ["ecmwf", "gfs", "icon"];
+const VARS = ["t2m", "td2m", "hr", "viento10", "rafaga10", "dir_viento", "precip", "cape", "radiacion", "nubosidad", "presion", "wbgt_est"] as const;
 const COLOR_SMN: Record<string, string> = { amarillo: "#C79000", naranja: "#FF6A1A", rojo: "#FF3B30", violeta: "#8E5BD9" };
 
 /** Serie horaria de consenso: fuente prioritaria por hora */
@@ -23,8 +24,16 @@ function consenso(pron: Pronostico[]): Map<number, Pronostico & { n: number }> {
   }
   const out = new Map<number, Pronostico & { n: number }>();
   for (const [t, ps] of [...porHora.entries()].sort((a, b) => a[0] - b[0])) {
-    const elegido = PRIORIDAD.map((f) => ps.find((p) => p.fuente === f)).find(Boolean) ?? ps[0];
-    out.set(t, { ...elegido, n: ps.length });
+    const orden = [...PRIORIDAD.map((f) => ps.find((p) => p.fuente === f)).filter((p): p is Pronostico => !!p), ...ps.filter((p) => !PRIORIDAD.includes(p.fuente))];
+    const fila = { ...orden[0], n: ps.length } as Pronostico & { n: number };
+    // Variable ausente en la fuente principal: se toma de la siguiente
+    for (const c of VARS) {
+      if (fila[c] == null) {
+        const alt = orden.find((p) => p[c] != null);
+        if (alt) (fila as Record<string, unknown>)[c] = alt[c];
+      }
+    }
+    out.set(t, fila);
   }
   return out;
 }

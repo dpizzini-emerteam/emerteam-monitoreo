@@ -19,6 +19,9 @@ def _hora(dt: str) -> datetime:
     return datetime.fromisoformat(dt).astimezone(timezone.utc).replace(minute=0, second=0, microsecond=0)
 
 
+VARIABLES = ("t2m", "td2m", "hr", "viento10", "rafaga10", "dir_viento", "cape", "radiacion", "presion", "wbgt_est", "precip")
+
+
 def serie_consenso(pron: list[dict]) -> dict[datetime, dict]:
     """Serie horaria: valores de la fuente prioritaria disponible y dispersión entre fuentes."""
     por_fuente: dict[str, dict[datetime, dict]] = {}
@@ -48,6 +51,14 @@ def serie_consenso(pron: list[dict]) -> dict[datetime, dict]:
             continue
         base = dict(por_fuente[disponibles[0]][h])
         base["fuente_principal"] = disponibles[0]
+        # Variable faltante en la fuente principal (p. ej. ráfaga ECMWF fuera de su alcance): siguiente fuente
+        for c in VARIABLES:
+            if base.get(c) is None:
+                for f in disponibles[1:]:
+                    if por_fuente[f][h].get(c) is not None:
+                        base[c] = por_fuente[f][h][c]
+                        base.setdefault("completado", []).append(f"{c}:{f}")
+                        break
         wb = [float(por_fuente[f][h]["wbgt_est"]) for f in disponibles if por_fuente[f][h].get("wbgt_est") is not None]
         rf = [float(por_fuente[f][h]["rafaga10"]) for f in disponibles if por_fuente[f][h].get("rafaga10") is not None]
         base["disp_wbgt"] = (max(wb) - min(wb)) if len(wb) > 1 else None
