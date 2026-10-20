@@ -1,0 +1,111 @@
+import { useEffect, useState } from "react";
+import { Link, useOutletContext } from "react-router-dom";
+import type { Ctx } from "../main";
+import { Barra } from "../componentes/Barra";
+import { diaLocal, fmtDia, fmtHora, supabase, type Evento, type Nivel } from "../datos";
+import { COLOR_NIVEL, NOMBRE_FASE } from "../reglas";
+
+type Resumen = Record<string, Record<string, number>>; // evento -> fase -> nivel máximo vigente
+
+export function Eventos() {
+  const { admin, session } = useOutletContext<Ctx>();
+  const [eventos, setEventos] = useState<Evento[] | null>(null);
+  const [resumen, setResumen] = useState<Resumen>({});
+  const [verCerrados, setVerCerrados] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      let q = supabase.from("mon_eventos").select("*, mon_modalidades(*)").order("largada");
+      if (!verCerrados) q = q.eq("estado", "activo");
+      const { data } = await q;
+      setEventos((data as Evento[]) ?? []);
+      const ids = (data ?? []).map((e) => e.id);
+      if (ids.length) {
+        const { data: niv } = await supabase
+          .from("mon_niveles")
+          .select("evento_id,fase,nivel")
+          .in("evento_id", ids)
+          .gt("hasta", new Date().toISOString())
+          .gt("nivel", 0);
+        const r: Resumen = {};
+        for (const n of (niv ?? []) as Pick<Nivel, "evento_id" | "fase" | "nivel">[]) {
+          const fase = n.fase === "personal" ? "armado" : n.fase;
+          r[n.evento_id] ??= {};
+          r[n.evento_id][fase] = Math.max(r[n.evento_id][fase] ?? 0, n.nivel);
+        }
+        setResumen(r);
+      }
+    })();
+  }, [verCerrados]);
+
+  const porDia: Record<string, Evento[]> = {};
+  for (const e of eventos ?? []) (porDia[diaLocal(e.largada)] ??= []).push(e);
+
+  return (
+    <>
+      <Barra titulo={admin ? "Administración" : "Mis eventos"} subtitulo={session.user.email ?? ""}>
+        {admin && (
+          <Link className="boton-osc" to="/evento/nuevo">
+            + Nuevo evento
+          </Link>
+        )}
+      </Barra>
+      <main className="contenedor" style={{ paddingTop: 26, paddingBottom: 26 }}>
+        {admin && (
+          <label style={{ flexDirection: "row", alignItems: "center", gap: 8, fontWeight: 500, marginBottom: 12 }}>
+            <input type="checkbox" checked={verCerrados} onChange={(e) => setVerCerrados(e.target.checked)} style={{ minHeight: 0 }} />
+            Ver también eventos cerrados
+          </label>
+        )}
+        {eventos === null && <p>Cargando…</p>}
+        {eventos?.length === 0 && (
+          <div className="tarjeta">
+            {admin
+              ? "No hay eventos cargados. Usá “Nuevo evento” para activar el monitoreo."
+              : "Todavía no tenés eventos asignados. Si esperabas ver uno, pedile a EMERTEAM que asocie tu correo al evento."}
+          </div>
+        )}
+        {Object.entries(porDia).map(([dia, evs]) => (
+          <section key={dia} className="seccion" style={{ marginTop: 18 }}>
+            <h2 style={{ fontSize: 28 }}>
+              {fmtDia(evs[0].largada)} <span className="chico" style={{ fontFamily: "Barlow", textTransform: "none" }}>{evs.length > 1 ? `${evs.length} eventos` : ""}</span>
+            </h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {evs.map((e) => {
+                const r = resumen[e.id] ?? {};
+                const max = Math.max(0, ...Object.values(r));
+                return (
+                  <article key={e.id} className="tarjeta" style={{ display: "grid", gridTemplateColumns: "minmax(240px,2fr) repeat(auto-fit,minmax(130px,1fr))", gap: 14, alignItems: "center" }}>
+                    <div style={{ borderLeft: `5px solid ${COLOR_NIVEL[max]}`, paddingLeft: 12 }}>
+                      <div className="condensada" style={{ fontSize: 22, fontWeight: 800, textTransform: "uppercase", lineHeight: 1.1 }}>{e.nombre}</div>
+                      <div className="chico">
+                        {e.ubicacion} · {fmtHora(e.largada)} · {(e.mon_modalidades ?? []).map((m) => m.nombre).join(", ")} · {e.participantes.toLocaleString("es-AR")} participantes
+                        {e.estado === "cerrado" && " · cerrado"}
+                      </div>
+                    </div>
+                    {(["armado", "carrera", "desarme"] as const).map((f) => (
+                      <div key={f}>
+                        <div className="chico">{NOMBRE_FASE[f]}</div>
+                        <span className="badge" style={{ background: COLOR_NIVEL[r[f] ?? 0], fontSize: 13 }}>{["Sin riesgo", "Vigilancia", "Acción", "Retiro", "Suspensión"][r[f] ?? 0]}</span>
+                      </div>
+                    ))}
+                    <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                      {admin && (
+                        <Link className="boton" to={`/evento/${e.id}/editar`}>
+                          Editar
+                        </Link>
+                      )}
+                      <Link className="boton negro" to={`/evento/${e.id}`}>
+                        Abrir
+                      </Link>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        ))}
+      </main>
+    </>
+  );
+}

@@ -1,0 +1,1 @@
+{"root":["./src/datos.ts","./src/main.tsx","./src/reglas.ts","./src/ventanas.ts","./src/componentes/Accesos.tsx","./src/componentes/Barra.tsx","./src/componentes/Icono.tsx","./src/componentes/Pie.tsx","./src/paginas/EventoForm.tsx","./src/paginas/EventoVista.tsx","./src/paginas/Eventos.tsx","./src/paginas/Login.tsx"],"version":"5.9.3"}
