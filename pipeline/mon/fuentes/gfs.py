@@ -19,7 +19,8 @@ log = logging.getLogger(__name__)
 BASE = os.environ.get("MON_GFS_BASE", "https://nomads.ncep.noaa.gov")
 FILTRO = BASE + "/cgi-bin/filter_gfs_0p25_1hr.pl"
 PROD = BASE + "/pub/data/nccf/com/gfs/prod"
-HORIZONTE_MAX = 120  # pasos horarios disponibles en el filtro 1hr
+HORARIO_MAX = 120    # pasos horarios publicados; después, cada 3 h
+HORIZONTE_MAX = 168  # alcance útil: armado, carrera y desarme dentro de 7 días
 PAUSA_S = 0.7        # NOMADS bloquea más de ~120 pedidos por minuto
 
 VARIABLES = ["TMP", "DPT", "RH", "UGRD", "VGRD", "GUST", "APCP", "DSWRF", "CAPE", "PRES", "TCDC"]
@@ -77,14 +78,19 @@ def _descargar(corrida: datetime, paso: int, caja: dict, destino: str) -> bool:
 
 def _hora_desde_balde(actual: tuple[int, int, float], previo: tuple[int, int, float] | None,
                       acumulado: bool) -> float:
-    """Convierte un valor de 'balde' GFS (acumulado o promedio desde el inicio del balde) a la última hora."""
+    """Valor horario medio del último intervalo a partir de un 'balde' GFS
+    (acumulado o promedio desde el inicio del balde). Sirve para pasos de 1 h y de 3 h."""
     s, e, v = actual
-    if previo is None or previo[0] != s or previo[1] != e - 1:
-        return v
-    _, _, vp = previo
+    if previo is None or previo[0] != s or not (s <= previo[1] < e):
+        return max(v / (e - s), 0.0) if acumulado else v
+    _, pe, vp = previo
     if acumulado:
-        return max(v - vp, 0.0)
-    return max(v * (e - s) - vp * (e - 1 - s), 0.0)
+        return max((v - vp) / (e - pe), 0.0)
+    return max((v * (e - s) - vp * (pe - s)) / (e - pe), 0.0)
+
+
+def _pasos(maximo: int) -> list[int]:
+    return [p for p in list(range(1, HORARIO_MAX + 1)) + list(range(HORARIO_MAX + 3, HORIZONTE_MAX + 1, 3)) if p <= maximo]
 
 
 def obtener(eventos: list[dict], hasta: datetime, ahora: datetime) -> tuple[datetime, list[dict]] | None:
@@ -94,13 +100,13 @@ def obtener(eventos: list[dict], hasta: datetime, ahora: datetime) -> tuple[date
         return None
     puntos = {e["id"]: (float(e["lat"]), float(e["lon"])) for e in eventos}
     caja = _caja(puntos)
-    pasos = min(HORIZONTE_MAX, max(1, math.ceil((hasta - corrida).total_seconds() / 3600)))
-    log.info("GFS corrida %s, pasos 1..%d, %d eventos", corrida.isoformat(), pasos, len(puntos))
+    pasos = _pasos(max(1, math.ceil((hasta - corrida).total_seconds() / 3600)))
+    log.info("GFS corrida %s, pasos 1..%d, %d eventos", corrida.isoformat(), pasos[-1], len(puntos))
 
     baldes_prev: dict[tuple[str, str], tuple[int, int, float]] = {}
     filas: list[dict] = []
     with tempfile.TemporaryDirectory() as tmp:
-        for paso in range(1, pasos + 1):
+        for paso in pasos:
             path = os.path.join(tmp, f"f{paso:03d}.grb2")
             if not _descargar(corrida, paso, caja, path):
                 log.error("GFS: falta el paso f%03d; se corta la serie", paso)

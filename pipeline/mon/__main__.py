@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+import traceback
 from datetime import datetime, timedelta, timezone
 
 from . import motor, ventanas
@@ -20,6 +21,13 @@ FUENTES = {"gfs": gfs, "ecmwf": ecmwf}
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("mon")
+
+
+def anotar(titulo: str) -> None:
+    """Deja el error como anotación de GitHub Actions (visible por API sin descargar logs)."""
+    tb = traceback.format_exc().strip().splitlines()
+    texto = " | ".join(tb[-6:]).replace("%", "%25").replace("\r", "").replace("\n", " ")
+    print(f"::error title={titulo}::{texto}", flush=True)
 
 
 def main() -> int:
@@ -59,8 +67,19 @@ def main() -> int:
         except Exception:  # noqa: BLE001
             errores += 1
             log.exception("Fallo la fuente %s", nombre)
+            anotar(f"Fuente {nombre}")
 
-    # Niveles con todas las fuentes guardadas
+    try:
+        _niveles(api, ahora)
+    except Exception:  # noqa: BLE001
+        log.exception("Fallo el cálculo de niveles")
+        anotar("Niveles")
+        errores += 1
+    return 1 if errores else 0
+
+
+def _niveles(api: Ingesta, ahora: datetime) -> None:
+    """Niveles con todas las fuentes guardadas."""
     completo = api.estado(incluir_pronosticos=True)
     pron = completo.get("pronosticos") or []
     por_evento = {}
@@ -69,7 +88,6 @@ def main() -> int:
         por_evento[ev["id"]] = motor.niveles_evento(ev, filas_ev, ahora)
         log.info("%s: %d tramos de nivel", ev["nombre"], len(por_evento[ev["id"]]))
     log.info("niveles: %s", api.niveles(por_evento))
-    return 1 if errores else 0
 
 
 if __name__ == "__main__":

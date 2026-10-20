@@ -58,25 +58,37 @@ Deno.serve(async (req) => {
       const respuesta: Record<string, unknown> = { eventos };
 
       // Última corrida procesada por fuente
-      const { data: corridas, error: e2 } = await supabase
-        .from("mon_pronosticos")
-        .select("fuente,corrida")
-        .order("corrida", { ascending: false })
-        .limit(200);
-      if (e2) throw e2;
       const ultimas: Record<string, string> = {};
-      for (const c of corridas ?? []) if (!ultimas[c.fuente]) ultimas[c.fuente] = c.corrida;
+      for (const fuente of FUENTES) {
+        const { data, error: e2 } = await supabase
+          .from("mon_pronosticos")
+          .select("corrida")
+          .eq("fuente", fuente)
+          .order("corrida", { ascending: false })
+          .limit(1);
+        if (e2) throw e2;
+        if (data?.[0]) ultimas[fuente] = data[0].corrida;
+      }
       respuesta.ultimas_corridas = ultimas;
 
       if (url.searchParams.get("incluir") === "pronosticos" && eventos?.length) {
         const ids = eventos.map((e) => e.id);
-        const { data: pron, error: e3 } = await supabase
-          .from("mon_pronosticos")
-          .select("*")
-          .in("evento_id", ids)
-          .gte("valido", new Date(Date.now() - 20 * 86400_000).toISOString())
-          .order("valido");
-        if (e3) throw e3;
+        const pron: unknown[] = [];
+        // La API devuelve como máximo 1000 filas por pedido: se pagina
+        for (let desde = 0; ; desde += 1000) {
+          const { data, error: e3 } = await supabase
+            .from("mon_pronosticos")
+            .select("*")
+            .in("evento_id", ids)
+            .gte("valido", new Date(Date.now() - 20 * 86400_000).toISOString())
+            .order("evento_id")
+            .order("fuente")
+            .order("valido")
+            .range(desde, desde + 999);
+          if (e3) throw e3;
+          pron.push(...(data ?? []));
+          if (!data || data.length < 1000) break;
+        }
         respuesta.pronosticos = pron;
       }
       return json(respuesta);
