@@ -11,3 +11,10 @@
     X-Content-Type-Options = "nosniff"
 [build.environment]
   NODE_VERSION = "22"
+
+# La dirección de Netlify lleva a la dirección propia
+[[redirects]]
+  from = "https://emerteam-monitoreo.netlify.app/*"
+  to = "https://riesgoambiental.emerteam.com.ar/:splat"
+  status = 301
+  force = true
