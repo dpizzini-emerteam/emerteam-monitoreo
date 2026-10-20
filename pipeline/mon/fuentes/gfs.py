@@ -23,7 +23,7 @@ HORARIO_MAX = 120    # pasos horarios publicados; después, cada 3 h
 HORIZONTE_MAX = 168  # alcance útil: armado, carrera y desarme dentro de 7 días
 PAUSA_S = 0.7        # NOMADS bloquea más de ~120 pedidos por minuto
 
-VARIABLES = ["TMP", "DPT", "RH", "UGRD", "VGRD", "GUST", "APCP", "DSWRF", "CAPE", "PRES", "TCDC"]
+VARIABLES = ["TMP", "DPT", "RH", "UGRD", "VGRD", "GUST", "APCP", "DSWRF", "CAPE", "PRES", "TCDC", "LAND"]
 NIVELES = ["2_m_above_ground", "10_m_above_ground", "surface", "entire_atmosphere"]
 
 
@@ -104,6 +104,7 @@ def obtener(eventos: list[dict], hasta: datetime, ahora: datetime) -> tuple[date
     log.info("GFS corrida %s, pasos 1..%d, %d eventos", corrida.isoformat(), pasos[-1], len(puntos))
 
     baldes_prev: dict[tuple[str, str], tuple[int, int, float]] = {}
+    elegidos: dict[str, grib.Punto] | None = None  # mismo punto de grilla en todos los pasos
     filas: list[dict] = []
     with tempfile.TemporaryDirectory() as tmp:
         for paso in pasos:
@@ -111,7 +112,9 @@ def obtener(eventos: list[dict], hasta: datetime, ahora: datetime) -> tuple[date
             if not _descargar(corrida, paso, caja, path):
                 log.error("GFS: falta el paso f%03d; se corta la serie", paso)
                 break
-            msgs = grib.leer(path, puntos)
+            if elegidos is None:
+                elegidos = grib.puntos_modelo(path, puntos)
+            msgs = grib.leer(path, puntos, elegidos)
             os.remove(path)
             if paso == 1:
                 log.info("GFS variables: %s", sorted({(m.nombre, m.nivel, m.tipo_paso) for m in msgs}))
@@ -133,12 +136,13 @@ def obtener(eventos: list[dict], hasta: datetime, ahora: datetime) -> tuple[date
                         baldes_prev[clave] = actual
                     else:
                         d[m.nombre] = v
-                filas.append(_fila(ev, puntos[ev], corrida, valido, d))
+                filas.append(_fila(ev, puntos[ev], corrida, valido, d, (elegidos or {}).get(ev)))
             time.sleep(PAUSA_S)
     return corrida, filas
 
 
-def _fila(ev: str, punto: tuple[float, float], corrida: datetime, valido: datetime, d: dict) -> dict:
+def _fila(ev: str, punto: tuple[float, float], corrida: datetime, valido: datetime, d: dict,
+          pm: grib.Punto | None = None) -> dict:
     t = d.get("2t")
     td = d.get("2d")
     t_c = t - 273.15 if t is not None else None
@@ -167,7 +171,14 @@ def _fila(ev: str, punto: tuple[float, float], corrida: datetime, valido: dateti
         "cape": _r(d.get("cape"), 0), "radiacion": _r(ssrd, 0),
         "nubosidad": _r(d.get("tcc")), "presion": _r(pres_hpa),
         "wbgt_est": wbgt,
+        **_punto(pm),
     }
+
+
+def _punto(pm: grib.Punto | None) -> dict:
+    if pm is None:
+        return {}
+    return {"punto_lat": round(pm.lat, 3), "punto_lon": round(pm.lon, 3), "punto_tierra": pm.tierra}
 
 
 def _r(x, n=2):

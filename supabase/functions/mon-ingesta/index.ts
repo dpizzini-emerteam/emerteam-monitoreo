@@ -38,6 +38,12 @@ async function autorizado(req: Request): Promise<boolean> {
   }
 }
 
+function distanciaKm(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
+  const r = Math.PI / 180;
+  const h = Math.sin(((b.lat - a.lat) * r) / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(((b.lon - a.lon) * r) / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.sqrt(h));
+}
+
 const FUENTES = new Set(["gfs", "ecmwf", "icon", "wrf_smn", "met_no"]);
 
 Deno.serve(async (req) => {
@@ -71,6 +77,19 @@ Deno.serve(async (req) => {
       }
       respuesta.ultimas_corridas = ultimas;
 
+      // Última corrida por evento y fuente: un evento nuevo (o con fecha/lugar cambiados) se procesa
+      // aunque la corrida ya esté guardada para los demás
+      const porEvento: Record<string, Record<string, string>> = {};
+      for (const ev of eventos ?? []) {
+        porEvento[ev.id] = {};
+        for (const fuente of ["gfs", "ecmwf"]) {
+          const { data } = await supabase.from("mon_pronosticos").select("corrida")
+            .eq("evento_id", ev.id).eq("fuente", fuente).order("corrida", { ascending: false }).limit(1);
+          if (data?.[0]) porEvento[ev.id][fuente] = data[0].corrida;
+        }
+      }
+      respuesta.ultimas_por_evento = porEvento;
+
       if (url.searchParams.get("incluir") === "pronosticos" && eventos?.length) {
         const ids = eventos.map((e) => e.id);
         const pron: unknown[] = [];
@@ -90,6 +109,29 @@ Deno.serve(async (req) => {
           if (!data || data.length < 1000) break;
         }
         respuesta.pronosticos = pron;
+
+        // Estación del SMN más cercana a cada evento (hasta 60 km) y sus observaciones de los últimos 4 días
+        const { data: est } = await supabase.from("mon_estado").select("valor").eq("clave", "smn_estaciones").maybeSingle();
+        const lista = est ? (JSON.parse(String(est.valor)) as { nombre: string; lat: number; lon: number }[]) : [];
+        const estaciones: Record<string, { nombre: string; lat: number; lon: number; km: number }> = {};
+        for (const ev of eventos) {
+          let mejor: { nombre: string; lat: number; lon: number; km: number } | null = null;
+          for (const e of lista) {
+            const km = distanciaKm({ lat: Number(ev.lat), lon: Number(ev.lon) }, e);
+            if (km <= 60 && (!mejor || km < mejor.km)) mejor = { nombre: e.nombre, lat: e.lat, lon: e.lon, km: Math.round(km * 10) / 10 };
+          }
+          if (mejor) estaciones[ev.id] = mejor;
+        }
+        respuesta.estaciones = estaciones;
+        const nombres = [...new Set(Object.values(estaciones).map((e) => e.nombre))];
+        const observaciones: Record<string, unknown[]> = {};
+        if (nombres.length) {
+          const { data: obs, error: e4 } = await supabase.from("mon_observaciones").select("estacion,valido,temp,hr,viento,dir_viento")
+            .in("estacion", nombres).gte("valido", new Date(Date.now() - 4 * 86400_000).toISOString()).order("valido").limit(5000);
+          if (e4) throw e4;
+          for (const o of obs ?? []) (observaciones[o.estacion as string] ??= []).push(o);
+        }
+        respuesta.observaciones = observaciones;
       }
       return json(respuesta);
     }
@@ -106,6 +148,27 @@ Deno.serve(async (req) => {
           const { error } = await supabase
             .from("mon_pronosticos")
             .upsert(filas.slice(i, i + 500), { onConflict: "evento_id,fuente,valido" });
+          if (error) throw error;
+        }
+        return json({ ok: true, filas: filas.length });
+      }
+
+      if (body.tipo === "correcciones") {
+        // Solo actualiza las columnas *_corr de filas ya guardadas
+        const permitidas = ["evento_id", "fuente", "corrida", "valido", "t2m_corr", "td2m_corr", "hr_corr", "viento10_corr", "rafaga10_corr", "wbgt_corr"];
+        const filas = ((body.filas ?? []) as Record<string, unknown>[]).map((f) => Object.fromEntries(permitidas.map((k) => [k, f[k] ?? null])));
+        if (!filas.every((f) => FUENTES.has(String(f.fuente)))) return json({ error: "fuente desconocida" }, 400);
+        for (let i = 0; i < filas.length; i += 500) {
+          const { error } = await supabase.from("mon_pronosticos").upsert(filas.slice(i, i + 500), { onConflict: "evento_id,fuente,valido" });
+          if (error) throw error;
+        }
+        return json({ ok: true, filas: filas.length });
+      }
+
+      if (body.tipo === "sesgos") {
+        const filas = (body.filas ?? []) as Record<string, unknown>[];
+        if (filas.length) {
+          const { error } = await supabase.from("mon_sesgos").upsert(filas, { onConflict: "evento_id,fuente" });
           if (error) throw error;
         }
         return json({ ok: true, filas: filas.length });

@@ -40,6 +40,16 @@ class Ingesta:
         r.raise_for_status()
         return r.json()
 
+    def correcciones(self, filas: list[dict]) -> dict:
+        r = self.s.post(URL, json={"tipo": "correcciones", "filas": filas}, headers=self._h(), timeout=180)
+        r.raise_for_status()
+        return r.json()
+
+    def sesgos(self, filas: list[dict]) -> dict:
+        r = self.s.post(URL, json={"tipo": "sesgos", "filas": filas}, headers=self._h(), timeout=60)
+        r.raise_for_status()
+        return r.json()
+
     def niveles(self, por_evento: dict[str, list[dict]]) -> dict:
         r = self.s.post(URL, json={"tipo": "niveles", "eventos": por_evento}, headers=self._h(), timeout=120)
         r.raise_for_status()

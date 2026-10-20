@@ -57,7 +57,16 @@ def obtener(eventos: list[dict], hasta: datetime, ahora: datetime) -> tuple[date
                 if not quitar:
                     raise
                 params = [p for p in params if p not in quitar]
-        msgs = grib.leer(path, puntos)
+        # Máscara tierra/mar (paso 0, campo fijo) para elegir el punto de tierra más cercano
+        elegidos = None
+        try:
+            mascara = os.path.join(tmp, "lsm.grib2")
+            _cliente().retrieve(date=corrida.strftime("%Y%m%d"), time=corrida.hour, type="fc",
+                                stream="oper", step=0, param="lsm", target=mascara)
+            elegidos = grib.puntos_modelo(mascara, puntos)
+        except Exception as e:  # noqa: BLE001
+            log.warning("ECMWF: sin máscara tierra/mar (%s); se usa el punto más cercano", str(e)[:200])
+        msgs = grib.leer(path, puntos, elegidos)
 
     log.info("ECMWF variables: %s", sorted({(m.nombre, m.tipo_paso) for m in msgs}))
     por_paso: dict[int, dict[str, dict[str, float]]] = {}
@@ -71,11 +80,11 @@ def obtener(eventos: list[dict], hasta: datetime, ahora: datetime) -> tuple[date
                 continue
             d = {k: v.get(ev) for k, v in por_paso.get(paso, {}).items()}
             prev = {k: v.get(ev) for k, v in por_paso.get(paso - PASO, {}).items()}
-            filas.append(_fila(ev, punto, corrida, corrida + timedelta(hours=paso), d, prev))
+            filas.append(_fila(ev, punto, corrida, corrida + timedelta(hours=paso), d, prev, (elegidos or {}).get(ev)))
     return corrida, filas
 
 
-def _fila(ev, punto, corrida, valido, d, prev) -> dict:
+def _fila(ev, punto, corrida, valido, d, prev, pm: grib.Punto | None = None) -> dict:
     t = d.get("2t")
     td = d.get("2d")
     t_c = t - 273.15 if t is not None else None
@@ -110,6 +119,7 @@ def _fila(ev, punto, corrida, valido, d, prev) -> dict:
         "precip": _r(precip), "prob_precip": None,
         "cape": _r(d.get("mucape"), 0), "radiacion": _r(ssrd, 0),
         "nubosidad": _r(tcc), "presion": _r(pres_hpa), "wbgt_est": wbgt,
+        **({} if pm is None else {"punto_lat": round(pm.lat, 3), "punto_lon": round(pm.lon, 3), "punto_tierra": pm.tierra}),
     }
 
 
