@@ -84,9 +84,13 @@ export type Acceso = {
   recibe_alertas: boolean;
 };
 
-export async function esAdmin(): Promise<boolean> {
-  const { data } = await supabase.from("mon_admins").select("email").limit(1);
-  return !!data && data.length > 0;
+export type RolEquipo = "editor" | "lector";
+export type IntegranteEquipo = { email: string; nombre: string; rol: RolEquipo; creado_en: string };
+
+/** Rol en el equipo EMERTEAM de la cuenta actual (null si no integra el equipo) */
+export async function miRol(email: string): Promise<RolEquipo | null> {
+  const { data } = await supabase.from("mon_admins").select("rol").eq("email", email.toLowerCase()).maybeSingle();
+  return (data?.rol as RolEquipo | undefined) ?? null;
 }
 
 export const TZ = "America/Argentina/Buenos_Aires";

@@ -92,3 +92,9 @@ thead th { background: var(--fondo); border-top: none; }
 .grilla > * { min-width: 0; }
 .tarjeta .rotulo { min-width: 0; overflow-wrap: break-word; hyphens: auto; }
 @media (max-width: 600px) { .tarjeta .rotulo { letter-spacing: 0.06em; } }
+
+/* Tablas de gestión */
+.tabla { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tabla th { text-align: left; padding: 8px; border-bottom: 2px solid var(--negro); font-family: "Barlow Condensed"; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; }
+.tabla td { padding: 8px; border-bottom: 1px solid var(--borde); vertical-align: middle; }
+.tabla select { min-height: 36px; font: inherit; padding: 0 8px; border: 1px solid var(--borde); border-radius: 6px; background: #fff; }

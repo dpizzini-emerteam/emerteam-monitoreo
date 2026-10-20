@@ -9,7 +9,7 @@ type Max = { nivel: number; variable: string; desde: string };
 type Resumen = Record<string, Record<string, Max>>; // evento -> fase -> nivel máximo vigente
 
 export function Eventos() {
-  const { admin, session } = useOutletContext<Ctx>();
+  const { admin, editor, session } = useOutletContext<Ctx>();
   const [eventos, setEventos] = useState<Evento[] | null>(null);
   const [resumen, setResumen] = useState<Resumen>({});
   const [verCerrados, setVerCerrados] = useState(false);
@@ -48,6 +48,11 @@ export function Eventos() {
     <>
       <Barra titulo={admin ? "Administración" : "Mis eventos"} subtitulo={session.user.email ?? ""}>
         {admin && (
+          <Link className="boton-osc" to="/equipo">
+            Equipo EMERTEAM
+          </Link>
+        )}
+        {editor && (
           <Link className="boton-osc" to="/evento/nuevo">
             + Nuevo evento
           </Link>
@@ -63,8 +68,10 @@ export function Eventos() {
         {eventos === null && <p>Cargando…</p>}
         {eventos?.length === 0 && (
           <div className="tarjeta">
-            {admin
+            {editor
               ? "No hay eventos cargados. Usá “Nuevo evento” para activar el monitoreo."
+              : admin
+              ? "No hay eventos cargados."
               : "Todavía no tenés eventos asignados. Si esperabas ver uno, pedile a EMERTEAM que asocie tu correo al evento."}
           </div>
         )}
@@ -97,7 +104,7 @@ export function Eventos() {
                       );
                     })}
                     <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                      {admin && (
+                      {editor && (
                         <Link className="boton" to={`/evento/${e.id}/editar`}>
                           Editar
                         </Link>

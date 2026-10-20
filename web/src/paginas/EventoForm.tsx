@@ -36,7 +36,7 @@ const VACIO: Form = {
 };
 
 export function EventoForm() {
-  const { admin, session } = useOutletContext<Ctx>();
+  const { editor, session } = useOutletContext<Ctx>();
   const { id } = useParams();
   const nav = useNavigate();
   const [f, setF] = useState<Form>(VACIO);
@@ -82,7 +82,7 @@ export function EventoForm() {
     else marca.current.setLatLng([lat, lon]);
   }, [f.lat, f.lon]);
 
-  if (!admin) return <p className="contenedor">Solo EMERTEAM puede cargar eventos.</p>;
+  if (!editor) return <p className="contenedor" style={{ paddingTop: 26 }}>Solo los editores de EMERTEAM pueden cargar y editar eventos.</p>;
 
   const set = (k: keyof Form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
 

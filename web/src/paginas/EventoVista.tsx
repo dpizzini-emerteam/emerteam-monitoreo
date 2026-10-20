@@ -63,7 +63,7 @@ function useSonido() {
 
 export function EventoVista() {
   const { id } = useParams();
-  const { admin, session } = useOutletContext<Ctx>();
+  const { editor, session } = useOutletContext<Ctx>();
   const miEmail = (session.user.email ?? "").toLowerCase();
   const [ev, setEv] = useState<Evento | null>(null);
   const [pron, setPron] = useState<Pronostico[]>([]);
@@ -127,7 +127,7 @@ export function EventoVista() {
       <Barra titulo={ev.nombre} subtitulo={`${fmtFechaHora(ev.largada)} · ${cuenta}`}>
         <span className="badge" style={{ ...estiloNivel(maxCarreraWbgt) }} title="Escala WBGT World Athletics (2020), máximo previsto para la carrera">WBGT · {NOMBRE_WA[maxCarreraWbgt]}</span>
         {alertas.length > 0 && <a href="#alerta-smn" className="boton-osc alerta" style={{ background: COLOR_SMN[alertas[0].color], color: "#111", borderColor: "#fff", fontWeight: 800 }}>Alerta SMN</a>}
-        {admin && <Link className="boton-osc" to={`/evento/${ev.id}/editar`}>Editar</Link>}
+        {editor && <Link className="boton-osc" to={`/evento/${ev.id}/editar`}>Editar</Link>}
         <Link className="boton-osc" to="/">Eventos</Link>
       </Barra>
 
@@ -163,7 +163,7 @@ export function EventoVista() {
         <Dias ev={ev} serie={serie} niveles={niveles} armado={v.armado} desarme={v.desarme} largada={v.largada} />
         <DiaCarrera serie={serie} v={v} />
         <Recomendaciones vigentes={vigentes} />
-        <Accesos eventoId={ev.id} puedeGestionar={admin || ev.organizador_email.toLowerCase() === miEmail} miEmail={miEmail} />
+        <Accesos eventoId={ev.id} puedeGestionar={editor || ev.organizador_email.toLowerCase() === miEmail} miEmail={miEmail} />
         <section className="seccion tarjeta" id="fuentes">
           <div className="rotulo">Fuentes y metodología</div>
           <p className="chico" style={{ marginBottom: 0 }}>
