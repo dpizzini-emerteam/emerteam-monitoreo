@@ -5,7 +5,7 @@ import {
   COLOR_SMN, estadoRayosGLM, fmtFechaHora, fmtHora, kmPorTrueno, nivelRayoMedido, nivelWBGT, num, ordenarAlertas, supabase, tituloAlerta,
   type AlertaSMN, type Evento, type Medicion, type Nivel, type Pronostico, type Rayo,
 } from "../datos";
-import { estiloNivel, estiloVariable, estiloWA, NOMBRE_CORTO, NOMBRE_FASE, NOMBRE_WA, nombreNivel, recomendacion } from "../reglas";
+import { ESTILO_SIN_DATOS, estiloNivel, estiloVariable, estiloWA, NOMBRE_CORTO, NOMBRE_FASE, NOMBRE_WA, nombreNivel, recomendacion } from "../reglas";
 import { consenso } from "../serie";
 import { calcular } from "../ventanas";
 
@@ -137,7 +137,7 @@ export function Comando() {
         <div className="cmd-celda">
           <div className="cmd-rot">WBGT {medW ? "medido" : "estimado"}</div>
           <div className="cmd-valor">{num(wbgt, 1)}<small>°C</small></div>
-          <span className="badge cmd-badge" style={estiloWA(nW ?? 0)}>{NOMBRE_WA[nW ?? 0]}</span>
+          {nW == null ? <span className="badge cmd-badge" style={ESTILO_SIN_DATOS}>Sin dato</span> : <span className="badge cmd-badge" style={estiloWA(nW)}>{NOMBRE_WA[nW]}</span>}
           <div className="cmd-nota">{medW ? `${medW.sector} · ${fmtHora(medW.tomada_en)}` : "Modelos · sin medición en la última hora"}</div>
         </div>
         <div className="cmd-celda">
@@ -146,6 +146,7 @@ export function Comando() {
           {(() => {
             const nv = Math.max(0, ...nivelesAhora.filter((n) => n.variable.startsWith("viento_")).map((n) => n.nivel));
             const peor = nivelesAhora.filter((n) => n.variable.startsWith("viento_")).sort((a, b) => b.nivel - a.nivel)[0];
+            if (!peor && rafaga == null) return <span className="badge cmd-badge" style={ESTILO_SIN_DATOS}>Sin dato</span>;
             return <span className="badge cmd-badge" style={estiloNivel(nv)}>{peor && nv > 0 ? `${nombreNivel(peor.variable, nv)} · ${NOMBRE_CORTO[peor.variable].replace("Viento · ", "")}` : "Bajo umbral"}</span>;
           })()}
           <div className="cmd-nota">{medV ? `${medV.sector} · ${fmtHora(medV.tomada_en)} · a ${num(medV.altura_viento_m, 1)} m` : "Modelos · ráfaga a 10 m"}</div>

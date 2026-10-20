@@ -144,3 +144,9 @@ export function recomendacion(variable: string, nivel: number, fase: string): st
   }
   return null;
 }
+
+/** Fase o variable todavía sin pronóstico: no se muestra un nivel que el sistema no calculó */
+export const SIN_PRONOSTICO = "Sin pronóstico";
+export const ESTILO_SIN_DATOS: import("react").CSSProperties = {
+  background: "transparent", color: "var(--texto2, #6b6b6b)", border: "1px dashed var(--borde-input)",
+};

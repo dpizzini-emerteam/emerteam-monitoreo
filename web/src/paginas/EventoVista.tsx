@@ -148,7 +148,7 @@ export function EventoVista() {
       <div className="contenedor">
         {PESTANAS.map((x) => (
           <Link key={x.clave} to={`/evento/${ev.id}/${x.clave}`} className="pestana" aria-current={x.clave === actual ? "page" : undefined}>
-            {FASES_DE[x.clave].length > 0 && <span className="punto" style={{ background: estiloNivel(nivelFase(FASES_DE[x.clave])).background }} aria-hidden />}
+            {FASES_DE[x.clave].length > 0 && <span className="punto" style={{ background: delaFase(x.clave).length ? estiloNivel(nivelFase(FASES_DE[x.clave])).background : "var(--borde-input)" }} aria-hidden />}
             {x.titulo}
           </Link>
         ))}

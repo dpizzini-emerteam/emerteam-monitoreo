@@ -4,7 +4,7 @@ import type { Ctx } from "../main";
 import { Barra } from "../componentes/Barra";
 import { Introduccion } from "../componentes/Introduccion";
 import { diaLocal, fmtDia, fmtHora, supabase, type Evento, type Nivel } from "../datos";
-import { COLOR_NIVEL, estiloNivel, estiloVariable, NOMBRE_CORTO, NOMBRE_FASE, nombreNivel } from "../reglas";
+import { COLOR_NIVEL, ESTILO_SIN_DATOS, estiloNivel, estiloVariable, NOMBRE_CORTO, NOMBRE_FASE, nombreNivel, SIN_PRONOSTICO } from "../reglas";
 
 type Max = { nivel: number; variable: string; desde: string };
 type Resumen = Record<string, Record<string, Max>>; // evento -> fase -> nivel máximo vigente
@@ -13,6 +13,7 @@ export function Eventos() {
   const { admin, editor, session } = useOutletContext<Ctx>();
   const [eventos, setEventos] = useState<Evento[] | null>(null);
   const [resumen, setResumen] = useState<Resumen>({});
+  const [cubiertas, setCubiertas] = useState<Record<string, Set<string>>>({}); // evento -> fases con pronóstico
   const [verCerrados, setVerCerrados] = useState(false);
 
   useEffect(() => {
@@ -28,16 +29,20 @@ export function Eventos() {
           .select("evento_id,fase,nivel,variable,desde")
           .in("evento_id", ids)
           .gt("hasta", new Date().toISOString())
-          .gt("nivel", 0);
+          .limit(10000);
         const r: Resumen = {};
+        const c: Record<string, Set<string>> = {};
         for (const n of (niv ?? []) as Pick<Nivel, "evento_id" | "fase" | "nivel" | "variable" | "desde">[]) {
           // La jornada del personal transcurre el día de carrera
           const fase = n.fase === "personal" ? "carrera" : n.fase;
+          (c[n.evento_id] ??= new Set()).add(fase);
+          if (n.nivel <= 0) continue;
           r[n.evento_id] ??= {};
           const prev = r[n.evento_id][fase];
           if (!prev || n.nivel > prev.nivel || (n.nivel === prev.nivel && n.desde < prev.desde)) r[n.evento_id][fase] = n;
         }
         setResumen(r);
+        setCubiertas(c);
       }
     })();
   }, [verCerrados]);
@@ -86,9 +91,10 @@ export function Eventos() {
               {evs.map((e) => {
                 const r = resumen[e.id] ?? {};
                 const max = Math.max(0, ...Object.values(r).map((m) => m.nivel));
+                const cub = cubiertas[e.id];
                 return (
                   <article key={e.id} className="tarjeta" style={{ display: "grid", gridTemplateColumns: "minmax(240px,2fr) repeat(auto-fit,minmax(130px,1fr))", gap: 14, alignItems: "center" }}>
-                    <div style={{ borderLeft: `5px solid ${COLOR_NIVEL[max]}`, paddingLeft: 12 }}>
+                    <div style={{ borderLeft: `5px solid ${cub?.size ? COLOR_NIVEL[max] : "var(--borde-input)"}`, paddingLeft: 12 }}>
                       <div className="condensada" style={{ fontSize: 22, fontWeight: 800, textTransform: "uppercase", lineHeight: 1.1 }}>{e.nombre}</div>
                       <div className="chico">
                         {e.ubicacion} · {fmtHora(e.largada)} · {(e.mon_modalidades ?? []).map((m) => m.nombre).join(", ")} · {e.participantes.toLocaleString("es-AR")} participantes
@@ -100,7 +106,9 @@ export function Eventos() {
                       return (
                         <div key={f} className="fase-estado">
                           <div className="rotulo">{NOMBRE_FASE[f]}</div>
-                          <span className="badge" style={m ? estiloVariable(m.variable, m.nivel) : estiloNivel(0)}>{m ? nombreNivel(m.variable, m.nivel) : "Bajo umbral"}</span>
+                          {cub?.has(f)
+                            ? <span className="badge" style={m ? estiloVariable(m.variable, m.nivel) : estiloNivel(0)}>{m ? nombreNivel(m.variable, m.nivel) : "Bajo umbral"}</span>
+                            : <span className="badge" style={ESTILO_SIN_DATOS}>{SIN_PRONOSTICO}</span>}
                           {m && <div className="chico">{NOMBRE_CORTO[m.variable] ?? m.variable} · {fmtDia(m.desde)} {fmtHora(m.desde)}</div>}
                         </div>
                       );

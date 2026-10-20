@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { diaLocal, fmtDia, fmtFechaHora, fmtHora, type AlertaSMN, type Nivel } from "../datos";
-import { estiloNivel, estiloVariable, NOMBRE_CORTO, nombreNivel, recomendacion } from "../reglas";
+import { ESTILO_SIN_DATOS, estiloNivel, estiloVariable, NOMBRE_CORTO, nombreNivel, recomendacion, SIN_PRONOSTICO } from "../reglas";
 
 const BLOQUES = [
   { clave: "armado", titulo: "Armado", fases: ["armado"] },
@@ -41,8 +41,9 @@ function accion(it: Item): string {
 
 export function Resumen({ vigentes, alertas, eventoId }: { vigentes: Nivel[]; alertas: AlertaSMN[]; eventoId: string }) {
   const bloques = BLOQUES.map((b) => {
-    const its = items(vigentes.filter((n) => (b.fases as readonly string[]).includes(n.fase)));
-    return { ...b, its, nivel: its[0]?.nivel ?? 0 };
+    const propios = vigentes.filter((n) => (b.fases as readonly string[]).includes(n.fase));
+    const its = items(propios);
+    return { ...b, its, nivel: its[0]?.nivel ?? 0, cubierto: propios.length > 0 };
   });
   const principal = bloques.flatMap((b) => b.its.map((it) => ({ ...it, bloque: b.titulo }))).sort((a, b) => b.nivel - a.nivel || a.desde.localeCompare(b.desde))[0];
   const hayDatos = vigentes.length > 0;
@@ -65,7 +66,8 @@ export function Resumen({ vigentes, alertas, eventoId }: { vigentes: Nivel[]; al
           </p>
         ) : (
           <p className="resumen-principal" style={{ borderColor: "#2FA34C" }}>
-            <b>Lo principal:</b> con el pronóstico actual, ninguna variable supera los umbrales en armado, carrera ni desarme. El dispositivo previsto es suficiente; la página avisa si eso cambia.
+            <b>Lo principal:</b> con el pronóstico actual, ninguna variable supera los umbrales en {bloques.filter((b) => b.cubierto).map((b) => b.titulo.toLowerCase()).join(", ").replace(/, ([^,]*)$/, " ni $1")}.
+            {bloques.every((b) => b.cubierto) ? " El dispositivo previsto es suficiente; la página avisa si eso cambia." : ` ${bloques.filter((b) => !b.cubierto).map((b) => b.titulo).join(" y ")} todavía sin pronóstico.`}
           </p>
         )}
 
@@ -74,10 +76,12 @@ export function Resumen({ vigentes, alertas, eventoId }: { vigentes: Nivel[]; al
             <Link key={b.clave} to={`/evento/${eventoId}/${b.clave}`} className="resumen-fase">
               <div className="resumen-cab">
                 <span className="rotulo">{b.titulo}</span>
-                <span className="badge" style={estiloNivel(b.nivel)}>{ESTADO[b.nivel]}</span>
+                {b.cubierto
+                  ? <span className="badge" style={estiloNivel(b.nivel)}>{ESTADO[b.nivel]}</span>
+                  : <span className="badge" style={ESTILO_SIN_DATOS}>{SIN_PRONOSTICO}</span>}
               </div>
               {b.its.length === 0 ? (
-                <p className="chico" style={{ margin: 0 }}>{hayDatos ? "Ninguna variable supera su umbral." : "Sin datos todavía."}</p>
+                <p className="chico" style={{ margin: 0 }}>{b.cubierto ? "Ninguna variable supera su umbral." : "Todavía fuera del alcance de los modelos (unos 6 días antes). Se completa sola."}</p>
               ) : (
                 <ul>
                   {b.its.slice(0, 3).map((it) => (
