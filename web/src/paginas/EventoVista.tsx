@@ -371,7 +371,7 @@ function Dias({ titulo, serie, uvDia, niveles, desde, hasta, nota, franjaSegura 
             <article key={d} className="tarjeta dia-tarjeta">
               <div className="dia-franja" style={{ background: colorNivel }} aria-hidden />
               <div className="dia-cab">
-                <span className="dia-fecha">{fmtDia(ps[0].valido)}</span>
+                <span className="dia-fecha">{(() => { const [dsem, ...resto] = fmtDia(ps[0].valido).replace(",", "").split(" "); return <>{dsem} <span>{resto.join(" ")}</span></>; })()}</span>
                 <span className="badge" style={estiloDia}>{nombreDia}</span>
               </div>
               <div className="dia-clima">
@@ -392,7 +392,7 @@ function Dias({ titulo, serie, uvDia, niveles, desde, hasta, nota, franjaSegura 
                 {peorDia && nivelDia > 0 ? (
                   <div className="dia-accion" style={{ borderColor: colorNivel }}>
                     <b>{NOMBRE_VARIABLE[peorDia.variable] ?? NOMBRE_CORTO[peorDia.variable]}</b>
-                    <span>{nombreDia} desde las {fmtHora(new Date(Math.max(new Date(peorDia.desde).getTime(), new Date(`${d}T00:00:00-03:00`).getTime())).toISOString())}</span>
+                    <span className="dia-accion-nivel" style={{ color: colorTextoNivel(colorNivel) }}>{nombreDia} desde las {fmtHora(new Date(Math.max(new Date(peorDia.desde).getTime(), new Date(`${d}T00:00:00-03:00`).getTime())).toISOString())}</span>
                   </div>
                 ) : (
                   <div className="dia-accion" style={{ borderColor: colorNivel }}><span>Sin variables por encima del umbral.</span></div>
@@ -608,4 +608,13 @@ function AjusteLocal({ ev, sesgos, pron }: { ev: Evento; sesgos: Sesgo[]; pron: 
       </p>
     </section>
   );
+}
+
+/** Color legible del nivel sobre fondo claro: los tonos muy claros (WBGT «Precaución», blanco) pasan a texto oscuro */
+function colorTextoNivel(c: string): string {
+  const x = c.replace("#", "");
+  if (x.length !== 6) return "var(--texto)";
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(x.slice(i, i + 2), 16) / 255);
+  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return lum > 0.55 ? "var(--texto)" : c;
 }

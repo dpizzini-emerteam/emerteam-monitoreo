@@ -372,6 +372,8 @@ input, select, textarea, button { font-family: inherit; }
 .dia-franja { height: 6px; }
 .dia-cab { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 14px 18px 0; }
 .dia-fecha { font-family: "Barlow Condensed", Arial, sans-serif; font-size: 22px; font-weight: 800; text-transform: uppercase; }
+.dia-fecha span { color: var(--texto3, #8a8a8a); font-weight: 700; }
+.dia-accion-nivel { font-weight: 700; }
 .dia-cab .badge { font-size: 14px; }
 .dia-clima { display: flex; align-items: center; gap: 14px; padding: 8px 18px 14px; }
 .dia-temps { line-height: 1; }
