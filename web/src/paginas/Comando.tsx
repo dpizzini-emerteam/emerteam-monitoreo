@@ -6,7 +6,7 @@ import {
   type AlertaSMN, type Evento, type Medicion, type Nivel, type Pronostico, type Uv, type Rayo,
 } from "../datos";
 import { ESTILO_SIN_DATOS, estiloNivel, estiloVariable, estiloWA, NOMBRE_CORTO, NOMBRE_FASE, NOMBRE_WA, nombreNivel, recomendacion } from "../reglas";
-import { UvChip } from "../componentes/Uv";
+import { Humedad, UvChip } from "../componentes/Uv";
 import { consenso } from "../serie";
 import { calcular } from "../ventanas";
 
@@ -171,7 +171,7 @@ export function Comando() {
             {actualP && <Icono tipo={iconoTiempo(actualP)} size={72} />}
             <div className="cmd-valor">{num(medW?.temp ?? actualP?.t2m)}<small>°C</small></div>
           </div>
-          <div className="cmd-nota">HR {num(medW?.hr ?? actualP?.hr)} % · lluvia {num(actualP?.precip, 1)} mm/h</div>
+          <div className="cmd-nota" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}><Humedad texto={`${num(medW?.hr ?? actualP?.hr)} %`} size={18} /> <span>lluvia {num(actualP?.precip, 1)} mm/h</span></div>
           <div style={{ marginTop: 6 }}><UvChip uv={actualP?.uv} /></div>
         </div>
       </section>
@@ -203,10 +203,10 @@ export function Comando() {
               <div key={h} className="cmd-hora" style={uc ? { outline: "3px solid var(--naranja)" } : undefined}>
                 <b>{fmtHora(p.valido)}</b>
                 <Icono tipo={iconoTiempo(p, (p.radiacion ?? 0) < 5)} size={44} />
-                <span>{num(p.t2m)}°</span>
+                <span>{num(p.t2m)} °C</span>
                 <span className="cmd-wbgt" style={estiloWA(n)}>WBGT {num(p.wbgt_est, 1)}</span>
                 <span className="cmd-chico">ráf. {num(p.rafaga10)}</span>
-                <span className="cmd-chico">HR {num(p.hr)} %</span>
+                <span className="cmd-chico"><Humedad texto={`${num(p.hr)} %`} size={15} /></span>
                 {(p.uv ?? 0) >= 0.5 ? <UvChip uv={p.uv} compacto /> : <span className="cmd-chico">UV {p.uv == null ? "—" : "0"}</span>}
                 <span className="cmd-chico">{num(p.precip, 1)} mm/h</span>
               </div>

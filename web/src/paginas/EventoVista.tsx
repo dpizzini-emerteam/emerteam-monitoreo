@@ -12,7 +12,7 @@ import { Introduccion } from "../componentes/Introduccion";
 import { Resumen } from "../componentes/Resumen";
 import { Mediciones } from "../componentes/Mediciones";
 import { consenso, FUENTE_UV, PRIORIDAD, uvMaxPorDia } from "../serie";
-import { UvChip } from "../componentes/Uv";
+import { Humedad, UvChip } from "../componentes/Uv";
 import {
   COLOR_SMN, estadoRayosGLM, ordenarAlertas, tituloAlerta, diaLocal, fmtDia, fmtFechaHora, fmtHora, num, supabase,
   type AlertaSMN, type Evento, type Rayo, type Nivel, type Pronostico, type Sesgo, type Uv,
@@ -369,14 +369,14 @@ function Dias({ titulo, serie, uvDia, niveles, desde, hasta, nota, franjaSegura 
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <Icono tipo={iconoTiempo(peor)} size={60} />
                 <div style={{ textAlign: "right", lineHeight: 1 }}>
-                  <div className="condensada" style={{ fontSize: 32, fontWeight: 800 }}>{num(Math.max(...t))}°</div>
-                  <div className="condensada" style={{ fontSize: 22, color: "var(--texto3)" }}>{num(Math.min(...t))}°</div>
+                  <div className="condensada" style={{ fontSize: 32, fontWeight: 800 }}>{num(Math.max(...t))}<small className="unidad">°C</small></div>
+                  <div className="condensada" style={{ fontSize: 22, color: "var(--texto3)" }}>{num(Math.min(...t))}<small className="unidad">°C</small></div>
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600 }}><Icono tipo="viento" size={20} />ráf. {num(raf)} km/h</div>
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600 }}><Icono tipo="gota" size={20} />{num(lluvia, 1)} mm</div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", fontWeight: 600 }}>
-                <span>HR {hrs.length ? `${num(Math.min(...hrs))}–${num(Math.max(...hrs))}` : "—"} %</span>
+                <Humedad texto={hrs.length ? `${num(Math.min(...hrs))}–${num(Math.max(...hrs))} %` : "—"} />
                 <UvChip uv={uvMax} />
               </div>
               <span className="badge" style={{ ...(peorDia && nivelDia > 0 ? estiloVariable(peorDia.variable, nivelDia) : estiloNivel(0)), alignSelf: "flex-start", fontSize: 13 }}>{peorDia && nivelDia > 0 ? nombreNivel(peorDia.variable, nivelDia) : "Bajo umbral"}</span>
@@ -392,7 +392,7 @@ function Dias({ titulo, serie, uvDia, niveles, desde, hasta, nota, franjaSegura 
           );
         })}
       </div>
-      <p className="chico">{nota} · HR: humedad relativa mínima y máxima del día · UV: máximo del día. {FUENTE_UV}</p>
+      <p className="chico">{nota} · Gota con %: humedad relativa mínima y máxima del día · UV: máximo del día. {FUENTE_UV}</p>
     </section>
   );
 }
@@ -456,12 +456,12 @@ function DiaCarrera({ serie, v }: { serie: Map<number, Pronostico & { n: number 
                     <b className="condensada" style={{ fontSize: 22 }}>{fmtHora(p.valido)}</b>
                     <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--texto2)" }}>{fase(t)}</span>
                     <Icono tipo={iconoTiempo(p, noche)} size={48} />
-                    <b className="condensada" style={{ fontSize: 24 }}>{num(p.t2m)}°</b>
-                    <span style={{ alignSelf: "stretch", ...estiloWA(n), fontWeight: 700, fontSize: 14, padding: "4px 6px", borderRadius: 4 }}>WBGT {num(p.wbgt_est, 1)}°</span>
+                    <b className="condensada" style={{ fontSize: 24 }}>{num(p.t2m)}<small className="unidad">°C</small></b>
+                    <span style={{ alignSelf: "stretch", ...estiloWA(n), fontWeight: 700, fontSize: 14, padding: "4px 6px", borderRadius: 4 }}>WBGT {num(p.wbgt_est, 1)} °C</span>
                     <span style={{ fontSize: 14, fontWeight: 600 }}>
                       <span style={{ display: "inline-block", transform: `rotate(${(p.dir_viento ?? 0) + 180}deg)` }}>↑</span> {num(p.viento10)}/{num(p.rafaga10)}
                     </span>
-                    <span className="chico">HR {num(p.hr)} %</span>
+                    <span className="chico"><Humedad texto={`${num(p.hr)} %`} size={16} /></span>
                     {(p.uv ?? 0) >= 0.5 ? <UvChip uv={p.uv} compacto /> : <span className="chico">UV {p.uv == null ? "—" : "0"}</span>}
                     <span className="chico">{num(p.precip, 1)} mm/h</span>
                   </div>
@@ -477,7 +477,7 @@ function DiaCarrera({ serie, v }: { serie: Map<number, Pronostico & { n: number 
             </div>
           ))}
         </div>
-        <span className="chico">Escala y colores WBGT: World Athletics (2020), Tabla 1; «Riesgo bajo» corresponde a «Almost Safe» · viento medio / ráfaga en km/h a 10 m · HR: humedad relativa · {FUENTE_UV}</span>
+        <span className="chico">Escala y colores WBGT: World Athletics (2020), Tabla 1; «Riesgo bajo» corresponde a «Almost Safe» · viento medio / ráfaga en km/h a 10 m · gota con %: humedad relativa · {FUENTE_UV}</span>
       </div>
     </section>
   );

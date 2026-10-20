@@ -361,3 +361,6 @@ input, select, textarea, button { font-family: inherit; }
 .guia-glosario dt { font-weight: 700; }
 .guia-glosario dd { margin: 2px 0 0; font-size: 15px; color: var(--texto2, #444); }
 @media (max-width: 640px) { .guia-tabla { min-width: 600px; } }
+
+.humedad { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.unidad { font-size: .5em; font-weight: 700; margin-left: 2px; vertical-align: super; }

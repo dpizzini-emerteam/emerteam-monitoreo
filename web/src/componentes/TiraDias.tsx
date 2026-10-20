@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { diaLocal, type Pronostico } from "../datos";
 import { Icono, type TipoIcono } from "./Icono";
-import { UvChip } from "./Uv";
+import { Humedad, UvChip } from "./Uv";
 
 type Fila = Pronostico & { n: number };
 const DIA = new Intl.DateTimeFormat("es-AR", { timeZone: "America/Argentina/Buenos_Aires", weekday: "short" });
@@ -47,8 +47,8 @@ export function TiraDias({ serie, uvDia, desde, hasta, largada, eventoId }: {
             {ps.length && temps.length ? (
               <>
                 <Icono tipo={iconoDia(ps)} size={46} />
-                <span className="tira-temp"><b>{Math.round(Math.max(...temps))}°</b> {Math.round(Math.min(...temps))}°</span>
-                <span className="tira-hr" title="Humedad relativa mínima y máxima">{hrs.length ? `HR ${Math.round(Math.min(...hrs))}–${Math.round(Math.max(...hrs))} %` : "HR —"}</span>
+                <span className="tira-temp"><b>{Math.round(Math.max(...temps))} °C</b> {Math.round(Math.min(...temps))} °C</span>
+                <span className="tira-hr"><Humedad texto={hrs.length ? `${Math.round(Math.min(...hrs))}–${Math.round(Math.max(...hrs))} %` : "—"} size={15} /></span>
                 <UvChip uv={uvDia.get(d)} compacto />
               </>
             ) : (

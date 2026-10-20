@@ -1,6 +1,6 @@
 export type TipoIcono =
   | "sol" | "solnube" | "nube" | "lluvia" | "tormenta" | "viento" | "termometro"
-  | "gota" | "rayo" | "luna" | "estructura" | "corredor";
+  | "gota" | "rayo" | "luna" | "estructura" | "corredor" | "humedad";
 
 export function Icono({ tipo, size = 40 }: { tipo: TipoIcono; size?: number }) {
   return (
@@ -77,6 +77,15 @@ export function Icono({ tipo, size = 40 }: { tipo: TipoIcono; size?: number }) {
         <>
           <path d="M32 8s-15 19-15 30a15 15 0 0 0 30 0C47 27 32 8 32 8z" fill="#2F80ED" />
           <path d="M25 40a7 7 0 0 0 7 7" fill="none" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" />
+        </>
+      )}
+      {tipo === "humedad" && (
+        <>
+          {/* Humedad relativa: gota contorneada con signo de porcentaje (distinta de la gota llena de lluvia) */}
+          <path d="M32 5s-17 21-17 34a17 17 0 0 0 34 0C49 26 32 5 32 5z" fill="#E6F4F1" stroke="#1F8A80" strokeWidth="4" strokeLinejoin="round" />
+          <circle cx="25.5" cy="34" r="4" fill="none" stroke="#1F8A80" strokeWidth="3.4" />
+          <circle cx="38.5" cy="47" r="4" fill="none" stroke="#1F8A80" strokeWidth="3.4" />
+          <path d="M40 31L24 50" stroke="#1F8A80" strokeWidth="3.6" strokeLinecap="round" />
         </>
       )}
       {tipo === "rayo" && <path d="M38 4L14 36h14l-6 24 28-34H35l7-22z" fill="#FFC20E" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" />}
