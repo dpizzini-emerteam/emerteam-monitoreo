@@ -1,3 +1,9 @@
+/* Cifras en Barlow (cero sin barra); letras en Atkinson Hyperlegible Next (I, l y 1 distinguibles) */
+@font-face { font-family: "Cifras"; font-style: normal; font-weight: 400; font-display: swap; src: url("/fuentes/barlow-latin-400-normal.woff2") format("woff2"); unicode-range: U+0030-0039; }
+@font-face { font-family: "Cifras"; font-style: normal; font-weight: 500; font-display: swap; src: url("/fuentes/barlow-latin-500-normal.woff2") format("woff2"); unicode-range: U+0030-0039; }
+@font-face { font-family: "Cifras"; font-style: normal; font-weight: 600; font-display: swap; src: url("/fuentes/barlow-latin-600-normal.woff2") format("woff2"); unicode-range: U+0030-0039; }
+@font-face { font-family: "Cifras"; font-style: normal; font-weight: 700; font-display: swap; src: url("/fuentes/barlow-latin-700-normal.woff2") format("woff2"); unicode-range: U+0030-0039; }
+
 :root {
   color-scheme: light;
   /* Marca (no cambia con el tema): barra, pie, bandas */
@@ -44,7 +50,7 @@ html, body { margin: 0; }
 #root { min-height: 100vh; display: flex; flex-direction: column; }
 #root > .pie { margin-top: auto; }
 body {
-  font-family: "Atkinson Hyperlegible Next", "Barlow", Arial, sans-serif;
+  font-family: "Cifras", "Atkinson Hyperlegible Next", "Barlow", Arial, sans-serif;
   font-variant-numeric: tabular-nums;
   color: var(--texto);
   background: var(--fondo);
@@ -186,7 +192,7 @@ a.resumen-fase:hover .resumen-ver { color: var(--naranja); }
 .cmd-evento { font-family: "Barlow Condensed"; font-weight: 800; font-size: clamp(22px, 2.6vw, 38px); text-transform: uppercase; line-height: 1.05; }
 .cmd-sub { color: #a9a9a9; font-size: 15px; }
 .cmd-fase { text-align: right; font-family: "Barlow Condensed"; font-weight: 800; font-size: clamp(20px, 2.2vw, 32px); text-transform: uppercase; color: var(--naranja); }
-.cmd-fase span { display: block; font-family: "Atkinson Hyperlegible Next", "Barlow"; font-weight: 600; font-size: 15px; color: #d0d0d0; text-transform: none; }
+.cmd-fase span { display: block; font-family: "Cifras", "Atkinson Hyperlegible Next", "Barlow"; font-weight: 600; font-size: 15px; color: #d0d0d0; text-transform: none; }
 .cmd-reloj { font-family: "Barlow Condensed"; font-weight: 800; font-size: clamp(40px, 5vw, 72px); line-height: 1; text-align: right; font-variant-numeric: tabular-nums; }
 .cmd-reloj span { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; }
 .cmd-reloj button, .cmd-reloj a { font: 600 13px "Barlow"; color: #cfcfcf; background: none; border: 1px solid #3a3a3a; border-radius: 6px; padding: 5px 9px; cursor: pointer; text-decoration: none; }
@@ -235,7 +241,7 @@ a.resumen-fase:hover .resumen-ver { color: var(--naranja); }
 textarea { font: inherit; font-size: 15px; padding: 10px; border: 1px solid var(--borde-input); border-radius: 6px; background: var(--superficie); color: var(--texto); resize: vertical; }
 
 /* Informe post-evento: identidad de documentos EMERTEAM (siempre en papel claro) */
-.inf-doc { --d-negro: #111111; --d-naranja: #FF6A1A; --d-gris: #7C7C7C; background: #fff; color: #111; max-width: 900px; margin: 0 auto 40px; border: 1px solid #e2e0dc; font-family: "Atkinson Hyperlegible Next", "Barlow", Arial, sans-serif; }
+.inf-doc { --d-negro: #111111; --d-naranja: #FF6A1A; --d-gris: #7C7C7C; background: #fff; color: #111; max-width: 900px; margin: 0 auto 40px; border: 1px solid #e2e0dc; font-family: "Cifras", "Atkinson Hyperlegible Next", "Barlow", Arial, sans-serif; }
 .inf-cab { background: var(--d-negro); color: #fff; display: flex; align-items: center; gap: 22px; padding: 22px 28px; border-bottom: 5px solid var(--d-naranja); }
 .inf-cab img { height: 52px; }
 .inf-cab h1 { margin: 0; font-family: "Barlow Condensed"; font-weight: 800; font-size: 30px; text-transform: uppercase; letter-spacing: 0.02em; }
