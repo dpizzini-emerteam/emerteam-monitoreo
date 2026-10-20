@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Icono, iconoTiempo } from "../componentes/Icono";
 import {
-  COLOR_SMN, fmtFechaHora, fmtHora, kmPorTrueno, nivelRayoMedido, nivelWBGT, num, ordenarAlertas, supabase, tituloAlerta,
-  type AlertaSMN, type Evento, type Medicion, type Nivel, type Pronostico,
+  COLOR_SMN, estadoRayosGLM, fmtFechaHora, fmtHora, kmPorTrueno, nivelRayoMedido, nivelWBGT, num, ordenarAlertas, supabase, tituloAlerta,
+  type AlertaSMN, type Evento, type Medicion, type Nivel, type Pronostico, type Rayo,
 } from "../datos";
 import { estiloNivel, estiloVariable, estiloWA, NOMBRE_CORTO, NOMBRE_FASE, NOMBRE_WA, nombreNivel, recomendacion } from "../reglas";
 import { consenso } from "../serie";
@@ -22,28 +22,31 @@ export function Comando() {
   const [niveles, setNiveles] = useState<Nivel[]>([]);
   const [alertas, setAlertas] = useState<AlertaSMN[]>([]);
   const [meds, setMeds] = useState<Medicion[]>([]);
+  const [rayos, setRayos] = useState<Rayo[]>([]);
   const [ahora, setAhora] = useState(Date.now());
 
   const cargar = useCallback(async () => {
     if (!id) return;
-    const [e, p, n, a, m] = await Promise.all([
+    const [e, p, n, a, m, r] = await Promise.all([
       supabase.from("mon_eventos").select("*, mon_modalidades(*)").eq("id", id).single(),
       supabase.from("mon_pronosticos").select("*").eq("evento_id", id).order("valido").limit(5000),
       supabase.from("mon_niveles").select("*").eq("evento_id", id).order("desde").limit(5000),
       supabase.from("mon_alertas_smn").select("*").eq("evento_id", id).neq("estado", "levantada"),
       supabase.from("mon_mediciones").select("*").eq("evento_id", id).order("tomada_en", { ascending: false }).limit(50),
+      supabase.from("mon_rayos").select("*").eq("evento_id", id).gte("ocurrido_en", new Date(Date.now() - 60 * 60_000).toISOString()).limit(2000),
     ]);
     if (e.data) setEv(e.data as Evento);
     setPron((p.data as Pronostico[]) ?? []);
     setNiveles((n.data as Nivel[]) ?? []);
     setAlertas(ordenarAlertas(((a.data as AlertaSMN[]) ?? []).filter((x) => !x.hasta || new Date(x.hasta).getTime() > Date.now())));
     setMeds((m.data as Medicion[]) ?? []);
+    setRayos((r.data as Rayo[]) ?? []);
   }, [id]);
 
   useEffect(() => {
     void cargar();
     const canal = supabase.channel(`comando-${id}`);
-    for (const tabla of ["mon_niveles", "mon_alertas_smn", "mon_mediciones"]) {
+    for (const tabla of ["mon_niveles", "mon_alertas_smn", "mon_mediciones", "mon_rayos"]) {
       canal.on("postgres_changes", { event: "*", schema: "public", table: tabla, filter: `evento_id=eq.${id}` }, () => void cargar());
     }
     canal.subscribe();
@@ -83,7 +86,11 @@ export function Comando() {
   const rafaga = medV?.rafaga ?? actualP?.rafaga10 ?? null;
   const nivelesAhora = niveles.filter((n) => new Date(n.desde).getTime() <= t && new Date(n.hasta).getTime() > t);
   const tormentaPron = Math.max(0, ...nivelesAhora.filter((n) => n.variable === "tormenta").map((n) => n.nivel));
-  const nR = medR ? nivelRayoMedido(medR) ?? 0 : null;
+  const nMed = medR ? nivelRayoMedido(medR) ?? 0 : null;
+  const glm = estadoRayosGLM(rayos, t);
+  // Manda la fuente más conservadora entre detector/trueno en terreno y satélite
+  const nR = nMed == null && glm.cantidad === 0 ? null : Math.max(nMed ?? 0, glm.nivel);
+  const fuenteR = nMed != null && nMed >= glm.nivel ? "Detector en terreno" : "Satélite GLM";
 
   // Acciones vigentes ahora (nivel 2 o más), sin repetir variable
   const acciones = Object.values(
@@ -146,9 +153,11 @@ export function Comando() {
         <div className="cmd-celda">
           <div className="cmd-rot">Tormenta eléctrica</div>
           <div className="cmd-valor" style={{ fontSize: "clamp(28px, 4vw, 54px)" }}>{nR != null ? NIVEL_RAYO[nR] : tormentaPron > 0 ? "Pronosticada" : "Sin señal"}</div>
-          <span className="badge cmd-badge" style={estiloNivel(nR ?? tormentaPron)}>{nR != null ? "Detector en terreno" : "Pronóstico"}</span>
+          <span className="badge cmd-badge" style={estiloNivel(nR ?? tormentaPron)}>{nR != null ? fuenteR : "Pronóstico"}</span>
           <div className="cmd-nota">
-            {medR ? `${medR.trueno ? "Trueno audible" : RANGO[medR.rayo_rango ?? ""] ?? ""}${medR.relampago_trueno_s != null ? ` · ≈ ${num(kmPorTrueno(medR.relampago_trueno_s), 1)} km` : ""} · ${fmtHora(medR.tomada_en)}` : "24 km alerta · 19 km demorar · 13 km o trueno: suspender"}
+            {glm.cantidad > 0 && <div>Satélite: {glm.cantidad} rayos en 30 min, el más cercano a {num(glm.km, 0)} km ({glm.ultimo ? fmtHora(glm.ultimo) : ""})</div>}
+            {medR && <div>Terreno: {medR.trueno ? "trueno audible" : RANGO[medR.rayo_rango ?? ""] ?? ""}{medR.relampago_trueno_s != null ? ` · ≈ ${num(kmPorTrueno(medR.relampago_trueno_s), 1)} km` : ""} · {fmtHora(medR.tomada_en)}</div>}
+            {!medR && glm.cantidad === 0 && "24 km alerta · 19 km demorar · 13 km o trueno: suspender"}
           </div>
         </div>
         <div className="cmd-celda">

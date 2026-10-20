@@ -170,3 +170,15 @@ export function nivelRayoMedido(m: Pick<Medicion, "trueno" | "rayo_rango" | "rel
 
 /** Colores de las alertas del SMN */
 export const COLOR_SMN: Record<string, string> = { amarillo: "#F5C400", naranja: "#FF6A1A", rojo: "#FF3B30", violeta: "#8E5BD9" };
+
+export type Rayo = { id: number; evento_id: string; ocurrido_en: string; lat: number; lon: number; distancia_km: number; fuente: string };
+
+/** Rayos por satélite en los últimos 30 min: distancia mínima y nivel (24 km alerta · 19 km preparar · 13 km suspender) */
+export function estadoRayosGLM(rayos: Rayo[], ahora = Date.now()): { nivel: number; km: number | null; cantidad: number; ultimo: string | null } {
+  const recientes = rayos.filter((r) => ahora - new Date(r.ocurrido_en).getTime() <= 30 * 60_000);
+  if (!recientes.length) return { nivel: 0, km: null, cantidad: 0, ultimo: null };
+  const km = Math.min(...recientes.map((r) => Number(r.distancia_km)));
+  const nivel = km < 13 ? 4 : km < 19 ? 3 : km < 24 ? 2 : 1;
+  const ultimo = recientes.map((r) => r.ocurrido_en).sort().at(-1) ?? null;
+  return { nivel, km, cantidad: recientes.length, ultimo };
+}

@@ -9,8 +9,8 @@ import { Resumen } from "../componentes/Resumen";
 import { Mediciones } from "../componentes/Mediciones";
 import { consenso, PRIORIDAD } from "../serie";
 import {
-  COLOR_SMN, ordenarAlertas, tituloAlerta, diaLocal, fmtDia, fmtFechaHora, fmtHora, num, supabase,
-  type AlertaSMN, type Evento, type Nivel, type Pronostico,
+  COLOR_SMN, estadoRayosGLM, ordenarAlertas, tituloAlerta, diaLocal, fmtDia, fmtFechaHora, fmtHora, num, supabase,
+  type AlertaSMN, type Evento, type Rayo, type Nivel, type Pronostico,
 } from "../datos";
 import { estiloNivel, estiloVariable, estiloWA, NOMBRE_CORTO, NOMBRE_FASE, NOMBRE_VARIABLE, NOMBRE_WA, REGLAS, TIPO_FUENTE, nombreNivel, recomendacion } from "../reglas";
 import { calcular } from "../ventanas";
@@ -47,22 +47,25 @@ export function EventoVista() {
   const [pron, setPron] = useState<Pronostico[]>([]);
   const [niveles, setNiveles] = useState<Nivel[]>([]);
   const [alertas, setAlertas] = useState<AlertaSMN[]>([]);
+  const [rayos, setRayos] = useState<Rayo[]>([]);
   const [error, setError] = useState("");
   const [descarteSonido, setDescarteSonido] = useState(false);
   const sonido = useSonido();
 
   const cargar = useCallback(async () => {
     if (!id) return;
-    const [e, p, n, a] = await Promise.all([
+    const [e, p, n, a, r] = await Promise.all([
       supabase.from("mon_eventos").select("*, mon_modalidades(*)").eq("id", id).single(),
       supabase.from("mon_pronosticos").select("*").eq("evento_id", id).order("valido").limit(5000),
       supabase.from("mon_niveles").select("*").eq("evento_id", id).order("desde").limit(5000),
       supabase.from("mon_alertas_smn").select("*").eq("evento_id", id).neq("estado", "levantada"),
+      supabase.from("mon_rayos").select("*").eq("evento_id", id).gte("ocurrido_en", new Date(Date.now() - 60 * 60_000).toISOString()).limit(2000),
     ]);
     if (e.error) return setError("No tenés acceso a este evento o no existe.");
     setEv(e.data as Evento);
     setPron((p.data as Pronostico[]) ?? []);
     setNiveles((n.data as Nivel[]) ?? []);
+    setRayos((r.data as Rayo[]) ?? []);
     setAlertas(ordenarAlertas(((a.data as AlertaSMN[]) ?? []).filter((x) => !x.hasta || new Date(x.hasta) > new Date())));
   }, [id]);
 
@@ -73,6 +76,7 @@ export function EventoVista() {
       .channel(`evento-${id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "mon_niveles", filter: `evento_id=eq.${id}` }, () => void cargar())
       .on("postgres_changes", { event: "*", schema: "public", table: "mon_alertas_smn", filter: `evento_id=eq.${id}` }, () => void cargar())
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "mon_rayos", filter: `evento_id=eq.${id}` }, () => void cargar())
       .subscribe();
     const t = setInterval(() => void cargar(), 5 * 60_000);
     return () => { clearInterval(t); void supabase.removeChannel(canal); };
@@ -84,12 +88,14 @@ export function EventoVista() {
   }, [pestana, ev]);
 
   // Aviso sonoro mientras haya alertas SMN vigentes
+  const glm = estadoRayosGLM(rayos);
+  const hayAviso = alertas.length > 0 || glm.nivel >= 2;
   useEffect(() => {
-    if (!alertas.length) return;
+    if (!hayAviso) return;
     sonido.sonar();
     const t = setInterval(sonido.sonar, 30_000);
     return () => clearInterval(t);
-  }, [alertas.length, sonido.sonar]);
+  }, [hayAviso, sonido.sonar]);
 
   const v = useMemo(() => (ev ? calcular(ev) : null), [ev]);
   const serie = useMemo(() => consenso(pron), [pron]);
@@ -167,6 +173,22 @@ export function EventoVista() {
           </div>
         </section>
       ))}
+
+      {glm.nivel >= 2 && (
+        <section role="alert" className="alerta" style={{ background: glm.nivel >= 4 ? "#FF3B30" : glm.nivel === 3 ? "#FF6A1A" : "#F5C400" }}>
+          <div className="contenedor" style={{ display: "flex", flexWrap: "wrap", gap: "14px 24px", alignItems: "center", padding: "16px 24px" }}>
+            <div className="icono-pulso"><Icono tipo="rayo" size={52} /></div>
+            <div style={{ flex: "1 1 300px" }}>
+              <div className="condensada" style={{ fontSize: 24, fontWeight: 800, textTransform: "uppercase" }}>
+                Rayos a {num(glm.km, 0)} km · {glm.nivel >= 4 ? "suspender actividad al aire libre" : glm.nivel === 3 ? "preparar evacuación o demorar largada" : "alerta por tormenta eléctrica"}
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>
+                Satélite GOES-19 (GLM): {glm.cantidad} rayos en los últimos 30 min. Reanudar con 30 min sin actividad a menos de 13 km. Precisión del satélite ≈ 10 km: confirmar con detector y trueno.
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       <main className="contenedor" style={{ paddingTop: 24 }}>
         {actual === "general" && (
