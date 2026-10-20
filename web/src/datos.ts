@@ -46,6 +46,35 @@ export type Pronostico = {
   presion: number | null;
   wbgt_est: number | null;
   procesado_en: string;
+  // Punto de grilla usado (tierra más cercana) y valores corregidos con observaciones del SMN
+  punto_lat?: number | null;
+  punto_lon?: number | null;
+  punto_tierra?: boolean | null;
+  t2m_corr?: number | null;
+  td2m_corr?: number | null;
+  hr_corr?: number | null;
+  viento10_corr?: number | null;
+  rafaga10_corr?: number | null;
+  wbgt_corr?: number | null;
+};
+
+/** Corrección aplicada y error medido para un evento y un modelo */
+export type Sesgo = {
+  evento_id: string;
+  fuente: string;
+  estacion: string | null;
+  distancia_km: number | null;
+  pares: number;
+  sesgo_t_dia: number | null;
+  sesgo_t_noche: number | null;
+  sesgo_td: number | null;
+  factor_viento: number | null;
+  error_t: number | null;
+  error_t_corr: number | null;
+  error_viento: number | null;
+  error_viento_corr: number | null;
+  aplicado: boolean;
+  calculado_en: string;
 };
 
 export type Nivel = {
