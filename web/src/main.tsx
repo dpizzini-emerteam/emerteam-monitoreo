@@ -1,6 +1,6 @@
 import { lazy, StrictMode, Suspense, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { createHashRouter, Outlet, RouterProvider } from "react-router-dom";
+import { createHashRouter, Navigate, Outlet, RouterProvider } from "react-router-dom";
 import type { Session } from "@supabase/supabase-js";
 import "./estilos.css";
 import { esAdmin, supabase } from "./datos";
@@ -19,7 +19,14 @@ function Raiz() {
   const [admin, setAdmin] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      // Limpia de la barra el código o token del enlace de ingreso
+      const u = new URL(window.location.href);
+      if (u.searchParams.has("code") || /access_token|error_description/.test(u.hash)) {
+        window.history.replaceState(null, "", u.origin + u.pathname + "#/");
+      }
+    });
     const { data } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
     return () => data.subscription.unsubscribe();
   }, []);
@@ -49,6 +56,7 @@ const router = createHashRouter([
       { path: "evento/nuevo", element: <EventoForm /> },
       { path: "evento/:id/editar", element: <EventoForm /> },
       { path: "evento/:id", element: <EventoVista /> },
+      { path: "*", element: <Navigate to="/" replace /> },
     ],
   },
 ]);

@@ -3,7 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 export const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL as string,
   import.meta.env.VITE_SUPABASE_ANON_KEY as string,
-  { auth: { persistSession: true, detectSessionInUrl: true } },
+  // PKCE: el enlace vuelve con ?code= (no con #access_token, que choca con el ruteo por #)
+  { auth: { persistSession: true, detectSessionInUrl: true, flowType: "pkce" } },
 );
 
 export type Modalidad = { id?: string; nombre: string; distancia_km: number; participantes: number | null; largada?: string | null };
