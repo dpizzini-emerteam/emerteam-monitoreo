@@ -276,7 +276,7 @@ Deno.serve(async (req) => {
         }
         registros.push({ evento_id: ev.id, tipo: cambios.map((c) => c.tipo).join(","), destinatario: d, asunto: correo.asunto, estado, error, detalle: { cambios } });
       }
-      if (cliente) await cliente.close().catch(() => undefined);
+      if (cliente) { try { await cliente.close(); } catch { /* conexión ya cerrada */ } }
       if (cliente && destinatarios.length && enviados === 0) avanzar = false; // fallaron todos: se reintenta en la próxima corrida
       if (registros.length) {
         const { error: eReg } = await supabase.from("mon_envios").insert(registros);
