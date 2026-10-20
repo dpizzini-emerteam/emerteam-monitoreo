@@ -215,6 +215,21 @@ export function EventoVista() {
       )}
 
       <main className="contenedor" style={{ paddingTop: 24 }}>
+        {pron.length === 0 && v.desarme[1].getTime() > ahora && (() => {
+          // Recién creado o con fecha/lugar cambiados: el procesamiento se dispara solo y tarda unos minutos
+          const cambio = new Date(ev.actualizado_en ?? ev.creado_en ?? 0).getTime();
+          const reciente = ahora - cambio < 45 * 60_000;
+          const llega = new Date(v.armado[0].getTime() - 6 * 86400_000);
+          return (
+            <div className="tarjeta" style={{ borderLeft: "4px solid var(--naranja)", marginBottom: 18 }}>
+              {reciente
+                ? <><b>Procesando el primer pronóstico.</b> El monitoreo ya está activo; los datos aparecen solos en unos minutos, sin recargar la página.</>
+                : llega.getTime() > ahora
+                ? <><b>Monitoreo activo.</b> El evento todavía está fuera del alcance de los modelos: el pronóstico empieza a llegar alrededor del {fmtDia(llega.toISOString())}.</>
+                : <><b>Monitoreo activo.</b> El pronóstico se incorpora en la próxima actualización de los modelos.</>}
+            </div>
+          );
+        })()}
         {actual === "general" && (
           <>
             <TiraDias serie={serie} desde={v.armado[0]} hasta={v.desarme[1]} largada={v.largada} eventoId={ev.id} />

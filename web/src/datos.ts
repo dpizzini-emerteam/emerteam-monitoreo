@@ -20,6 +20,8 @@ export type Evento = {
   participantes: number;
   armado_dias: number;
   cupo_equipo: number;
+  creado_en?: string;
+  actualizado_en?: string;
   duracion_propia_min: number | null;
   demora_largada_min: number | null;
   portico: "estructural" | "inflable";
