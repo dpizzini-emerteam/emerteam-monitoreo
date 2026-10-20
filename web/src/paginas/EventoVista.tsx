@@ -10,7 +10,7 @@ import {
   diaLocal, fmtDia, fmtFechaHora, fmtHora, num, supabase,
   type AlertaSMN, type Evento, type Nivel, type Pronostico,
 } from "../datos";
-import { estiloNivel, NOMBRE_CORTO, NOMBRE_FASE, NOMBRE_VARIABLE, NOMBRE_WA, REGLAS, TIPO_FUENTE, nombreNivel, recomendacion } from "../reglas";
+import { estiloNivel, estiloVariable, estiloWA, NOMBRE_CORTO, NOMBRE_FASE, NOMBRE_VARIABLE, NOMBRE_WA, REGLAS, TIPO_FUENTE, nombreNivel, recomendacion } from "../reglas";
 import { calcular } from "../ventanas";
 
 const PRIORIDAD = ["ecmwf", "gfs", "icon"];
@@ -309,7 +309,7 @@ function Dias({ titulo, serie, niveles, desde, hasta, nota, franjaSegura }: {
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600 }}><Icono tipo="viento" size={20} />ráf. {num(raf)} km/h</div>
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600 }}><Icono tipo="gota" size={20} />{num(lluvia, 1)} mm</div>
-              <span className="badge" style={{ ...estiloNivel(nivelDia), alignSelf: "flex-start", fontSize: 13 }}>{peorDia && nivelDia > 0 ? nombreNivel(peorDia.variable, nivelDia) : "Bajo umbral"}</span>
+              <span className="badge" style={{ ...(peorDia && nivelDia > 0 ? estiloVariable(peorDia.variable, nivelDia) : estiloNivel(0)), alignSelf: "flex-start", fontSize: 13 }}>{peorDia && nivelDia > 0 ? nombreNivel(peorDia.variable, nivelDia) : "Bajo umbral"}</span>
               {peorDia && nivelDia > 0 && <span className="chico" style={{ marginTop: -4 }}>{NOMBRE_CORTO[peorDia.variable]}</span>}
               {franja && (
                 <div className="franja-segura" title="Tramo continuo entre las 6 y las 21 h con el nivel más bajo del día">
@@ -387,7 +387,7 @@ function DiaCarrera({ serie, v }: { serie: Map<number, Pronostico & { n: number 
                     <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--texto2)" }}>{fase(t)}</span>
                     <Icono tipo={iconoTiempo(p, noche)} size={48} />
                     <b className="condensada" style={{ fontSize: 24 }}>{num(p.t2m)}°</b>
-                    <span style={{ alignSelf: "stretch", ...estiloNivel(n), fontWeight: 700, fontSize: 14, padding: "4px 6px", borderRadius: 4 }}>WBGT {num(p.wbgt_est, 1)}°</span>
+                    <span style={{ alignSelf: "stretch", ...estiloWA(n), fontWeight: 700, fontSize: 14, padding: "4px 6px", borderRadius: 4 }}>WBGT {num(p.wbgt_est, 1)}°</span>
                     <span style={{ fontSize: 14, fontWeight: 600 }}>
                       <span style={{ display: "inline-block", transform: `rotate(${(p.dir_viento ?? 0) + 180}deg)` }}>↑</span> {num(p.viento10)}/{num(p.rafaga10)}
                     </span>
@@ -401,12 +401,12 @@ function DiaCarrera({ serie, v }: { serie: Map<number, Pronostico & { n: number 
         )}
         <div className="leyenda-wbgt">
           {["< 21 °C", "21–25 °C", "25–28 °C", "28–30 °C", "> 30 °C"].map((r, i) => (
-            <div key={r} style={estiloNivel(i)}>
+            <div key={r} style={estiloWA(i)}>
               <b>{NOMBRE_WA[i]}</b> <span>{r}</span>
             </div>
           ))}
         </div>
-        <span className="chico">Escala WBGT World Athletics (2020); «Riesgo bajo» corresponde a «Almost Safe» · viento medio / ráfaga en km/h a 10 m</span>
+        <span className="chico">Escala y colores WBGT: World Athletics (2020), Tabla 1; «Riesgo bajo» corresponde a «Almost Safe» · viento medio / ráfaga en km/h a 10 m</span>
       </div>
     </section>
   );
@@ -446,9 +446,9 @@ function TarjetaReco({ n }: { n: Nivel }) {
   const r = REGLAS[n.regla];
   const texto = recomendacion(n.variable, n.nivel, n.fase);
   return (
-    <article className="tarjeta" style={{ display: "flex", flexDirection: "column", gap: 8, borderLeft: `5px solid ${estiloNivel(n.nivel).background}` }}>
+    <article className="tarjeta" style={{ display: "flex", flexDirection: "column", gap: 8, borderLeft: `5px solid ${estiloVariable(n.variable, n.nivel).background}` }}>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-        <span className="badge" style={{ ...estiloNivel(n.nivel) }}>{nombreNivel(n.variable, n.nivel)}</span>
+        <span className="badge" style={{ ...estiloVariable(n.variable, n.nivel) }}>{nombreNivel(n.variable, n.nivel)}</span>
         {n.fase === "personal" && <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", border: "1px solid var(--texto)", padding: "2px 7px", borderRadius: 4 }}>{NOMBRE_FASE[n.fase]}</span>}
         {n.confianza === "baja" && <span className="chico">tendencia</span>}
       </div>

@@ -42,6 +42,22 @@ export const COLOR_NIVEL = ["#2FA34C", "#C79000", "#FF6A1A", "#FF3B30", "#7A1610
 export const TEXTO_NIVEL = ["#111111", "#111111", "#111111", "#111111", "#FFFFFF"];
 export const estiloNivel = (n: number) => ({ background: COLOR_NIVEL[n] ?? COLOR_NIVEL[0], color: TEXTO_NIVEL[n] ?? "#111111" });
 
+/**
+ * Colores oficiales de la escala WBGT: World Athletics (2020), Competition Medical Guidelines, Tabla 1, p. 15.
+ * Almost Safe blanco · Caution verde claro · Warning ámbar · Severe Warning rojo · Danger negro.
+ * Se usan SOLO para la escala WBGT; el resto de las variables usa el semáforo EMERTEAM (COLOR_NIVEL).
+ */
+export const COLOR_WA = ["#FFFFFF", "#B8D484", "#FBBC43", "#E83F43", "#1D1D1B"];
+export const TEXTO_WA = ["#111111", "#111111", "#111111", "#111111", "#FFFFFF"];
+export const estiloWA = (n: number) => ({
+  background: COLOR_WA[n] ?? COLOR_WA[0],
+  color: TEXTO_WA[n] ?? "#111111",
+  // el blanco necesita contorno para leerse sobre tarjetas claras
+  boxShadow: n === 0 ? "inset 0 0 0 1px #1D1D1B" : undefined,
+});
+/** Estilo de nivel según la variable: WBGT con colores World Athletics, el resto con el semáforo EMERTEAM */
+export const estiloVariable = (variable: string, n: number) => (variable === "wbgt" ? estiloWA(n) : estiloNivel(n));
+
 export const NOMBRE_WA = ["Riesgo bajo", "Precaución", "Advertencia", "Advertencia severa", "Peligro"];
 
 export const NOMBRE_VARIABLE: Record<string, string> = {

@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { diaLocal, fmtDia, fmtFechaHora, fmtHora, type AlertaSMN, type Nivel } from "../datos";
-import { estiloNivel, NOMBRE_CORTO, nombreNivel, recomendacion } from "../reglas";
+import { estiloNivel, estiloVariable, NOMBRE_CORTO, nombreNivel, recomendacion } from "../reglas";
 
 const BLOQUES = [
   { clave: "armado", titulo: "Armado", fases: ["armado"] },
@@ -59,7 +59,7 @@ export function Resumen({ vigentes, alertas, eventoId }: { vigentes: Nivel[]; al
         {!hayDatos ? (
           <p className="resumen-principal">El resumen se completa con la primera actualización de los modelos para este evento.</p>
         ) : principal ? (
-          <p className="resumen-principal" style={{ borderColor: estiloNivel(principal.nivel).background }}>
+          <p className="resumen-principal" style={{ borderColor: estiloVariable(principal.variable, principal.nivel).background }}>
             <b>Lo principal · {principal.bloque}:</b> {NOMBRE_CORTO[principal.variable]} — {nombreNivel(principal.variable, principal.nivel)} ({franja(principal.desde, principal.hasta)}). {accion(principal)}
             {principal.confianza === "baja" && " Es una tendencia: se confirma o descarta con las próximas actualizaciones."}
           </p>
@@ -82,7 +82,7 @@ export function Resumen({ vigentes, alertas, eventoId }: { vigentes: Nivel[]; al
                 <ul>
                   {b.its.slice(0, 3).map((it) => (
                     <li key={it.variable}>
-                      <span className="punto" style={{ background: estiloNivel(it.nivel).background }} aria-hidden />
+                      <span className="punto" style={{ background: estiloVariable(it.variable, it.nivel).background }} aria-hidden />
                       <span>
                         <b>{NOMBRE_CORTO[it.variable]}</b> · {nombreNivel(it.variable, it.nivel)}
                         <br />

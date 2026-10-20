@@ -4,7 +4,7 @@ import type { Ctx } from "../main";
 import { Barra } from "../componentes/Barra";
 import { Introduccion } from "../componentes/Introduccion";
 import { diaLocal, fmtDia, fmtHora, supabase, type Evento, type Nivel } from "../datos";
-import { COLOR_NIVEL, estiloNivel, NOMBRE_CORTO, NOMBRE_FASE, nombreNivel } from "../reglas";
+import { COLOR_NIVEL, estiloNivel, estiloVariable, NOMBRE_CORTO, NOMBRE_FASE, nombreNivel } from "../reglas";
 
 type Max = { nivel: number; variable: string; desde: string };
 type Resumen = Record<string, Record<string, Max>>; // evento -> fase -> nivel máximo vigente
@@ -100,7 +100,7 @@ export function Eventos() {
                       return (
                         <div key={f} className="fase-estado">
                           <div className="rotulo">{NOMBRE_FASE[f]}</div>
-                          <span className="badge" style={estiloNivel(m?.nivel ?? 0)}>{m ? nombreNivel(m.variable, m.nivel) : "Bajo umbral"}</span>
+                          <span className="badge" style={m ? estiloVariable(m.variable, m.nivel) : estiloNivel(0)}>{m ? nombreNivel(m.variable, m.nivel) : "Bajo umbral"}</span>
                           {m && <div className="chico">{NOMBRE_CORTO[m.variable] ?? m.variable} · {fmtDia(m.desde)} {fmtHora(m.desde)}</div>}
                         </div>
                       );
