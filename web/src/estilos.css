@@ -296,3 +296,13 @@ textarea { font: inherit; font-size: 15px; padding: 10px; border: 1px solid var(
 
 /* Campos y botones heredan la fuente legible del texto */
 input, select, textarea, button { font-family: inherit; }
+
+/* Buscador de ubicación del evento */
+.buscador-ubicacion { display: flex; gap: 8px; flex-wrap: wrap; }
+.buscador-ubicacion input { flex: 1 1 260px; min-width: 0; }
+.resultados-ubicacion { list-style: none; margin: 8px 0 0; padding: 0; border: 1px solid var(--borde); border-radius: 6px; overflow: hidden; }
+.resultados-ubicacion li + li { border-top: 1px solid var(--borde); }
+.resultados-ubicacion button { width: 100%; text-align: left; background: var(--superficie); color: var(--texto); border: 0; padding: 10px 12px; cursor: pointer; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; font-size: 15px; }
+.resultados-ubicacion button:hover, .resultados-ubicacion button:focus-visible { background: var(--uc-fondo); }
+.resultados-ubicacion span { color: var(--texto2, #555); font-size: 14px; }
+.resultados-ubicacion small { margin-left: auto; color: var(--gris-tec); font-size: 12px; }

@@ -5,6 +5,7 @@ import "leaflet/dist/leaflet.css";
 import type { Ctx } from "../main";
 import { Barra } from "../componentes/Barra";
 import { supabase, type Evento, type Modalidad } from "../datos";
+import { buscarUbicacion, leerCoordenadas, type Resultado } from "../geocodificar";
 
 // Argentina no aplica horario de verano: UTC−03:00 fijo
 const OFFSET = "-03:00";
@@ -47,6 +48,10 @@ export function EventoForm() {
   const mapaRef = useRef<HTMLDivElement>(null);
   const mapa = useRef<L.Map | null>(null);
   const marca = useRef<L.CircleMarker | null>(null);
+  const centrado = useRef(false);
+  const [busqueda, setBusqueda] = useState("");
+  const [resultados, setResultados] = useState<Resultado[] | null>(null);
+  const [buscando, setBuscando] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -81,7 +86,28 @@ export function EventoForm() {
     if (!mapa.current || Number.isNaN(lat) || Number.isNaN(lon)) return;
     if (!marca.current) marca.current = L.circleMarker([lat, lon], { radius: 9, color: "#111", fillColor: "#FF6A1A", fillOpacity: 1 }).addTo(mapa.current);
     else marca.current.setLatLng([lat, lon]);
+    // Al abrir un evento existente, el mapa se centra en su punto
+    if (!centrado.current) { mapa.current.setView([lat, lon], 14); centrado.current = true; }
   }, [f.lat, f.lon]);
+
+  async function buscar(texto = busqueda) {
+    if (!texto.trim()) return;
+    setBuscando(true);
+    const r = await buscarUbicacion(texto);
+    setBuscando(false);
+    setResultados(r);
+    if (r.length === 1) elegir(r[0]);
+  }
+
+  function elegir(r: Resultado) {
+    centrado.current = true;
+    setF((p) => ({
+      ...p, lat: String(r.lat), lon: String(r.lon),
+      ubicacion: p.ubicacion.trim() ? p.ubicacion : r.fuente === "Coordenadas" ? "" : [r.etiqueta, r.detalle].filter(Boolean).join(", "),
+    }));
+    mapa.current?.setView([r.lat, r.lon], r.zoom);
+    setResultados(null);
+  }
 
   if (!editor) return <p className="contenedor" style={{ paddingTop: 26 }}>Solo los editores de EMERTEAM pueden cargar y editar eventos.</p>;
 
@@ -93,10 +119,20 @@ export function EventoForm() {
     const largada = new Date(`${f.largada}:00${OFFSET}`);
     if (!id && largada.getTime() < Date.now()) return setError("La fecha de largada ya pasó.");
     if (!mods.length || mods.some((m) => !m.nombre || !(m.distancia_km > 0))) return setError("Cargá al menos una modalidad con distancia.");
+    let lat = parseFloat(f.lat), lon = parseFloat(f.lon);
+    if (Number.isNaN(lat) || Number.isNaN(lon)) {
+      // Sin coordenadas: se buscan con el lugar o con lo escrito en el buscador
+      const texto = busqueda.trim() || f.ubicacion.trim();
+      const r = texto ? await buscarUbicacion(texto) : [];
+      if (!r.length) return setError("Indicá la ubicación: buscá una ciudad, dirección o coordenadas, o tocá el mapa.");
+      if (r.length > 1 && !busqueda.trim()) { setResultados(r); return setError("Hay más de una coincidencia para el lugar: elegí la correcta en la lista."); }
+      lat = r[0].lat; lon = r[0].lon;
+    }
+    const ubicacion = f.ubicacion.trim() || (busqueda.trim() && !leerCoordenadas(busqueda) ? busqueda.trim() : `${lat}, ${lon}`);
     setGuardando(true);
     const fila = {
-      nombre: f.nombre.trim(), largada: largada.toISOString(), ubicacion: f.ubicacion.trim(),
-      lat: parseFloat(f.lat), lon: parseFloat(f.lon), organizador_email: f.organizador_email.trim().toLowerCase(),
+      nombre: f.nombre.trim(), largada: largada.toISOString(), ubicacion,
+      lat, lon, organizador_email: f.organizador_email.trim().toLowerCase(),
       participantes: parseInt(f.participantes, 10), armado_dias: parseInt(f.armado_dias, 10), cupo_equipo: parseInt(f.cupo_equipo, 10),
       duracion_propia_min: f.duracion_propia_min ? parseInt(f.duracion_propia_min, 10) : null,
       demora_largada_min: f.demora_largada_min ? parseInt(f.demora_largada_min, 10) : null,
@@ -154,11 +190,37 @@ export function EventoForm() {
           </div>
 
           <div className="tarjeta">
-            <div className="rotulo" style={{ marginBottom: 10 }}>Ubicación · tocá el mapa en el punto de largada y llegada</div>
-            <div className="form" style={{ marginBottom: 12 }}>
-              <label style={{ gridColumn: "span 2" }}>Lugar<input required value={f.ubicacion} onChange={set("ubicacion")} placeholder="Costanera Norte, CABA" /></label>
-              <label>Latitud<input required value={f.lat} onChange={set("lat")} /></label>
-              <label>Longitud<input required value={f.lon} onChange={set("lon")} /></label>
+            <div className="rotulo" style={{ marginBottom: 6 }}>Ubicación del punto de largada y llegada</div>
+            <p className="chico" style={{ marginTop: 0 }}>Alcanza con uno de estos datos: ciudad, dirección, lugar conocido, coordenadas o un enlace de Google Maps. Después podés ajustar el punto tocando el mapa.</p>
+            <div className="buscador-ubicacion">
+              <input
+                value={busqueda}
+                onChange={(e) => { setBusqueda(e.target.value); setResultados(null); }}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void buscar(); } }}
+                placeholder="Ej.: Mar del Plata · Av. Libertador 1500, CABA · Parque Tres de Febrero · -38.0285, -57.5340"
+                aria-label="Buscar ubicación"
+              />
+              <button type="button" className="boton primario" onClick={() => void buscar()} disabled={buscando || !busqueda.trim()}>{buscando ? "Buscando…" : "Buscar"}</button>
+            </div>
+            {resultados && (
+              resultados.length === 0
+                ? <p className="chico" style={{ color: "var(--rojo)" }}>Sin resultados. Probá con la ciudad, agregá la provincia o tocá el punto en el mapa.</p>
+                : resultados.length > 1 && (
+                  <ul className="resultados-ubicacion">
+                    {resultados.map((r, i) => (
+                      <li key={i}>
+                        <button type="button" onClick={() => elegir(r)}>
+                          <b>{r.etiqueta}</b>{r.detalle && <span>{r.detalle}</span>}<small>{r.fuente}</small>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )
+            )}
+            <div className="form" style={{ margin: "12px 0" }}>
+              <label style={{ gridColumn: "span 2" }}>Lugar (como se muestra en la web)<input value={f.ubicacion} onChange={set("ubicacion")} placeholder="Se completa con la búsqueda" /></label>
+              <label>Latitud<input value={f.lat} onChange={set("lat")} inputMode="decimal" /></label>
+              <label>Longitud<input value={f.lon} onChange={set("lon")} inputMode="decimal" /></label>
             </div>
             <div ref={mapaRef} style={{ height: 380, borderRadius: 8, border: "1px solid var(--borde)" }} />
           </div>
