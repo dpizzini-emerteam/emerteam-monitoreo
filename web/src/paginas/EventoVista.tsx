@@ -125,7 +125,7 @@ export function EventoVista() {
   return (
     <>
       <Barra titulo={ev.nombre} subtitulo={`${fmtFechaHora(ev.largada)} · ${cuenta}`}>
-        <span className="badge" style={{ ...estiloNivel(maxCarreraWbgt) }}>{NOMBRE_WA[maxCarreraWbgt]} WA</span>
+        <span className="badge" style={{ ...estiloNivel(maxCarreraWbgt) }} title="Escala WBGT World Athletics (2020), máximo previsto para la carrera">WBGT · {NOMBRE_WA[maxCarreraWbgt]}</span>
         {alertas.length > 0 && <a href="#alerta-smn" className="boton-osc alerta" style={{ background: COLOR_SMN[alertas[0].color], color: "#111", borderColor: "#fff", fontWeight: 800 }}>Alerta SMN</a>}
         {admin && <Link className="boton-osc" to={`/evento/${ev.id}/editar`}>Editar</Link>}
         <Link className="boton-osc" to="/">Eventos</Link>
