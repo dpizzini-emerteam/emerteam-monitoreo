@@ -13,6 +13,19 @@
     // Aplica el tema elegido antes de pintar, para evitar un destello
     try { var t = localStorage.getItem("mon_tema"); if (t === "claro" || t === "oscuro") document.documentElement.dataset.tema = t; } catch (e) {}
   </script>
+  <script>
+    // Si la página quedó de una versión anterior y su código ya no existe, se recarga una vez para tomar la nueva
+    window.addEventListener("error", function (e) {
+      var el = e.target;
+      if (!el || el.tagName !== "SCRIPT" || !/\/assets\//.test(el.src || "")) return;
+      try {
+        var ultima = +(sessionStorage.getItem("mon-recarga-version") || 0);
+        if (Date.now() - ultima < 30000) return;
+        sessionStorage.setItem("mon-recarga-version", String(Date.now()));
+      } catch (x) {}
+      location.reload();
+    }, true);
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet" />
 </head>

@@ -63,6 +63,14 @@ function ErrorPagina() {
 /** admin: integra el equipo EMERTEAM (ve todo); editor: además edita y administra el equipo */
 export type Ctx = { session: Session; admin: boolean; editor: boolean };
 
+function Cargando() {
+  return (
+    <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--texto2, #666)", fontSize: 16 }}>
+      Cargando…
+    </div>
+  );
+}
+
 function Raiz() {
   const enComando = useLocation().pathname.endsWith("/dashboard");
   const [session, setSession] = useState<Session | null | undefined>(undefined);
@@ -85,9 +93,8 @@ function Raiz() {
     if (session?.user.email) miRol(session.user.email).then(setRol);
   }, [session]);
 
-  if (session === undefined) return null;
+  if (session === undefined || (session && rol === undefined)) return <Cargando />;
   if (!session) return <Login />;
-  if (rol === undefined) return null;
   return (
     <>
       <Suspense fallback={null}>

@@ -132,8 +132,15 @@ export type IntegranteEquipo = { email: string; nombre: string; rol: RolEquipo; 
 
 /** Rol en el equipo EMERTEAM de la cuenta actual (null si no integra el equipo) */
 export async function miRol(email: string): Promise<RolEquipo | null> {
-  const { data } = await supabase.from("mon_admins").select("rol").eq("email", email.toLowerCase()).maybeSingle();
-  return (data?.rol as RolEquipo | undefined) ?? null;
+  // Si la consulta falla o tarda más de 12 s, se sigue como organizador (lo que ve cada uno lo define la base)
+  try {
+    const consulta = supabase.from("mon_admins").select("rol").eq("email", email.toLowerCase()).maybeSingle();
+    const espera = new Promise<{ data: null }>((ok) => setTimeout(() => ok({ data: null }), 12_000));
+    const { data } = await Promise.race([consulta, espera]);
+    return (data?.rol as RolEquipo | undefined) ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export const TZ = "America/Argentina/Buenos_Aires";

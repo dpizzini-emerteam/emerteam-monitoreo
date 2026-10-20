@@ -3,6 +3,17 @@
   command = "npx vite build"
   publish = "dist"
 
+# La página principal siempre se revalida (los archivos con hash sí se guardan en caché)
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/"
+  [headers.values]
+    Cache-Control = "no-cache"
+
 [[headers]]
   for = "/*"
   [headers.values]
