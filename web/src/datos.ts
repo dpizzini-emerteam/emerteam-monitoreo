@@ -167,3 +167,6 @@ export function nivelRayoMedido(m: Pick<Medicion, "trueno" | "rayo_rango" | "rel
   if (desdeRango == null && desdeKm == null) return null;
   return Math.max(desdeRango ?? 0, desdeKm ?? 0);
 }
+
+/** Colores de las alertas del SMN */
+export const COLOR_SMN: Record<string, string> = { amarillo: "#F5C400", naranja: "#FF6A1A", rojo: "#FF3B30", violeta: "#8E5BD9" };

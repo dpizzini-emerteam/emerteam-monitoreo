@@ -7,39 +7,14 @@ import { Accesos } from "../componentes/Accesos";
 import { Introduccion } from "../componentes/Introduccion";
 import { Resumen } from "../componentes/Resumen";
 import { Mediciones } from "../componentes/Mediciones";
+import { consenso, PRIORIDAD } from "../serie";
 import {
-  ordenarAlertas, tituloAlerta, diaLocal, fmtDia, fmtFechaHora, fmtHora, num, supabase,
+  COLOR_SMN, ordenarAlertas, tituloAlerta, diaLocal, fmtDia, fmtFechaHora, fmtHora, num, supabase,
   type AlertaSMN, type Evento, type Nivel, type Pronostico,
 } from "../datos";
 import { estiloNivel, estiloVariable, estiloWA, NOMBRE_CORTO, NOMBRE_FASE, NOMBRE_VARIABLE, NOMBRE_WA, REGLAS, TIPO_FUENTE, nombreNivel, recomendacion } from "../reglas";
 import { calcular } from "../ventanas";
 
-const PRIORIDAD = ["ecmwf", "gfs", "icon"];
-const VARS = ["t2m", "td2m", "hr", "viento10", "rafaga10", "dir_viento", "precip", "cape", "radiacion", "nubosidad", "presion", "wbgt_est"] as const;
-const COLOR_SMN: Record<string, string> = { amarillo: "#C79000", naranja: "#FF6A1A", rojo: "#FF3B30", violeta: "#8E5BD9" };
-
-/** Serie horaria de consenso: fuente prioritaria por hora */
-function consenso(pron: Pronostico[]): Map<number, Pronostico & { n: number }> {
-  const porHora = new Map<number, Pronostico[]>();
-  for (const p of pron) {
-    const t = new Date(p.valido).getTime();
-    porHora.set(t, [...(porHora.get(t) ?? []), p]);
-  }
-  const out = new Map<number, Pronostico & { n: number }>();
-  for (const [t, ps] of [...porHora.entries()].sort((a, b) => a[0] - b[0])) {
-    const orden = [...PRIORIDAD.map((f) => ps.find((p) => p.fuente === f)).filter((p): p is Pronostico => !!p), ...ps.filter((p) => !PRIORIDAD.includes(p.fuente))];
-    const fila = { ...orden[0], n: ps.length } as Pronostico & { n: number };
-    // Variable ausente en la fuente principal: se toma de la siguiente
-    for (const c of VARS) {
-      if (fila[c] == null) {
-        const alt = orden.find((p) => p[c] != null);
-        if (alt) (fila as Record<string, unknown>)[c] = alt[c];
-      }
-    }
-    out.set(t, fila);
-  }
-  return out;
-}
 
 function useSonido() {
   const ctx = useRef<AudioContext | null>(null);
@@ -157,6 +132,7 @@ export function EventoVista() {
     <>
       <Barra titulo={ev.nombre} subtitulo={`${fmtFechaHora(ev.largada)} · ${cuenta}`} abajo={pestanas}>
         {alertas.length > 0 && <a href="#alerta-smn" className="boton-osc alerta" style={{ background: COLOR_SMN[alertas[0].color], color: "#111", borderColor: "#fff", fontWeight: 800 }}>Alerta SMN</a>}
+        {admin && <Link className="boton-osc" to={`/evento/${ev.id}/comando`}>Comando</Link>}
         {editor && <Link className="boton-osc" to={`/evento/${ev.id}/editar`}>Editar</Link>}
         <Link className="boton-osc" to="/">Eventos</Link>
       </Barra>

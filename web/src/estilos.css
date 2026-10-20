@@ -179,3 +179,55 @@ a.resumen-fase:hover .resumen-ver { color: var(--naranja); }
   .leyenda-wbgt > div { flex-direction: row; justify-content: space-between; padding: 6px 10px; }
 }
 .form-med { grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); }
+
+/* Pantalla de comando (siempre oscura, letra grande) */
+.comando { --c-fondo: #0c0c0c; --c-celda: #181818; --c-borde: #2a2a2a; min-height: 100vh; background: var(--c-fondo); color: #f2f2f2; padding: 18px clamp(14px, 2.5vw, 36px) 24px; display: flex; flex-direction: column; gap: 16px; --tinta: #e6e6e6; }
+.cmd-cab { display: grid; grid-template-columns: 1fr auto auto; gap: 18px; align-items: center; border-bottom: 3px solid var(--naranja); padding-bottom: 12px; }
+.cmd-evento { font-family: "Barlow Condensed"; font-weight: 800; font-size: clamp(22px, 2.6vw, 38px); text-transform: uppercase; line-height: 1.05; }
+.cmd-sub { color: #a9a9a9; font-size: 15px; }
+.cmd-fase { text-align: right; font-family: "Barlow Condensed"; font-weight: 800; font-size: clamp(20px, 2.2vw, 32px); text-transform: uppercase; color: var(--naranja); }
+.cmd-fase span { display: block; font-family: "Barlow"; font-weight: 600; font-size: 15px; color: #d0d0d0; text-transform: none; }
+.cmd-reloj { font-family: "Barlow Condensed"; font-weight: 800; font-size: clamp(40px, 5vw, 72px); line-height: 1; text-align: right; font-variant-numeric: tabular-nums; }
+.cmd-reloj span { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; }
+.cmd-reloj button, .cmd-reloj a { font: 600 13px "Barlow"; color: #cfcfcf; background: none; border: 1px solid #3a3a3a; border-radius: 6px; padding: 5px 9px; cursor: pointer; text-decoration: none; }
+.cmd-alerta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 20px; color: #111; padding: 14px 20px; border-radius: 10px; font-size: clamp(18px, 2vw, 26px); }
+.cmd-alerta b { font-family: "Barlow Condensed"; text-transform: uppercase; font-weight: 800; }
+.cmd-grilla { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.cmd-celda { background: var(--c-celda); border: 1px solid var(--c-borde); border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; }
+.cmd-rot { font-family: "Barlow Condensed"; font-weight: 700; font-size: 15px; letter-spacing: 0.12em; text-transform: uppercase; color: #a9a9a9; }
+.cmd-valor { font-family: "Barlow Condensed"; font-weight: 800; font-size: clamp(44px, 6vw, 92px); line-height: 0.95; font-variant-numeric: tabular-nums; }
+.cmd-valor small { font-size: 0.4em; margin-left: 6px; color: #bdbdbd; }
+.cmd-badge { align-self: flex-start; font-size: 18px; }
+.cmd-nota { font-size: 14px; color: #bdbdbd; }
+.cmd-bloque { background: var(--c-celda); border: 1px solid var(--c-borde); border-radius: 12px; padding: 14px 18px; display: flex; flex-direction: column; gap: 10px; }
+.cmd-nada { margin: 0; font-size: 18px; color: #cfcfcf; }
+.cmd-acciones { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.cmd-acciones li { border-left: 6px solid; padding: 4px 0 4px 14px; font-size: 18px; }
+.cmd-acciones li .badge { margin-right: 10px; }
+.cmd-acciones li p { margin: 6px 0 0; font-size: 17px; color: #e0e0e0; line-height: 1.4; }
+.cmd-fasecita { color: #a9a9a9; font-size: 15px; }
+.cmd-horas { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; }
+.cmd-hora { background: #222; border-radius: 10px; padding: 10px 6px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; font-size: 18px; }
+.cmd-hora b { font-family: "Barlow Condensed"; font-size: 24px; }
+.cmd-wbgt { font-weight: 700; font-size: 15px; padding: 3px 8px; border-radius: 4px; align-self: stretch; }
+.cmd-chico { font-size: 14px; color: #bdbdbd; }
+.cmd-meds { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.cmd-meds div { display: flex; flex-direction: column; font-size: 16px; }
+.cmd-meds span { color: #cfcfcf; font-size: 15px; }
+.cmd-pie { margin-top: auto; color: #6f6f6f; font-size: 13px; text-align: center; }
+@media (max-width: 900px) {
+  .cmd-cab { grid-template-columns: 1fr auto; }
+  .cmd-fase { grid-column: 1 / -1; text-align: left; order: 3; }
+  .cmd-grilla { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cmd-horas { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .comando { padding: 12px 12px 20px; }
+  .cmd-cab { gap: 10px; }
+  .cmd-reloj { font-size: 40px; }
+  .cmd-grilla { gap: 8px; }
+  .cmd-celda { padding: 12px; min-width: 0; }
+  .cmd-horas { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .cmd-alerta { font-size: 16px; }
+  .cmd-badge { font-size: 14px; white-space: normal; }
+}
