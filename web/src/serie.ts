@@ -66,4 +66,4 @@ export function uvMaxPorDia(uv: Uv[]): Map<string, number> {
   }
   return out;
 }
-export const FUENTE_UV = "Índice UV con cielo despejado: MET Norway, Locationforecast 2.0 (CC BY 4.0). Categorías: OMS (2002).";
+export const FUENTE_UV = "Índice UV con cielo despejado: MET Norway, Locationforecast 2.0 (CC BY 4.0); más allá de 2,5 días, estimado por altura solar. Categorías: OMS (2002).";

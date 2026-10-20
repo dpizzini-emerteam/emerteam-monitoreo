@@ -1,8 +1,9 @@
 """Índice UV con cielo despejado: MET Norway, Locationforecast 2.0 (api.met.no), licencia CC BY 4.0.
 
-La API entrega pasos de 1 h durante ~2,5 días y de 6 h después. Las horas intermedias se completan
-con la forma de la curva diaria del UV con cielo despejado (Madronich, 2007: UVI ≈ 12,5 · μ0^2,42):
-se interpola en el tiempo el factor k = UVI / (12,5 · μ0^2,42) de los pasos con sol y se aplica a cada hora.
+La API entrega el UV solo en los pasos horarios (~2,5 días). Las horas sin dato se completan con la forma
+de la curva diaria del UV con cielo despejado (Madronich, 2007: UVI ≈ 12,5 · μ0^2,42): se interpola el factor
+k = UVI / (12,5 · μ0^2,42) entre pasos con sol y, después del último dato, se usa el k medio de las últimas 24 h
+(el k refleja ozono y aerosoles, que varían poco de un día al siguiente). Esas horas quedan marcadas como interpoladas.
 Las condiciones de uso exigen identificarse en el User-Agent y no consultar más de lo necesario.
 """
 
@@ -44,7 +45,9 @@ def obtener_evento(ev: dict, hasta: datetime) -> list[dict]:
     ks = [(t, uv / _forma(mu)) for t, uv in puntos if (mu := cos_cenit(lat, lon, t)) >= MU_MIN and _forma(mu) > 0]
     filas = []
     t = puntos[0][0]
-    fin = min(puntos[-1][0], hasta)
+    fin = min(hasta, puntos[-1][0] + timedelta(days=7))  # mismo alcance que el pronóstico de los modelos
+    ultimos = [k for tk, k in ks if tk >= ks[-1][0] - timedelta(hours=24)] if ks else []
+    k_ext = sum(ultimos) / len(ultimos) if ultimos else None
     while t <= fin:
         if t in exactos:
             uv, interp = exactos[t], False
@@ -58,8 +61,10 @@ def obtener_evento(ev: dict, hasta: datetime) -> list[dict]:
                 if antes and despues:
                     (t0, k0), (t1, k1) = antes[-1], despues[0]
                     k = k0 if t1 == t0 else k0 + (k1 - k0) * (t - t0) / (t1 - t0)
+                elif antes:
+                    k = k_ext if k_ext is not None else antes[-1][1]
                 else:
-                    k = (antes or despues)[-1 if antes else 0][1]
+                    k = despues[0][1]
                 uv = k * _forma(mu)
             interp = True
         filas.append({"evento_id": ev["id"], "valido": t.isoformat(), "uv": round(max(uv, 0.0), 1),
