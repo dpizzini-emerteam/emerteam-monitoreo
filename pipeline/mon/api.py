@@ -54,3 +54,8 @@ class Ingesta:
         r = self.s.post(URL, json={"tipo": "niveles", "eventos": por_evento}, headers=self._h(), timeout=120)
         r.raise_for_status()
         return r.json()
+
+    def uv(self, por_evento: dict[str, list[dict]]) -> dict:
+        r = self.s.post(URL, json={"tipo": "uv", "eventos": por_evento}, headers=self._h(), timeout=120)
+        r.raise_for_status()
+        return r.json()

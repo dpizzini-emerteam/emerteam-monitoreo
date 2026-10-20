@@ -3,9 +3,10 @@ import { Link, useParams } from "react-router-dom";
 import { Icono, iconoTiempo } from "../componentes/Icono";
 import {
   COLOR_SMN, estadoRayosGLM, fmtFechaHora, fmtHora, kmPorTrueno, nivelRayoMedido, nivelWBGT, num, ordenarAlertas, supabase, tituloAlerta,
-  type AlertaSMN, type Evento, type Medicion, type Nivel, type Pronostico, type Rayo,
+  type AlertaSMN, type Evento, type Medicion, type Nivel, type Pronostico, type Uv, type Rayo,
 } from "../datos";
 import { ESTILO_SIN_DATOS, estiloNivel, estiloVariable, estiloWA, NOMBRE_CORTO, NOMBRE_FASE, NOMBRE_WA, nombreNivel, recomendacion } from "../reglas";
+import { UvChip } from "../componentes/Uv";
 import { consenso } from "../serie";
 import { calcular } from "../ventanas";
 
@@ -23,17 +24,19 @@ export function Comando() {
   const [alertas, setAlertas] = useState<AlertaSMN[]>([]);
   const [meds, setMeds] = useState<Medicion[]>([]);
   const [rayos, setRayos] = useState<Rayo[]>([]);
+  const [uv, setUv] = useState<Uv[]>([]);
   const [ahora, setAhora] = useState(Date.now());
 
   const cargar = useCallback(async () => {
     if (!id) return;
-    const [e, p, n, a, m, r] = await Promise.all([
+    const [e, p, n, a, m, r, u] = await Promise.all([
       supabase.from("mon_eventos").select("*, mon_modalidades(*)").eq("id", id).single(),
       supabase.from("mon_pronosticos").select("*").eq("evento_id", id).order("valido").limit(5000),
       supabase.from("mon_niveles").select("*").eq("evento_id", id).order("desde").limit(5000),
       supabase.from("mon_alertas_smn").select("*").eq("evento_id", id).neq("estado", "levantada"),
       supabase.from("mon_mediciones").select("*").eq("evento_id", id).order("tomada_en", { ascending: false }).limit(50),
       supabase.from("mon_rayos").select("*").eq("evento_id", id).gte("ocurrido_en", new Date(Date.now() - 60 * 60_000).toISOString()).limit(2000),
+      supabase.from("mon_uv").select("evento_id,valido,uv,interpolado").eq("evento_id", id).order("valido").limit(1000),
     ]);
     if (e.data) setEv(e.data as Evento);
     setPron((p.data as Pronostico[]) ?? []);
@@ -41,6 +44,7 @@ export function Comando() {
     setAlertas(ordenarAlertas(((a.data as AlertaSMN[]) ?? []).filter((x) => !x.hasta || new Date(x.hasta).getTime() > Date.now())));
     setMeds((m.data as Medicion[]) ?? []);
     setRayos((r.data as Rayo[]) ?? []);
+    setUv((u.data as Uv[]) ?? []);
   }, [id]);
 
   useEffect(() => {
@@ -59,7 +63,7 @@ export function Comando() {
     return () => { clearInterval(reloj); clearInterval(recarga); void supabase.removeChannel(canal); void bloqueo?.release(); };
   }, [cargar, id]);
 
-  const serie = useMemo(() => consenso(pron), [pron]);
+  const serie = useMemo(() => consenso(pron, uv), [pron, uv]);
   if (!ev) return <div className="comando"><p style={{ padding: 40 }}>Cargando…</p></div>;
   const v = calcular(ev);
 
@@ -168,6 +172,7 @@ export function Comando() {
             <div className="cmd-valor">{num(medW?.temp ?? actualP?.t2m)}<small>°C</small></div>
           </div>
           <div className="cmd-nota">HR {num(medW?.hr ?? actualP?.hr)} % · lluvia {num(actualP?.precip, 1)} mm/h</div>
+          <div style={{ marginTop: 6 }}><UvChip uv={actualP?.uv} /></div>
         </div>
       </section>
 
@@ -201,6 +206,8 @@ export function Comando() {
                 <span>{num(p.t2m)}°</span>
                 <span className="cmd-wbgt" style={estiloWA(n)}>WBGT {num(p.wbgt_est, 1)}</span>
                 <span className="cmd-chico">ráf. {num(p.rafaga10)}</span>
+                <span className="cmd-chico">HR {num(p.hr)} %</span>
+                {(p.uv ?? 0) >= 0.5 ? <UvChip uv={p.uv} compacto /> : <span className="cmd-chico">UV {p.uv == null ? "—" : "0"}</span>}
                 <span className="cmd-chico">{num(p.precip, 1)} mm/h</span>
               </div>
             );

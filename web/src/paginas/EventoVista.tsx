@@ -11,10 +11,11 @@ import { armarComunicado } from "../comunicacion";
 import { Introduccion } from "../componentes/Introduccion";
 import { Resumen } from "../componentes/Resumen";
 import { Mediciones } from "../componentes/Mediciones";
-import { consenso, PRIORIDAD } from "../serie";
+import { consenso, FUENTE_UV, PRIORIDAD, uvMaxPorDia } from "../serie";
+import { UvChip } from "../componentes/Uv";
 import {
   COLOR_SMN, estadoRayosGLM, ordenarAlertas, tituloAlerta, diaLocal, fmtDia, fmtFechaHora, fmtHora, num, supabase,
-  type AlertaSMN, type Evento, type Rayo, type Nivel, type Pronostico, type Sesgo,
+  type AlertaSMN, type Evento, type Rayo, type Nivel, type Pronostico, type Sesgo, type Uv,
 } from "../datos";
 import { estiloNivel, estiloVariable, estiloWA, NOMBRE_CORTO, NOMBRE_FASE, NOMBRE_VARIABLE, NOMBRE_WA, REGLAS, TIPO_FUENTE, nombreNivel, recomendacion } from "../reglas";
 import { calcular } from "../ventanas";
@@ -54,13 +55,14 @@ export function EventoVista() {
   const [rayos, setRayos] = useState<Rayo[]>([]);
   const [informeAprobado, setInformeAprobado] = useState(false);
   const [sesgos, setSesgos] = useState<Sesgo[]>([]);
+  const [uv, setUv] = useState<Uv[]>([]);
   const [error, setError] = useState("");
   const [descarteSonido, setDescarteSonido] = useState(false);
   const sonido = useSonido();
 
   const cargar = useCallback(async () => {
     if (!id) return;
-    const [e, p, n, a, r, inf, sg] = await Promise.all([
+    const [e, p, n, a, r, inf, sg, u] = await Promise.all([
       supabase.from("mon_eventos").select("*, mon_modalidades(*)").eq("id", id).single(),
       supabase.from("mon_pronosticos").select("*").eq("evento_id", id).order("valido").limit(5000),
       supabase.from("mon_niveles").select("*").eq("evento_id", id).order("desde").limit(5000),
@@ -68,6 +70,7 @@ export function EventoVista() {
       supabase.from("mon_rayos").select("*").eq("evento_id", id).gte("ocurrido_en", new Date(Date.now() - 60 * 60_000).toISOString()).limit(2000),
       supabase.from("mon_informes").select("estado").eq("evento_id", id).maybeSingle(),
       supabase.from("mon_sesgos").select("*").eq("evento_id", id),
+      supabase.from("mon_uv").select("evento_id,valido,uv,interpolado").eq("evento_id", id).order("valido").limit(1000),
     ]);
     if (e.error) return setError("No tenés acceso a este evento o no existe.");
     setEv(e.data as Evento);
@@ -76,6 +79,7 @@ export function EventoVista() {
     setRayos((r.data as Rayo[]) ?? []);
     setInformeAprobado(inf.data?.estado === "aprobado");
     setSesgos((sg.data as Sesgo[]) ?? []);
+    setUv((u.data as Uv[]) ?? []);
     setAlertas(ordenarAlertas(((a.data as AlertaSMN[]) ?? []).filter((x) => !x.hasta || new Date(x.hasta) > new Date())));
   }, [id]);
 
@@ -116,7 +120,8 @@ export function EventoVista() {
   }, [hayAviso, sonido.sonar]);
 
   const v = useMemo(() => (ev ? calcular(ev) : null), [ev]);
-  const serie = useMemo(() => consenso(pron), [pron]);
+  const serie = useMemo(() => consenso(pron, uv), [pron, uv]);
+  const uvDia = useMemo(() => uvMaxPorDia(uv), [uv]);
   const ahora = Date.now();
   // Solo cuentan los niveles que caen dentro de las fases del evento (si se cambió la fecha o el lugar,
   // lo calculado para la fecha anterior no se muestra mientras se recalcula)
@@ -233,7 +238,7 @@ export function EventoVista() {
         })()}
         {actual === "general" && (
           <>
-            <TiraDias serie={serie} desde={v.armado[0]} hasta={v.desarme[1]} largada={v.largada} eventoId={ev.id} />
+            <TiraDias serie={serie} uvDia={uvDia} desde={v.armado[0]} hasta={v.desarme[1]} largada={v.largada} eventoId={ev.id} />
             <Introduccion />
             <Resumen vigentes={vigentes} alertas={alertas} eventoId={ev.id} />
             {comunicado && (
@@ -247,7 +252,7 @@ export function EventoVista() {
         )}
         {actual === "armado" && (
           <>
-            <Dias titulo="Armado" serie={serie} niveles={nivelesFase("armado")} desde={v.armado[0]} hasta={v.armado[1]} franjaSegura
+            <Dias titulo="Armado" serie={serie} uvDia={uvDia} niveles={nivelesFase("armado")} desde={v.armado[0]} hasta={v.armado[1]} franjaSegura
               nota={`${ev.ubicacion} · armado desde ${fmtFechaHora(v.armado[0].toISOString())} hasta ${fmtFechaHora(v.armado[1].toISOString())}`} />
             <Recomendaciones lista={delaFase("armado")} vacio="Con el pronóstico actual no hay recomendaciones para el armado." />
           </>
@@ -261,7 +266,7 @@ export function EventoVista() {
         )}
         {actual === "desarme" && (
           <>
-            <Dias titulo="Desarme" serie={serie} niveles={nivelesFase("desarme")} desde={v.desarme[0]} hasta={v.desarme[1]} franjaSegura
+            <Dias titulo="Desarme" serie={serie} uvDia={uvDia} niveles={nivelesFase("desarme")} desde={v.desarme[0]} hasta={v.desarme[1]} franjaSegura
               nota={`${ev.ubicacion} · desarme desde ${fmtFechaHora(v.desarme[0].toISOString())} hasta ${fmtFechaHora(v.desarme[1].toISOString())}`} />
             <Recomendaciones lista={delaFase("desarme")} vacio="Con el pronóstico actual no hay recomendaciones para el desarme." />
           </>
@@ -276,7 +281,7 @@ export function EventoVista() {
             <section className="seccion tarjeta" id="fuentes">
               <div className="rotulo">Fuentes y metodología</div>
               <p className="chico" style={{ marginBottom: 0 }}>
-                Modelos ECMWF IFS (CC BY 4.0) y NOAA GFS, comparados por separado; avisos oficiales del SMN. WBGT estimado hora por hora por el método de Liljegren et al. (2008).
+                Modelos ECMWF IFS (CC BY 4.0) y NOAA GFS, comparados por separado; avisos oficiales del SMN. WBGT estimado hora por hora por el método de Liljegren et al. (2008). Índice UV con cielo despejado: MET Norway, Locationforecast 2.0 (CC BY 4.0), categorías OMS (2002).
                 Escala de estrés térmico: World Athletics (2020). Cada recomendación indica su fuente y su tipo.
                 Se usa el punto de grilla de tierra más cercano al evento y, cuando hay una estación del SMN a menos de 40 km con al menos 12 horas comparables,
                 se corrige el sesgo de temperatura (por separado de día y de noche), punto de rocío y viento con las observaciones de las últimas 72 h, y se recalcula el WBGT.
@@ -324,8 +329,8 @@ function iconoAlerta(f: string): TipoIcono {
   return "nube";
 }
 
-function Dias({ titulo, serie, niveles, desde, hasta, nota, franjaSegura }: {
-  titulo: string; serie: Map<number, Pronostico & { n: number }>; niveles: Nivel[];
+function Dias({ titulo, serie, uvDia, niveles, desde, hasta, nota, franjaSegura }: {
+  titulo: string; serie: Map<number, Pronostico & { n: number }>; uvDia: Map<string, number>; niveles: Nivel[];
   desde: Date; hasta: Date; nota: string; franjaSegura?: boolean;
 }) {
   const dias = new Map<string, (Pronostico & { n: number })[]>();
@@ -348,6 +353,8 @@ function Dias({ titulo, serie, niveles, desde, hasta, nota, franjaSegura }: {
         {[...dias.entries()].map(([d, ps]) => {
           const t = ps.map((p) => p.t2m).filter((x): x is number => x != null);
           const raf = Math.max(...ps.map((p) => p.rafaga10 ?? 0));
+          const hrs = ps.map((p) => p.hr).filter((x): x is number => x != null);
+          const uvMax = uvDia.get(d);
           const lluvia = ps.reduce((a, p) => a + (p.precip ?? 0) * (horasPaso.get(new Date(p.valido).getTime()) ?? 1), 0);
           const delDia = niveles.filter((n) => diaLocal(n.desde) <= d && diaLocal(n.hasta) >= d);
           const peorDia = delDia.reduce<Nivel | null>((m, n) => (!m || n.nivel > m.nivel ? n : m), null);
@@ -368,6 +375,10 @@ function Dias({ titulo, serie, niveles, desde, hasta, nota, franjaSegura }: {
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600 }}><Icono tipo="viento" size={20} />ráf. {num(raf)} km/h</div>
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600 }}><Icono tipo="gota" size={20} />{num(lluvia, 1)} mm</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", fontWeight: 600 }}>
+                <span>HR {hrs.length ? `${num(Math.min(...hrs))}–${num(Math.max(...hrs))}` : "—"} %</span>
+                <UvChip uv={uvMax} />
+              </div>
               <span className="badge" style={{ ...(peorDia && nivelDia > 0 ? estiloVariable(peorDia.variable, nivelDia) : estiloNivel(0)), alignSelf: "flex-start", fontSize: 13 }}>{peorDia && nivelDia > 0 ? nombreNivel(peorDia.variable, nivelDia) : "Bajo umbral"}</span>
               {peorDia && nivelDia > 0 && <span className="chico" style={{ marginTop: -4 }}>{NOMBRE_CORTO[peorDia.variable]}</span>}
               {franja && (
@@ -381,7 +392,7 @@ function Dias({ titulo, serie, niveles, desde, hasta, nota, franjaSegura }: {
           );
         })}
       </div>
-      <p className="chico">{nota}</p>
+      <p className="chico">{nota} · HR: humedad relativa mínima y máxima del día · UV: máximo del día. {FUENTE_UV}</p>
     </section>
   );
 }
@@ -451,6 +462,7 @@ function DiaCarrera({ serie, v }: { serie: Map<number, Pronostico & { n: number 
                       <span style={{ display: "inline-block", transform: `rotate(${(p.dir_viento ?? 0) + 180}deg)` }}>↑</span> {num(p.viento10)}/{num(p.rafaga10)}
                     </span>
                     <span className="chico">HR {num(p.hr)} %</span>
+                    {(p.uv ?? 0) >= 0.5 ? <UvChip uv={p.uv} compacto /> : <span className="chico">UV {p.uv == null ? "—" : "0"}</span>}
                     <span className="chico">{num(p.precip, 1)} mm/h</span>
                   </div>
                 );
@@ -465,7 +477,7 @@ function DiaCarrera({ serie, v }: { serie: Map<number, Pronostico & { n: number 
             </div>
           ))}
         </div>
-        <span className="chico">Escala y colores WBGT: World Athletics (2020), Tabla 1; «Riesgo bajo» corresponde a «Almost Safe» · viento medio / ráfaga en km/h a 10 m</span>
+        <span className="chico">Escala y colores WBGT: World Athletics (2020), Tabla 1; «Riesgo bajo» corresponde a «Almost Safe» · viento medio / ráfaga en km/h a 10 m · HR: humedad relativa · {FUENTE_UV}</span>
       </div>
     </section>
   );

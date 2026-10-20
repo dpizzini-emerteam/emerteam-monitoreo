@@ -15,7 +15,7 @@ from datetime import datetime, timedelta, timezone
 
 from . import correccion, motor, ventanas
 from .api import Ingesta
-from .fuentes import ecmwf, gfs
+from .fuentes import ecmwf, gfs, metno
 
 FUENTES = {"gfs": gfs, "ecmwf": ecmwf}
 
@@ -73,6 +73,16 @@ def main() -> int:
             errores += 1
             log.exception("Fallo la fuente %s", nombre)
             anotar(f"Fuente {nombre}")
+
+    # Índice UV con cielo despejado (MET Norway): se reemplaza completo en cada corrida
+    try:
+        uv = metno.obtener(eventos, {e["id"]: ventanas.calcular(e).desarme[1] + timedelta(hours=3) for e in eventos})
+        if uv:
+            log.info("uv: %s", api.uv(uv))
+    except Exception:  # noqa: BLE001
+        errores += 1
+        log.exception("Fallo el índice UV")
+        anotar("UV")
 
     try:
         _niveles(api, ahora)

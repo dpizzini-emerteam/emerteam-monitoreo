@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { diaLocal, type Pronostico } from "../datos";
 import { Icono, type TipoIcono } from "./Icono";
+import { UvChip } from "./Uv";
 
 type Fila = Pronostico & { n: number };
 const DIA = new Intl.DateTimeFormat("es-AR", { timeZone: "America/Argentina/Buenos_Aires", weekday: "short" });
@@ -17,9 +18,9 @@ function iconoDia(ps: { t: number; p: Fila; h: number }[]): TipoIcono {
   return nub >= 75 ? "nube" : nub >= 30 ? "solnube" : "sol";
 }
 
-/** Tira de días del evento (armado → desarme) con ícono y temperaturas máxima y mínima */
-export function TiraDias({ serie, desde, hasta, largada, eventoId }: {
-  serie: Map<number, Fila>; desde: Date; hasta: Date; largada: Date; eventoId: string;
+/** Tira de días del evento (armado → desarme) con ícono, temperaturas máxima y mínima, humedad y UV máximo */
+export function TiraDias({ serie, uvDia, desde, hasta, largada, eventoId }: {
+  serie: Map<number, Fila>; uvDia: Map<string, number>; desde: Date; hasta: Date; largada: Date; eventoId: string;
 }) {
   const claves: string[] = [];
   for (let t = desde.getTime(); t <= hasta.getTime() + 3600_000; t += 3600_000) {
@@ -35,6 +36,7 @@ export function TiraDias({ serie, desde, hasta, largada, eventoId }: {
       {claves.map((d) => {
         const ps = entradas.filter(([t]) => diaLocal(new Date(t).toISOString()) === d).map(([t, p]) => ({ t, p, h: pasos.get(t) ?? 1 }));
         const temps = ps.map(({ p }) => p.t2m).filter((x): x is number => x != null);
+        const hrs = ps.map(({ p }) => p.hr).filter((x): x is number => x != null);
         const mediodia = new Date(`${d}T12:00:00-03:00`);
         const carrera = d === diaCarrera;
         const fase = d < diaCarrera ? "armado" : carrera ? "carrera" : "desarme";
@@ -46,6 +48,8 @@ export function TiraDias({ serie, desde, hasta, largada, eventoId }: {
               <>
                 <Icono tipo={iconoDia(ps)} size={46} />
                 <span className="tira-temp"><b>{Math.round(Math.max(...temps))}°</b> {Math.round(Math.min(...temps))}°</span>
+                <span className="tira-hr" title="Humedad relativa mínima y máxima">{hrs.length ? `HR ${Math.round(Math.min(...hrs))}–${Math.round(Math.max(...hrs))} %` : "HR —"}</span>
+                <UvChip uv={uvDia.get(d)} compacto />
               </>
             ) : (
               <>

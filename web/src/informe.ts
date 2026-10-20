@@ -1,6 +1,6 @@
 // Armado del informe post-evento a partir de los datos registrados.
 // El resultado es un objeto serializable: al aprobarse se guarda como copia fija (mon_informes.contenido).
-import { kmPorTrueno, nivelRayoMedido, type AlertaSMN, type Evento, type Medicion, type Pronostico, type Rayo } from "./datos";
+import { kmPorTrueno, nivelRayoMedido, type AlertaSMN, type Evento, type Medicion, type Pronostico, type Rayo, type Uv } from "./datos";
 import { consenso } from "./serie";
 import { calcular } from "./ventanas";
 
@@ -14,6 +14,7 @@ export type Pico = { valor: number; hora: string; sector?: string } | null;
 export type FaseInforme = {
   fase: "armado" | "personal" | "desarme"; desde: string; hasta: string;
   rafagaEst: Pico; rafagaMed: Pico; wbgtEst: Pico; lluviaMm: number; recos: RecoInforme[];
+  hrMin?: number | null; hrMax?: number | null; uvMax?: Pico;
 };
 export type Informe = {
   version: 1;
@@ -21,7 +22,7 @@ export type Informe = {
   evento: { nombre: string; largada: string; ubicacion: string; modalidades: string; participantes: number };
   ventanas: { exposicion: [string, string]; carrera: [string, string]; ultimoCuarto: [string, string] };
   corredores: {
-    wbgtEst: Pico; wbgtMed: Pico; temperaturaMax: Pico; humedadMedia: number | null; rafagaEst: Pico; rafagaMed: Pico; lluviaMm: number;
+    wbgtEst: Pico; wbgtMed: Pico; temperaturaMax: Pico; humedadMedia: number | null; hrMin?: number | null; hrMax?: number | null; uvMax?: Pico; rafagaEst: Pico; rafagaMed: Pico; lluviaMm: number;
     rayos: { cantidad: number; minKm: number | null; hora: string | null };
     rayosTerreno: { nivelMax: number; detalle: string | null };
     recos: RecoInforme[];
@@ -63,9 +64,11 @@ function recosDe(hist: FilaHistorial[], fases: string[]): RecoInforme[] {
   return out.sort((a, b) => b.nivel - a.nivel || a.desde.localeCompare(b.desde));
 }
 
-export function armarInforme(ev: Evento, pron: Pronostico[], hist: FilaHistorial[], meds: Medicion[], rayos: Rayo[], alertas: AlertaSMN[]): Informe {
+export function armarInforme(ev: Evento, pron: Pronostico[], hist: FilaHistorial[], meds: Medicion[], rayos: Rayo[], alertas: AlertaSMN[], uv: Uv[] = []): Informe {
   const v = calcular(ev);
-  const serie = [...consenso(pron).entries()];
+  const serie = [...consenso(pron, uv).entries()];
+  const rangoHr = (ps: Pronostico[]) => { const x = ps.map((p) => p.hr).filter((h): h is number => h != null); return x.length ? { hrMin: Math.round(Math.min(...x)), hrMax: Math.round(Math.max(...x)) } : { hrMin: null, hrMax: null }; };
+  const uvEn = (a: Date, b: Date) => maximo(uv.filter((u) => enVentana(u.valido, a, b)).map((u) => ({ ...u, uv: Number(u.uv) })), (u) => u.uv, (u) => u.valido);
   // Horas que representa cada paso, para acumular lluvia
   const pasos = serie.map(([t], i) => ({ t, h: i === 0 ? 1 : Math.min(6, (t - serie[i - 1][0]) / 3600_000) }));
   const horasPaso = new Map(pasos.map((p) => [p.t, p.h]));
@@ -91,6 +94,7 @@ export function armarInforme(ev: Evento, pron: Pronostico[], hist: FilaHistorial
       rafagaMed: maximo(ms, (m) => m.rafaga, (m) => m.tomada_en, (m) => m.sector),
       wbgtEst: maximo(ps, (p) => p.wbgt_est, (p) => p.valido),
       lluviaMm: lluvia(a, b),
+      ...rangoHr(ps), uvMax: uvEn(a, b),
       recos: recosDe(hist, [f]),
     };
   };
@@ -112,6 +116,7 @@ export function armarInforme(ev: Evento, pron: Pronostico[], hist: FilaHistorial
       wbgtMed: maximo(medsExpo, (m) => m.wbgt, (m) => m.tomada_en, (m) => m.sector),
       temperaturaMax: maximo(expo, (p) => p.t2m, (p) => p.valido),
       humedadMedia: hrs.length ? Math.round(hrs.reduce((a, b) => a + b, 0) / hrs.length) : null,
+      ...rangoHr(expo), uvMax: uvEn(e0, e1),
       rafagaEst: maximo(expo, (p) => p.rafaga10, (p) => p.valido),
       rafagaMed: maximo(medsExpo, (m) => m.rafaga, (m) => m.tomada_en, (m) => m.sector),
       lluviaMm: lluvia(e0, e1),

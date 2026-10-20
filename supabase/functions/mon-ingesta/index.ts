@@ -174,6 +174,27 @@ Deno.serve(async (req) => {
         return json({ ok: true, filas: filas.length });
       }
 
+      if (body.tipo === "uv") {
+        // Índice UV con cielo despejado: reemplaza la serie de cada evento desde la primera hora informada
+        const porEvento = (body.eventos ?? {}) as Record<string, Record<string, unknown>[]>;
+        const permitidas = ["evento_id", "valido", "uv", "interpolado", "fuente", "actualizado_en"];
+        let total = 0;
+        for (const [eventoId, filas0] of Object.entries(porEvento)) {
+          const filas = filas0.map((f) => ({ ...Object.fromEntries(permitidas.map((k) => [k, f[k] ?? null])), evento_id: eventoId, fuente: "met_no" }));
+          if (!filas.length) continue;
+          // Se conservan las horas pasadas (para el informe posterior); se reemplaza desde la primera hora nueva
+          const desde = filas.map((f) => String(f.valido)).sort()[0];
+          const { error: ed } = await supabase.from("mon_uv").delete().eq("evento_id", eventoId).gte("valido", desde);
+          if (ed) throw ed;
+          for (let i = 0; i < filas.length; i += 500) {
+            const { error } = await supabase.from("mon_uv").insert(filas.slice(i, i + 500));
+            if (error) throw error;
+          }
+          total += filas.length;
+        }
+        return json({ ok: true, filas: total });
+      }
+
       if (body.tipo === "niveles") {
         // Reemplaza los niveles calculados desde pronóstico para cada evento informado
         const porEvento = (body.eventos ?? {}) as Record<string, Record<string, unknown>[]>;

@@ -58,7 +58,12 @@ export type Pronostico = {
   viento10_corr?: number | null;
   rafaga10_corr?: number | null;
   wbgt_corr?: number | null;
+  // Índice UV con cielo despejado (MET Norway), agregado al armar la serie
+  uv?: number | null;
 };
+
+/** Índice UV con cielo despejado por hora (MET Norway, Locationforecast 2.0) */
+export type Uv = { evento_id: string; valido: string; uv: number; interpolado: boolean };
 
 /** Corrección aplicada y error medido para un evento y un modelo */
 export type Sesgo = {

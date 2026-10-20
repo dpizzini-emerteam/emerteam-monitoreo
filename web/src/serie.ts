@@ -1,5 +1,5 @@
 // Serie horaria de consenso entre modelos (misma regla que el procesamiento)
-import type { Pronostico } from "./datos";
+import type { Pronostico, Uv } from "./datos";
 
 export const PRIORIDAD = ["ecmwf", "gfs", "icon"];
 const VARS = ["t2m", "td2m", "hr", "viento10", "rafaga10", "dir_viento", "precip", "cape", "radiacion", "nubosidad", "presion", "wbgt_est"] as const;
@@ -15,7 +15,8 @@ export function corregido(p: Pronostico): Pronostico {
 }
 
 /** Serie horaria de consenso: fuente prioritaria por hora (con valores corregidos si los hay) */
-export function consenso(pron: Pronostico[]): Map<number, Pronostico & { n: number }> {
+export function consenso(pron: Pronostico[], uv: Uv[] = []): Map<number, Pronostico & { n: number }> {
+  const uvHora = new Map(uv.map((u) => [new Date(u.valido).getTime(), Number(u.uv)]));
   const porHora = new Map<number, Pronostico[]>();
   for (const p0 of pron) {
     const p = corregido(p0);
@@ -38,7 +39,31 @@ export function consenso(pron: Pronostico[]): Map<number, Pronostico & { n: numb
         if (alt) (fila as Record<string, unknown>)[c] = alt[c];
       }
     }
+    fila.uv = uvHora.get(t) ?? null;
     out.set(t, fila);
   }
   return out;
 }
+
+/** Categorías del índice UV: OMS (2002), Global Solar UV Index: A Practical Guide */
+export const UV_CATEGORIAS = [
+  { desde: 0, nombre: "Bajo", fondo: "#2FA34C", texto: "#111111" },
+  { desde: 3, nombre: "Moderado", fondo: "#C79000", texto: "#111111" },
+  { desde: 6, nombre: "Alto", fondo: "#FF6A1A", texto: "#111111" },
+  { desde: 8, nombre: "Muy alto", fondo: "#FF3B30", texto: "#111111" },
+  { desde: 11, nombre: "Extremo", fondo: "#6B3FA0", texto: "#FFFFFF" },
+];
+export function categoriaUv(uv: number) {
+  const r = Math.round(uv);
+  return [...UV_CATEGORIAS].reverse().find((c) => r >= c.desde) ?? UV_CATEGORIAS[0];
+}
+/** Máximo de UV por día local (AAAA-MM-DD) a partir de la serie horaria */
+export function uvMaxPorDia(uv: Uv[]): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const u of uv) {
+    const d = new Date(new Date(u.valido).getTime() - 3 * 3600_000).toISOString().slice(0, 10);
+    out.set(d, Math.max(out.get(d) ?? 0, Number(u.uv)));
+  }
+  return out;
+}
+export const FUENTE_UV = "Índice UV con cielo despejado: MET Norway, Locationforecast 2.0 (CC BY 4.0). Categorías: OMS (2002).";

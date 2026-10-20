@@ -323,6 +323,8 @@ input, select, textarea, button { font-family: inherit; }
 .tira-fecha { font-size: 12px; color: var(--texto2, #6b6b6b); margin-top: -4px; }
 .tira-temp { font-size: 15px; white-space: nowrap; color: var(--texto2, #555); }
 .tira-temp b { color: var(--texto); font-weight: 700; }
+.tira-hr { font-size: 12.5px; white-space: nowrap; color: var(--texto2, #555); }
+.uv-chip { display: inline-block; font-weight: 700; font-size: 12.5px; line-height: 1.2; padding: 2px 7px; border-radius: 4px; white-space: nowrap; }
 .tira-sin { height: 46px; display: flex; align-items: center; font-size: 22px; color: var(--borde-input); }
 /* Las tres fases del listado alineadas arriba aunque una no tenga detalle */
 .fase-estado { align-self: start; }
