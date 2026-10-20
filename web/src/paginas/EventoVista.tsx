@@ -267,7 +267,7 @@ function Dias({ ev, serie, niveles, armado, desarme, largada }: {
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600 }}><Icono tipo="viento" size={20} />ráf. {num(raf)} km/h</div>
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600 }}><Icono tipo="gota" size={20} />{num(lluvia, 1)} mm</div>
-              <span className="badge" style={{ ...estiloNivel(nivelDia), alignSelf: "flex-start", fontSize: 13 }}>{peorDia && nivelDia > 0 ? nombreNivel(peorDia.variable, nivelDia) : "Sin riesgo"}</span>
+              <span className="badge" style={{ ...estiloNivel(nivelDia), alignSelf: "flex-start", fontSize: 13 }}>{peorDia && nivelDia > 0 ? nombreNivel(peorDia.variable, nivelDia) : "Bajo umbral"}</span>
               {peorDia && nivelDia > 0 && <span className="chico" style={{ marginTop: -4 }}>{NOMBRE_CORTO[peorDia.variable]}</span>}
               {lejano(ps[0].valido) && <span className="chico">Tendencia · confianza baja</span>}
             </article>
@@ -332,7 +332,7 @@ function DiaCarrera({ serie, v }: { serie: Map<number, Pronostico & { n: number 
             </div>
           ))}
         </div>
-        <span className="chico">Escala WBGT World Athletics (2020) · viento medio / ráfaga en km/h a 10 m</span>
+        <span className="chico">Escala WBGT World Athletics (2020); «Riesgo bajo» corresponde a «Almost Safe» · viento medio / ráfaga en km/h a 10 m</span>
       </div>
     </section>
   );

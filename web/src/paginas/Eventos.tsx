@@ -91,7 +91,7 @@ export function Eventos() {
                       return (
                         <div key={f} className="fase-estado">
                           <div className="rotulo">{NOMBRE_FASE[f]}</div>
-                          <span className="badge" style={estiloNivel(m?.nivel ?? 0)}>{m ? nombreNivel(m.variable, m.nivel) : "Sin riesgo"}</span>
+                          <span className="badge" style={estiloNivel(m?.nivel ?? 0)}>{m ? nombreNivel(m.variable, m.nivel) : "Bajo umbral"}</span>
                           {m && <div className="chico">{NOMBRE_CORTO[m.variable] ?? m.variable} · {fmtDia(m.desde)} {fmtHora(m.desde)}</div>}
                         </div>
                       );

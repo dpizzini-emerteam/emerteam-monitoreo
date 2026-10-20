@@ -42,7 +42,7 @@ export const COLOR_NIVEL = ["#2FA34C", "#C79000", "#FF6A1A", "#FF3B30", "#7A1610
 export const TEXTO_NIVEL = ["#111111", "#111111", "#111111", "#111111", "#FFFFFF"];
 export const estiloNivel = (n: number) => ({ background: COLOR_NIVEL[n] ?? COLOR_NIVEL[0], color: TEXTO_NIVEL[n] ?? "#111111" });
 
-export const NOMBRE_WA = ["Casi seguro", "Precaución", "Advertencia", "Advertencia severa", "Peligro"];
+export const NOMBRE_WA = ["Riesgo bajo", "Precaución", "Advertencia", "Advertencia severa", "Peligro"];
 
 export const NOMBRE_VARIABLE: Record<string, string> = {
   wbgt: "Estrés térmico de corredores",
