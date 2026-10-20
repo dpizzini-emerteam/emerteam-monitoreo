@@ -5,39 +5,60 @@ export type TipoIcono =
 export function Icono({ tipo, size = 40 }: { tipo: TipoIcono; size?: number }) {
   return (
     <svg viewBox="0 0 64 64" width={size} height={size} aria-hidden="true" style={{ flex: "0 0 auto", color: "var(--tinta)" }}>
-      {tipo === "sol" && (
-        <>
-          <g stroke="#F5B400" strokeWidth="4" strokeLinecap="round">
-            <path d="M32 6v7M32 51v7M6 32h7M51 32h7M13.6 13.6l5 5M45.4 45.4l5 5M13.6 50.4l5-5M45.4 18.6l5-5" />
-          </g>
-          <circle cx="32" cy="32" r="12" fill="#F5B400" />
-        </>
-      )}
+      <defs>
+        <radialGradient id="ic-sol" cx="40%" cy="35%" r="70%">
+          <stop offset="0%" stopColor="#FFE07A" /><stop offset="55%" stopColor="#FFB31A" /><stop offset="100%" stopColor="#F28C00" />
+        </radialGradient>
+        <linearGradient id="ic-nube" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#FFFFFF" /><stop offset="100%" stopColor="#C9CED6" />
+        </linearGradient>
+        <linearGradient id="ic-nube-gris" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#E3E6EA" /><stop offset="100%" stopColor="#9EA4AD" />
+        </linearGradient>
+        <linearGradient id="ic-nube-osc" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#9AA1AB" /><stop offset="100%" stopColor="#5E6570" />
+        </linearGradient>
+        <linearGradient id="ic-gota" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#5AB0FF" /><stop offset="100%" stopColor="#1E6FD9" />
+        </linearGradient>
+        <linearGradient id="ic-rayo" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#FFE45C" /><stop offset="100%" stopColor="#FFB000" />
+        </linearGradient>
+        <filter id="ic-sombra" x="-20%" y="-20%" width="140%" height="150%">
+          <feDropShadow dx="0" dy="1.5" stdDeviation="1.4" floodColor="#000" floodOpacity="0.22" />
+        </filter>
+      </defs>
+      {tipo === "sol" && <path d={SOL(32, 32, 19)} fill="url(#ic-sol)" filter="url(#ic-sombra)" />}
       {tipo === "solnube" && (
         <>
-          <g stroke="#F5B400" strokeWidth="3.5" strokeLinecap="round">
-            <path d="M24 6v5M8 22h5M12.7 10.7l3.5 3.5M35.3 10.7l-3.5 3.5" />
-          </g>
-          <circle cx="24" cy="23" r="9" fill="#F5B400" />
-          <path d="M24 52h26a9 9 0 0 0 1-18 13 13 0 0 0-25-3 10 10 0 0 0-2 21z" fill="#B9BEC6" />
+          <path d={SOL(25, 24, 15)} fill="url(#ic-sol)" filter="url(#ic-sombra)" />
+          <path d={NUBE} transform="translate(8 14) scale(0.8)" fill="url(#ic-nube)" filter="url(#ic-sombra)" />
         </>
       )}
-      {tipo === "nube" && <path d="M18 48h28a11 11 0 0 0 1-22 15 15 0 0 0-29-4 13 13 0 0 0 0 26z" fill="#B9BEC6" />}
+      {tipo === "nube" && (
+        <>
+          <path d={NUBE} transform="translate(-4 -2) scale(0.78)" fill="url(#ic-nube-gris)" />
+          <path d={NUBE} transform="translate(6 10) scale(0.85)" fill="url(#ic-nube-gris)" filter="url(#ic-sombra)" />
+        </>
+      )}
+      {tipo === "luna" && (
+        <>
+          <path d="M38 10a22 22 0 1 0 16 33A18 18 0 1 1 38 10z" fill="#D9DDE3" filter="url(#ic-sombra)" />
+          <path d={NUBE} transform="translate(14 22) scale(0.62)" fill="url(#ic-nube-gris)" opacity="0.9" />
+        </>
+      )}
       {tipo === "lluvia" && (
         <>
-          <path d="M18 38h28a11 11 0 0 0 1-22 15 15 0 0 0-29-4 13 13 0 0 0 0 26z" fill="#9AA0A8" />
-          <g stroke="#2F80ED" strokeWidth="4" strokeLinecap="round">
-            <path d="M22 45l-3 9M33 45l-3 9M44 45l-3 9" />
-          </g>
+          <path d={NUBE} transform="translate(3 -2) scale(0.9)" fill="url(#ic-nube-gris)" filter="url(#ic-sombra)" />
+          {[[22, 46], [34, 50], [46, 46]].map(([x, y]) => <path key={x} d={GOTA(x, y)} fill="url(#ic-gota)" />)}
         </>
       )}
       {tipo === "tormenta" && (
         <>
-          <path d="M18 38h28a11 11 0 0 0 1-22 15 15 0 0 0-29-4 13 13 0 0 0 0 26z" fill="#5F656E" />
-          <path d="M34 34l-10 15h8l-4 12 13-17h-8l5-10z" fill="#FFC20E" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-          <g stroke="#2F80ED" strokeWidth="3.5" strokeLinecap="round">
-            <path d="M18 45l-2 6M50 45l-2 6" />
-          </g>
+          <path d={NUBE} transform="translate(3 -3) scale(0.9)" fill="url(#ic-nube-osc)" filter="url(#ic-sombra)" />
+          <path d="M35 33L24 49h8l-4 13 14-18h-8l5-11z" fill="url(#ic-rayo)" stroke="#C77F00" strokeWidth="1.2" strokeLinejoin="round" filter="url(#ic-sombra)" />
+          <path d={GOTA(17, 46)} fill="url(#ic-gota)" />
+          <path d={GOTA(48, 46)} fill="url(#ic-gota)" />
         </>
       )}
       {tipo === "viento" && (
@@ -78,6 +99,22 @@ export function Icono({ tipo, size = 40 }: { tipo: TipoIcono; size?: number }) {
       )}
     </svg>
   );
+}
+
+/** Sol con borde ondulado (centro y radio) */
+function SOL(cx: number, cy: number, r: number): string {
+  const n = 12, pts: string[] = [];
+  for (let k = 0; k <= n * 2; k++) {
+    const a = (Math.PI * k) / n;
+    const rr = k % 2 ? r * 0.9 : r;
+    pts.push(`${(cx + rr * Math.cos(a)).toFixed(1)} ${(cy + rr * Math.sin(a)).toFixed(1)}`);
+  }
+  return `M${pts.join(" L")}Z`;
+}
+/** Nube de tres lóbulos con base plana, en una caja de ~64×44 */
+const NUBE = "M16 46a12 12 0 0 1-1-24 16 16 0 0 1 30-5 12 12 0 0 1 14 11 9 9 0 0 1-2 18z";
+function GOTA(x: number, y: number): string {
+  return `M${x} ${y - 7}c-3 5-5 8-5 10.5a5 5 0 0 0 10 0c0-2.5-2-5.5-5-10.5z`;
 }
 
 /** Ícono del tiempo a partir de una fila de pronóstico */

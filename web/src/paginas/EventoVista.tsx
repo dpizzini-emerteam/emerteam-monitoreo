@@ -5,6 +5,7 @@ import { Barra } from "../componentes/Barra";
 import { Icono, iconoTiempo, type TipoIcono } from "../componentes/Icono";
 import { Accesos } from "../componentes/Accesos";
 import { Comunicacion } from "../componentes/Comunicacion";
+import { TiraDias } from "../componentes/TiraDias";
 import { armarComunicado } from "../comunicacion";
 import { Introduccion } from "../componentes/Introduccion";
 import { Resumen } from "../componentes/Resumen";
@@ -216,6 +217,7 @@ export function EventoVista() {
       <main className="contenedor" style={{ paddingTop: 24 }}>
         {actual === "general" && (
           <>
+            <TiraDias serie={serie} desde={v.armado[0]} hasta={v.desarme[1]} largada={v.largada} eventoId={ev.id} />
             <Introduccion />
             <Resumen vigentes={vigentes} alertas={alertas} eventoId={ev.id} />
             {comunicado && (
