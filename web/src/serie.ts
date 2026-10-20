@@ -26,6 +26,11 @@ export function consenso(pron: Pronostico[]): Map<number, Pronostico & { n: numb
   for (const [t, ps] of [...porHora.entries()].sort((a, b) => a[0] - b[0])) {
     const orden = [...PRIORIDAD.map((f) => ps.find((p) => p.fuente === f)).filter((p): p is Pronostico => !!p), ...ps.filter((p) => !PRIORIDAD.includes(p.fuente))];
     const fila = { ...orden[0], n: ps.length } as Pronostico & { n: number };
+    // Ráfaga faltante en la fuente principal: viento medio propio × factor de ráfaga de la otra fuente
+    if (fila.rafaga10 == null && fila.viento10 != null) {
+      const o = orden.find((p) => p.rafaga10 != null && (p.viento10 ?? 0) >= 5);
+      if (o) fila.rafaga10 = Math.round(fila.viento10 * Math.min(2.5, Math.max(1.2, o.rafaga10! / o.viento10!)) * 10) / 10;
+    }
     // Variable ausente en la fuente principal: se toma de la siguiente
     for (const c of VARS) {
       if (fila[c] == null) {

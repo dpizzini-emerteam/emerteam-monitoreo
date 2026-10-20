@@ -51,7 +51,18 @@ def serie_consenso(pron: list[dict]) -> dict[datetime, dict]:
             continue
         base = dict(por_fuente[disponibles[0]][h])
         base["fuente_principal"] = disponibles[0]
-        # Variable faltante en la fuente principal (p. ej. ráfaga ECMWF fuera de su alcance): siguiente fuente
+        # Ráfaga faltante en la fuente principal (ECMWF no la publica más allá de ~90 h): se estima con el
+        # viento medio de la propia fuente y el factor de ráfaga (ráfaga / viento medio) de la otra fuente,
+        # para no mezclar el viento de un modelo con la ráfaga de otro
+        if base.get("rafaga10") is None and base.get("viento10") is not None:
+            for f in disponibles[1:]:
+                o = por_fuente[f][h]
+                if o.get("rafaga10") is not None and o.get("viento10") and float(o["viento10"]) >= 5:
+                    factor = min(2.5, max(1.2, float(o["rafaga10"]) / float(o["viento10"])))
+                    base["rafaga10"] = round(float(base["viento10"]) * factor, 1)
+                    base.setdefault("completado", []).append(f"rafaga10:factor_{f}")
+                    break
+        # Otra variable faltante en la fuente principal: siguiente fuente
         for c in VARIABLES:
             if base.get(c) is None:
                 for f in disponibles[1:]:
@@ -63,6 +74,8 @@ def serie_consenso(pron: list[dict]) -> dict[datetime, dict]:
         rf = [float(por_fuente[f][h]["rafaga10"]) for f in disponibles if por_fuente[f][h].get("rafaga10") is not None]
         base["disp_wbgt"] = (max(wb) - min(wb)) if len(wb) > 1 else None
         base["disp_rafaga"] = (max(rf) - min(rf)) if len(rf) > 1 else None
+        vv = [float(por_fuente[f][h]["viento10"]) for f in disponibles if por_fuente[f][h].get("viento10") is not None]
+        base["disp_viento"] = (max(vv) - min(vv)) if len(vv) > 1 else None
         base["n_fuentes"] = len(disponibles)
         salida[h] = base
     return salida
@@ -71,11 +84,11 @@ def serie_consenso(pron: list[dict]) -> dict[datetime, dict]:
 def confianza(fila: dict, horas_adelante: float) -> str:
     if fila.get("n_fuentes", 1) < 2:
         return "baja" if horas_adelante > 72 else "media"
-    dw, dr = fila.get("disp_wbgt"), fila.get("disp_rafaga")
+    dw, dr, dv = fila.get("disp_wbgt"), fila.get("disp_rafaga"), fila.get("disp_viento")
     peor = "alta"
-    if (dw is not None and dw >= 2) or (dr is not None and dr >= 20):
+    if (dw is not None and dw >= 2) or (dr is not None and dr >= 20) or (dv is not None and dv >= 15):
         peor = "baja"
-    elif (dw is not None and dw >= 1) or (dr is not None and dr >= 10):
+    elif (dw is not None and dw >= 1) or (dr is not None and dr >= 10) or (dv is not None and dv >= 8):
         peor = "media"
     if horas_adelante > 96 and peor == "alta":
         peor = "media"
