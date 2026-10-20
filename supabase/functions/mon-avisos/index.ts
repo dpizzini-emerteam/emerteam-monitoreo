@@ -13,7 +13,7 @@ import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
   auth: { persistSession: false },
 });
-const WEB = Deno.env.get("MON_URL_WEB") ?? "https://emerteam-monitoreo.netlify.app";
+const WEB = Deno.env.get("MON_URL_WEB") ?? "https://riesgoambiental.emerteam.com.ar";
 const HORIZONTE_MS = 5 * 86400_000;
 
 const COLOR = ["#2FA34C", "#C79000", "#FF6A1A", "#FF3B30", "#7A1610"];
