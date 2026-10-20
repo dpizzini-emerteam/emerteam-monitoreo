@@ -127,3 +127,43 @@ export function num(x: number | null | undefined, dec = 0): string {
   if (x === null || x === undefined || Number.isNaN(x)) return "—";
   return x.toLocaleString("es-AR", { minimumFractionDigits: dec, maximumFractionDigits: dec });
 }
+
+export type Medicion = {
+  id: string;
+  evento_id: string;
+  operador: string;
+  tomada_en: string;
+  sector: string;
+  lat: number | null;
+  lon: number | null;
+  wbgt: number | null;
+  temp: number | null;
+  hr: number | null;
+  viento_medio: number | null;
+  rafaga: number | null;
+  altura_viento_m: number | null;
+  rayo_detector: string | null;
+  rayo_rango: string | null;
+  rayo_conteo: number | null;
+  rayo_tendencia: string | null;
+  trueno: boolean | null;
+  relampago_trueno_s: number | null;
+  foto_path: string | null;
+};
+
+/** Nivel WBGT World Athletics (0–4) */
+export const nivelWBGT = (w: number | null | undefined) => (w == null ? null : w >= 30 ? 4 : w >= 28 ? 3 : w >= 25 ? 2 : w >= 21 ? 1 : 0);
+
+/** Distancia del rayo por relámpago-trueno: 343 m/s */
+export const kmPorTrueno = (s: number | null | undefined) => (s == null ? null : (s * 343) / 1000);
+
+/** Nivel de tormenta por medición en terreno, escalera NWS: 24 / 19 / 13 km; trueno audible = suspensión */
+export function nivelRayoMedido(m: Pick<Medicion, "trueno" | "rayo_rango" | "relampago_trueno_s">): number | null {
+  if (m.trueno) return 4;
+  const km = kmPorTrueno(m.relampago_trueno_s);
+  const rango = m.rayo_rango;
+  const desdeRango = rango === "<13" ? 4 : rango === "13-19" ? 3 : rango === "19-24" ? 2 : rango === ">24" ? 1 : rango === "sin" ? 0 : null;
+  const desdeKm = km == null ? null : km < 13 ? 4 : km < 19 ? 3 : km < 24 ? 2 : 1;
+  if (desdeRango == null && desdeKm == null) return null;
+  return Math.max(desdeRango ?? 0, desdeKm ?? 0);
+}

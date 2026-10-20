@@ -6,6 +6,7 @@ import { Icono, iconoTiempo, type TipoIcono } from "../componentes/Icono";
 import { Accesos } from "../componentes/Accesos";
 import { Introduccion } from "../componentes/Introduccion";
 import { Resumen } from "../componentes/Resumen";
+import { Mediciones } from "../componentes/Mediciones";
 import {
   ordenarAlertas, tituloAlerta, diaLocal, fmtDia, fmtFechaHora, fmtHora, num, supabase,
   type AlertaSMN, type Evento, type Nivel, type Pronostico,
@@ -65,7 +66,7 @@ function useSonido() {
 
 export function EventoVista() {
   const { id, pestana } = useParams();
-  const { editor, session } = useOutletContext<Ctx>();
+  const { admin, editor, session } = useOutletContext<Ctx>();
   const miEmail = (session.user.email ?? "").toLowerCase();
   const [ev, setEv] = useState<Evento | null>(null);
   const [pron, setPron] = useState<Pronostico[]>([]);
@@ -144,7 +145,7 @@ export function EventoVista() {
       <div className="contenedor">
         {PESTANAS.map((x) => (
           <Link key={x.clave} to={`/evento/${ev.id}/${x.clave}`} className="pestana" aria-current={x.clave === actual ? "page" : undefined}>
-            {x.clave !== "equipo" && <span className="punto" style={{ background: estiloNivel(nivelFase(FASES_DE[x.clave])).background }} aria-hidden />}
+            {FASES_DE[x.clave].length > 0 && <span className="punto" style={{ background: estiloNivel(nivelFase(FASES_DE[x.clave])).background }} aria-hidden />}
             {x.titulo}
           </Link>
         ))}
@@ -219,6 +220,7 @@ export function EventoVista() {
             <Recomendaciones lista={delaFase("desarme")} vacio="Con el pronóstico actual no hay recomendaciones para el desarme." />
           </>
         )}
+        {actual === "mediciones" && <Mediciones eventoId={ev.id} puedeCargar={admin} miEmail={miEmail} />}
         {actual === "equipo" && (
           <>
             <Accesos eventoId={ev.id} puedeGestionar={editor || ev.organizador_email.toLowerCase() === miEmail} miEmail={miEmail} />
@@ -237,16 +239,17 @@ export function EventoVista() {
   );
 }
 
-type Pestana = "general" | "armado" | "carrera" | "desarme" | "equipo";
+type Pestana = "general" | "armado" | "carrera" | "desarme" | "mediciones" | "equipo";
 const PESTANAS: { clave: Pestana; titulo: string }[] = [
   { clave: "general", titulo: "General" },
   { clave: "armado", titulo: "Armado" },
   { clave: "carrera", titulo: "Día de carrera" },
   { clave: "desarme", titulo: "Desarme" },
+  { clave: "mediciones", titulo: "Mediciones" },
   { clave: "equipo", titulo: "Equipo y fuentes" },
 ];
 const FASES_DE: Record<Pestana, string[]> = {
-  general: ["armado", "carrera", "personal", "desarme"], armado: ["armado"], carrera: ["carrera", "personal"], desarme: ["desarme"], equipo: [],
+  general: ["armado", "carrera", "personal", "desarme"], armado: ["armado"], carrera: ["carrera", "personal"], desarme: ["desarme"], mediciones: [], equipo: [],
 };
 
 function DatosVigentes({ ultimaCorrida, procesado }: { ultimaCorrida: string[]; procesado?: string }) {

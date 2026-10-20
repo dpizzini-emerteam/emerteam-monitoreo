@@ -178,3 +178,4 @@ a.resumen-fase:hover .resumen-ver { color: var(--naranja); }
   .leyenda-wbgt { grid-template-columns: 1fr; }
   .leyenda-wbgt > div { flex-direction: row; justify-content: space-between; padding: 6px 10px; }
 }
+.form-med { grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); }
