@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { diaLocal, fmtDia, fmtFechaHora, fmtHora, type AlertaSMN, type Nivel } from "../datos";
 import { estiloNivel, NOMBRE_CORTO, nombreNivel, recomendacion } from "../reglas";
 
@@ -38,7 +39,7 @@ function accion(it: Item): string {
   return i > 0 ? t.slice(0, i + 1) : t;
 }
 
-export function Resumen({ vigentes, alertas }: { vigentes: Nivel[]; alertas: AlertaSMN[] }) {
+export function Resumen({ vigentes, alertas, eventoId }: { vigentes: Nivel[]; alertas: AlertaSMN[]; eventoId: string }) {
   const bloques = BLOQUES.map((b) => {
     const its = items(vigentes.filter((n) => (b.fases as readonly string[]).includes(n.fase)));
     return { ...b, its, nivel: its[0]?.nivel ?? 0 };
@@ -70,7 +71,7 @@ export function Resumen({ vigentes, alertas }: { vigentes: Nivel[]; alertas: Ale
 
         <div className="resumen-fases">
           {bloques.map((b) => (
-            <div key={b.clave} className="resumen-fase">
+            <Link key={b.clave} to={`/evento/${eventoId}/${b.clave}`} className="resumen-fase">
               <div className="resumen-cab">
                 <span className="rotulo">{b.titulo}</span>
                 <span className="badge" style={estiloNivel(b.nivel)}>{ESTADO[b.nivel]}</span>
@@ -92,10 +93,10 @@ export function Resumen({ vigentes, alertas }: { vigentes: Nivel[]; alertas: Ale
                   {b.its.length > 3 && <li className="chico">y {b.its.length - 3} más en el detalle</li>}
                 </ul>
               )}
-            </div>
+              <span className="resumen-ver">Ver {b.titulo.toLowerCase()} →</span>
+            </Link>
           ))}
         </div>
-        <a href="#recomendaciones" className="chico" style={{ fontWeight: 600 }}>Ver el detalle de cada recomendación y su fuente ↓</a>
       </div>
     </section>
   );

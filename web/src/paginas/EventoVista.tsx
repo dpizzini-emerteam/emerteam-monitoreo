@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useOutletContext, useParams } from "react-router-dom";
+import { Link, Navigate, useOutletContext, useParams } from "react-router-dom";
 import type { Ctx } from "../main";
 import { Barra } from "../componentes/Barra";
 import { Icono, iconoTiempo, type TipoIcono } from "../componentes/Icono";
@@ -64,7 +64,7 @@ function useSonido() {
 }
 
 export function EventoVista() {
-  const { id } = useParams();
+  const { id, pestana } = useParams();
   const { editor, session } = useOutletContext<Ctx>();
   const miEmail = (session.user.email ?? "").toLowerCase();
   const [ev, setEv] = useState<Evento | null>(null);
@@ -102,6 +102,11 @@ export function EventoVista() {
     return () => { clearInterval(t); void supabase.removeChannel(canal); };
   }, [cargar, id, miEmail]);
 
+  // En celular, la pestaña activa queda a la vista
+  useEffect(() => {
+    document.querySelector(".pestana[aria-current='page']")?.scrollIntoView({ inline: "center", block: "nearest" });
+  }, [pestana, ev]);
+
   // Aviso sonoro mientras haya alertas SMN vigentes
   useEffect(() => {
     if (!alertas.length) return;
@@ -118,16 +123,38 @@ export function EventoVista() {
   if (error) return (<><Barra titulo="Evento" /><p className="contenedor">{error}</p></>);
   if (!ev || !v) return (<><Barra titulo="Cargando…" /></>);
 
-  const maxCarreraWbgt = Math.max(0, ...vigentes.filter((n) => n.fase === "carrera" && n.variable === "wbgt").map((n) => n.nivel));
   const faltan = v.largada.getTime() - ahora;
   const cuenta = faltan > 0 ? `faltan ${Math.floor(faltan / 86400_000)} d ${Math.floor((faltan % 86400_000) / 3600_000)} h` : "en curso o finalizado";
-  const ultimaCorrida = PRIORIDAD.map((f) => pron.filter((p) => p.fuente === f).map((p) => p.corrida).sort().at(-1)).filter(Boolean);
+  const ultimaCorrida = PRIORIDAD.map((f) => pron.filter((p) => p.fuente === f).map((p) => p.corrida).sort().at(-1)).filter(Boolean) as string[];
   const procesado = pron.map((p) => p.procesado_en).sort().at(-1);
+
+  // Fase que corresponde por fecha: armado hasta el día previo, carrera ese día, desarme después
+  const hoy = diaLocal(new Date().toISOString());
+  const diaCarrera = diaLocal(v.largada.toISOString());
+  const porFecha: Pestana = hoy < diaCarrera ? "armado" : hoy === diaCarrera ? "carrera" : "desarme";
+  if (!pestana || !PESTANAS.some((x) => x.clave === pestana)) return <Navigate to={`/evento/${ev.id}/${porFecha}`} replace />;
+  const actual = pestana as Pestana;
+
+  const nivelFase = (fases: string[]) => Math.max(0, ...vigentes.filter((n) => fases.includes(n.fase)).map((n) => n.nivel));
+  const delaFase = (p: Pestana) => vigentes.filter((n) => FASES_DE[p].includes(n.fase));
+  const nivelesFase = (p: Pestana) => niveles.filter((n) => FASES_DE[p].includes(n.fase));
+
+  const pestanas = (
+    <nav className="pestanas" aria-label="Secciones del evento">
+      <div className="contenedor">
+        {PESTANAS.map((x) => (
+          <Link key={x.clave} to={`/evento/${ev.id}/${x.clave}`} className="pestana" aria-current={x.clave === actual ? "page" : undefined}>
+            {x.clave !== "equipo" && <span className="punto" style={{ background: estiloNivel(nivelFase(FASES_DE[x.clave])).background }} aria-hidden />}
+            {x.titulo}
+          </Link>
+        ))}
+      </div>
+    </nav>
+  );
 
   return (
     <>
-      <Barra titulo={ev.nombre} subtitulo={`${fmtFechaHora(ev.largada)} · ${cuenta}`}>
-        <span className="badge" style={{ ...estiloNivel(maxCarreraWbgt) }} title="Escala WBGT World Athletics (2020), máximo previsto para la carrera">WBGT · {NOMBRE_WA[maxCarreraWbgt]}</span>
+      <Barra titulo={ev.nombre} subtitulo={`${fmtFechaHora(ev.largada)} · ${cuenta}`} abajo={pestanas}>
         {alertas.length > 0 && <a href="#alerta-smn" className="boton-osc alerta" style={{ background: COLOR_SMN[alertas[0].color], color: "#111", borderColor: "#fff", fontWeight: 800 }}>Alerta SMN</a>}
         {editor && <Link className="boton-osc" to={`/evento/${ev.id}/editar`}>Editar</Link>}
         <Link className="boton-osc" to="/">Eventos</Link>
@@ -146,7 +173,7 @@ export function EventoVista() {
       )}
 
       {alertas.map((a) => (
-        <section key={a.id} id="alerta-smn" role="alert" className="alerta" style={{ background: COLOR_SMN[a.color], scrollMarginTop: 80 }}>
+        <section key={a.id} id="alerta-smn" role="alert" className="alerta" style={{ background: COLOR_SMN[a.color], scrollMarginTop: 130 }}>
           <div className="contenedor" style={{ display: "flex", flexWrap: "wrap", gap: "14px 24px", alignItems: "center", padding: "16px 24px" }}>
             <div className="icono-pulso"><Icono tipo={iconoAlerta(a.fenomeno)} size={52} /></div>
             <div style={{ flex: "1 1 300px" }}>
@@ -161,22 +188,71 @@ export function EventoVista() {
       ))}
 
       <main className="contenedor" style={{ paddingTop: 24 }}>
-        <Introduccion />
-        <Resumen vigentes={vigentes} alertas={alertas} />
-        <Indicadores vigentes={vigentes} ultimaCorrida={ultimaCorrida as string[]} procesado={procesado} />
-        <Dias ev={ev} serie={serie} niveles={niveles} armado={v.armado} desarme={v.desarme} largada={v.largada} />
-        <DiaCarrera serie={serie} v={v} />
-        <Recomendaciones vigentes={vigentes} />
-        <Accesos eventoId={ev.id} puedeGestionar={editor || ev.organizador_email.toLowerCase() === miEmail} miEmail={miEmail} />
-        <section className="seccion tarjeta" id="fuentes">
-          <div className="rotulo">Fuentes y metodología</div>
-          <p className="chico" style={{ marginBottom: 0 }}>
-            Modelos ECMWF IFS (CC BY 4.0) y NOAA GFS, comparados por separado; avisos oficiales del SMN. WBGT estimado hora por hora por el método de Liljegren et al. (2008).
-            Escala de estrés térmico: World Athletics (2020). Cada recomendación indica su fuente y su tipo.
-          </p>
-        </section>
+        {actual === "general" && (
+          <>
+            <Introduccion />
+            <Resumen vigentes={vigentes} alertas={alertas} eventoId={ev.id} />
+            <DatosVigentes ultimaCorrida={ultimaCorrida} procesado={procesado} />
+          </>
+        )}
+        {actual === "armado" && (
+          <>
+            <Dias titulo="Armado" serie={serie} niveles={nivelesFase("armado")} desde={v.armado[0]} hasta={v.armado[1]} franjaSegura
+              nota={`${ev.ubicacion} · armado desde ${fmtFechaHora(v.armado[0].toISOString())} hasta ${fmtFechaHora(v.armado[1].toISOString())}`} />
+            <Recomendaciones lista={delaFase("armado")} vacio="Con el pronóstico actual no hay recomendaciones para el armado." />
+          </>
+        )}
+        {actual === "carrera" && (
+          <>
+            <DiaCarrera serie={serie} v={v} />
+            <Recomendaciones lista={delaFase("carrera")} vacio="Con el pronóstico actual no hay recomendaciones para el día de carrera." />
+          </>
+        )}
+        {actual === "desarme" && (
+          <>
+            <Dias titulo="Desarme" serie={serie} niveles={nivelesFase("desarme")} desde={v.desarme[0]} hasta={v.desarme[1]} franjaSegura
+              nota={`${ev.ubicacion} · desarme desde ${fmtFechaHora(v.desarme[0].toISOString())} hasta ${fmtFechaHora(v.desarme[1].toISOString())}`} />
+            <Recomendaciones lista={delaFase("desarme")} vacio="Con el pronóstico actual no hay recomendaciones para el desarme." />
+          </>
+        )}
+        {actual === "equipo" && (
+          <>
+            <Accesos eventoId={ev.id} puedeGestionar={editor || ev.organizador_email.toLowerCase() === miEmail} miEmail={miEmail} />
+            <DatosVigentes ultimaCorrida={ultimaCorrida} procesado={procesado} />
+            <section className="seccion tarjeta" id="fuentes">
+              <div className="rotulo">Fuentes y metodología</div>
+              <p className="chico" style={{ marginBottom: 0 }}>
+                Modelos ECMWF IFS (CC BY 4.0) y NOAA GFS, comparados por separado; avisos oficiales del SMN. WBGT estimado hora por hora por el método de Liljegren et al. (2008).
+                Escala de estrés térmico: World Athletics (2020). Cada recomendación indica su fuente y su tipo.
+              </p>
+            </section>
+          </>
+        )}
       </main>
     </>
+  );
+}
+
+type Pestana = "general" | "armado" | "carrera" | "desarme" | "equipo";
+const PESTANAS: { clave: Pestana; titulo: string }[] = [
+  { clave: "general", titulo: "General" },
+  { clave: "armado", titulo: "Armado" },
+  { clave: "carrera", titulo: "Día de carrera" },
+  { clave: "desarme", titulo: "Desarme" },
+  { clave: "equipo", titulo: "Equipo y fuentes" },
+];
+const FASES_DE: Record<Pestana, string[]> = {
+  general: ["armado", "carrera", "personal", "desarme"], armado: ["armado"], carrera: ["carrera", "personal"], desarme: ["desarme"], equipo: [],
+};
+
+function DatosVigentes({ ultimaCorrida, procesado }: { ultimaCorrida: string[]; procesado?: string }) {
+  return (
+    <p className="chico" style={{ marginTop: 18 }}>
+      <span style={{ color: "var(--ok-texto)", fontWeight: 600 }}>● Se actualiza sola</span>
+      {" · "}
+      {ultimaCorrida.length ? `Modelos de ${ultimaCorrida.map((c) => fmtFechaHora(c)).join(" y ")}` : "Esperando la primera corrida de los modelos"}
+      {procesado && ` · procesado ${fmtFechaHora(procesado)}`}
+    </p>
   );
 }
 
@@ -189,44 +265,9 @@ function iconoAlerta(f: string): TipoIcono {
   return "nube";
 }
 
-function Indicadores({ vigentes, ultimaCorrida, procesado }: { vigentes: Nivel[]; ultimaCorrida: string[]; procesado?: string }) {
-  const max = (filtro: (n: Nivel) => boolean) => vigentes.filter(filtro).reduce<Nivel | null>((a, n) => (!a || n.nivel > a.nivel ? n : a), null);
-  const tiles: { label: string; icono: TipoIcono; n: Nivel | null }[] = [
-    { label: "Estrés térmico · carrera", icono: "termometro", n: max((n) => n.variable === "wbgt") },
-    { label: "Viento · estructuras", icono: "viento", n: max((n) => n.variable.startsWith("viento_")) },
-    { label: "Tormenta", icono: "tormenta", n: max((n) => n.variable === "tormenta") },
-    { label: "Lluvia y suelo", icono: "lluvia", n: max((n) => n.variable === "lluvia") },
-    { label: "Calor del personal", icono: "estructura", n: max((n) => n.variable === "calor_personal") },
-  ];
-  return (
-    <section className="grilla" aria-label="Estado actual" style={{ marginTop: 24 }}>
-      {tiles.map((t) => (
-        <div key={t.label} className="tarjeta" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span className="rotulo">{t.label}</span>
-            <Icono tipo={t.icono} size={36} />
-          </div>
-          <span className="badge" style={{ ...estiloNivel(t.n?.nivel ?? 0), alignSelf: "flex-start" }}>
-            {t.n ? nombreNivel(t.n.variable, t.n.nivel) : "Sin datos"}
-          </span>
-          {t.n && t.n.nivel > 0 && <span className="chico">{NOMBRE_FASE[t.n.fase]} · {fmtFechaHora(t.n.desde)}</span>}
-        </div>
-      ))}
-      <div className="tarjeta">
-        <div className="rotulo">Datos vigentes</div>
-        <div className="chico" style={{ marginTop: 8, lineHeight: 1.6 }}>
-          {ultimaCorrida.length ? ultimaCorrida.map((c) => <div key={c}>Corrida {fmtFechaHora(c)}</div>) : "Esperando la primera corrida"}
-          {procesado && <div>Procesado {fmtFechaHora(procesado)}</div>}
-          <div style={{ color: "var(--ok-texto)" }}>● Se actualiza sola</div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function Dias({ ev, serie, niveles, armado, desarme, largada }: {
-  ev: Evento; serie: Map<number, Pronostico & { n: number }>; niveles: Nivel[];
-  armado: [Date, Date]; desarme: [Date, Date]; largada: Date;
+function Dias({ titulo, serie, niveles, desde, hasta, nota, franjaSegura }: {
+  titulo: string; serie: Map<number, Pronostico & { n: number }>; niveles: Nivel[];
+  desde: Date; hasta: Date; nota: string; franjaSegura?: boolean;
 }) {
   const dias = new Map<string, (Pronostico & { n: number })[]>();
   // Horas que representa cada paso (1 h o 3 h según modelo y plazo), para acumular lluvia
@@ -235,16 +276,15 @@ function Dias({ ev, serie, niveles, armado, desarme, largada }: {
   for (const [t, p] of serie) {
     horasPaso.set(t, previo == null ? (p.fuente === "ecmwf" ? 3 : 1) : Math.min(6, (t - previo) / 3600_000));
     previo = t;
-    if (t < armado[0].getTime() || t > desarme[1].getTime()) continue;
+    if (t < desde.getTime() || t > hasta.getTime()) continue;
     const d = diaLocal(new Date(t).toISOString());
     dias.set(d, [...(dias.get(d) ?? []), p]);
   }
-  const diaCarrera = diaLocal(largada.toISOString());
   const lejano = (iso: string) => new Date(iso).getTime() - Date.now() > 6 * 86400_000;
   return (
     <section className="seccion" aria-labelledby="dias-t">
-      <h2 id="dias-t">Evolución por día</h2>
-      {dias.size === 0 && <div className="tarjeta">Todavía no hay pronóstico procesado para este evento. El sistema lo completa con la próxima corrida de los modelos.</div>}
+      <h2 id="dias-t">{titulo} · pronóstico por día</h2>
+      {dias.size === 0 && <div className="tarjeta">Todavía no hay pronóstico para estos días. El sistema lo completa cuando entran en el horizonte de los modelos.</div>}
       <div className="grilla">
         {[...dias.entries()].map(([d, ps]) => {
           const t = ps.map((p) => p.t2m).filter((x): x is number => x != null);
@@ -253,15 +293,13 @@ function Dias({ ev, serie, niveles, armado, desarme, largada }: {
           const delDia = niveles.filter((n) => diaLocal(n.desde) <= d && diaLocal(n.hasta) >= d);
           const peorDia = delDia.reduce<Nivel | null>((m, n) => (!m || n.nivel > m.nivel ? n : m), null);
           const nivelDia = peorDia?.nivel ?? 0;
-          const fase = d === diaCarrera ? "Carrera" : d < diaCarrera ? "Armado" : "Desarme";
           const media = ps[Math.floor(ps.length / 2)];
           const peor = ps.reduce((a, p) => ((p.precip ?? 0) > (a.precip ?? 0) ? p : a), media);
+          const franja = franjaSegura ? franjaFavorable(d, delDia, desde, hasta) : null;
+          if (franjaSegura && !franja) return null; // la fase no ocupa horario diurno ese día
           return (
-            <article key={d} className="tarjeta" style={{ display: "flex", flexDirection: "column", gap: 8, ...(d === diaCarrera ? { border: "2px solid var(--texto)", boxShadow: "0 0 0 4px #FF6A1A" } : {}) }}>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span className="condensada" style={{ fontSize: 20, fontWeight: 800, textTransform: "uppercase" }}>{fmtDia(ps[0].valido)}</span>
-                <span className="chico" style={{ fontWeight: 700 }}>{fase}</span>
-              </div>
+            <article key={d} className="tarjeta" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <span className="condensada" style={{ fontSize: 20, fontWeight: 800, textTransform: "uppercase" }}>{fmtDia(ps[0].valido)}</span>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <Icono tipo={iconoTiempo(peor)} size={60} />
                 <div style={{ textAlign: "right", lineHeight: 1 }}>
@@ -273,14 +311,46 @@ function Dias({ ev, serie, niveles, armado, desarme, largada }: {
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600 }}><Icono tipo="gota" size={20} />{num(lluvia, 1)} mm</div>
               <span className="badge" style={{ ...estiloNivel(nivelDia), alignSelf: "flex-start", fontSize: 13 }}>{peorDia && nivelDia > 0 ? nombreNivel(peorDia.variable, nivelDia) : "Bajo umbral"}</span>
               {peorDia && nivelDia > 0 && <span className="chico" style={{ marginTop: -4 }}>{NOMBRE_CORTO[peorDia.variable]}</span>}
+              {franja && (
+                <div className="franja-segura" title="Tramo continuo entre las 6 y las 21 h con el nivel más bajo del día">
+                  <span className="punto" style={{ background: estiloNivel(franja.nivel).background, marginTop: 0 }} aria-hidden />
+                  Mejor franja: {franja.texto}
+                </div>
+              )}
               {lejano(ps[0].valido) && <span className="chico">Tendencia · confianza baja</span>}
             </article>
           );
         })}
       </div>
-      <p className="chico">{ev.ubicacion} · armado desde {fmtFechaHora(armado[0].toISOString())}</p>
+      <p className="chico">{nota}</p>
     </section>
   );
+}
+
+/** Tramo continuo más largo, entre las 6 y las 21 h, con el nivel más bajo del día en la fase */
+function franjaFavorable(dia: string, niveles: Nivel[], desde: Date, hasta: Date): { texto: string; nivel: number } | null {
+  const base = new Date(`${dia}T00:00:00-03:00`).getTime();
+  const horas: { h: number; nivel: number }[] = [];
+  for (let h = 6; h < 21; h++) {
+    const t = base + h * 3600_000;
+    if (t < desde.getTime() || t + 3600_000 > hasta.getTime()) continue;
+    const n = Math.max(0, ...niveles.filter((x) => new Date(x.desde).getTime() <= t && new Date(x.hasta).getTime() > t).map((x) => x.nivel));
+    horas.push({ h, nivel: n });
+  }
+  if (!horas.length) return null;
+  const minimo = Math.min(...horas.map((x) => x.nivel));
+  let mejor: [number, number] | null = null;
+  let ini: number | null = null;
+  let anterior: number | null = null;
+  for (const x of horas) {
+    if (x.nivel !== minimo) { ini = null; anterior = x.h; continue; }
+    if (ini === null || anterior !== x.h - 1) ini = x.h;
+    anterior = x.h;
+    if (!mejor || x.h + 1 - ini > mejor[1] - mejor[0]) mejor = [ini, x.h + 1];
+  }
+  if (!mejor) return null;
+  const hh = (n: number) => `${String(n).padStart(2, "0")}:00`;
+  return { texto: `${hh(mejor[0])} a ${hh(mejor[1])} h`, nivel: minimo };
 }
 
 function DiaCarrera({ serie, v }: { serie: Map<number, Pronostico & { n: number }>; v: ReturnType<typeof calcular> }) {
@@ -329,10 +399,10 @@ function DiaCarrera({ serie, v }: { serie: Map<number, Pronostico & { n: number 
             </div>
           </div>
         )}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0,1fr))", gap: 4, fontSize: 13 }}>
+        <div className="leyenda-wbgt">
           {["< 21 °C", "21–25 °C", "25–28 °C", "28–30 °C", "> 30 °C"].map((r, i) => (
-            <div key={r} style={{ ...estiloNivel(i), padding: 8, borderRadius: i === 0 ? "6px 0 0 6px" : i === 4 ? "0 6px 6px 0" : 0 }}>
-              <b>{NOMBRE_WA[i]}</b><br />{r}
+            <div key={r} style={estiloNivel(i)}>
+              <b>{NOMBRE_WA[i]}</b> <span>{r}</span>
             </div>
           ))}
         </div>
@@ -342,42 +412,55 @@ function DiaCarrera({ serie, v }: { serie: Map<number, Pronostico & { n: number 
   );
 }
 
-function Recomendaciones({ vigentes }: { vigentes: Nivel[] }) {
+function Recomendaciones({ lista: vig, vacio }: { lista: Nivel[]; vacio: string }) {
   const grupos = new Map<string, Nivel>();
-  for (const n of vigentes.filter((x) => x.nivel > 0)) {
+  for (const n of vig.filter((x) => x.nivel > 0)) {
     const k = `${n.fase}|${n.variable}|${n.nivel}`;
     const prev = grupos.get(k);
     if (!prev || n.desde < prev.desde) grupos.set(k, n);
   }
   const lista = [...grupos.values()].sort((a, b) => b.nivel - a.nivel || a.desde.localeCompare(b.desde));
+  const accion = lista.filter((n) => n.nivel >= 2);
+  const vigilar = lista.filter((n) => n.nivel === 1);
   return (
-    <section className="seccion" id="recomendaciones" style={{ scrollMarginTop: 90 }}>
+    <section className="seccion" id="recomendaciones" style={{ scrollMarginTop: 130 }}>
       <h2>Recomendaciones EMERTEAM</h2>
-      {lista.length === 0 && <div className="tarjeta">Sin recomendaciones activas para el horizonte de pronóstico.</div>}
+      {lista.length === 0 && <div className="tarjeta">{vacio}</div>}
+      {lista.length > 0 && accion.length === 0 && <div className="tarjeta">No hay acciones previstas: solo situaciones para vigilar.</div>}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,460px),1fr))", gap: 12 }}>
-        {lista.map((n) => {
-          const r = REGLAS[n.regla];
-          const texto = recomendacion(n.variable, n.nivel, n.fase);
-          return (
-            <article key={`${n.fase}${n.variable}${n.nivel}`} className="tarjeta" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-                <span className="badge" style={{ ...estiloNivel(n.nivel) }}>{nombreNivel(n.variable, n.nivel)}</span>
-                <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", border: "1px solid var(--texto)", padding: "2px 7px", borderRadius: 4 }}>{NOMBRE_FASE[n.fase]}</span>
-                {n.confianza && <span className="chico">confianza {n.confianza}</span>}
-              </div>
-              <h3 style={{ margin: 0, fontFamily: "Barlow", fontSize: 18 }}>{NOMBRE_VARIABLE[n.variable] ?? n.variable}</h3>
-              <div className="chico">Desde {fmtFechaHora(n.desde)} · valor {num(n.valor, 1)}{n.umbral != null && ` · umbral ${num(n.umbral, 1)}`}</div>
-              {texto && <p style={{ margin: 0, lineHeight: 1.5 }}>{texto}</p>}
-              {r && (
-                <details style={{ borderTop: "1px solid var(--borde)", paddingTop: 8 }}>
-                  <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 14 }}>Fuente · {TIPO_FUENTE[r.tipo]}</summary>
-                  <p className="chico" style={{ margin: "8px 0 0" }}>{r.fuente}</p>
-                </details>
-              )}
-            </article>
-          );
-        })}
+        {accion.map((n) => <TarjetaReco key={`${n.fase}${n.variable}${n.nivel}`} n={n} />)}
       </div>
+      {vigilar.length > 0 && (
+        <details className="ver-tambien" open={accion.length === 0}>
+          <summary>Ver también: {vigilar.length} {vigilar.length === 1 ? "situación para vigilar" : "situaciones para vigilar"}</summary>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,460px),1fr))", gap: 12 }}>
+            {vigilar.map((n) => <TarjetaReco key={`${n.fase}${n.variable}${n.nivel}`} n={n} />)}
+          </div>
+        </details>
+      )}
     </section>
+  );
+}
+
+function TarjetaReco({ n }: { n: Nivel }) {
+  const r = REGLAS[n.regla];
+  const texto = recomendacion(n.variable, n.nivel, n.fase);
+  return (
+    <article className="tarjeta" style={{ display: "flex", flexDirection: "column", gap: 8, borderLeft: `5px solid ${estiloNivel(n.nivel).background}` }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+        <span className="badge" style={{ ...estiloNivel(n.nivel) }}>{nombreNivel(n.variable, n.nivel)}</span>
+        {n.fase === "personal" && <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", border: "1px solid var(--texto)", padding: "2px 7px", borderRadius: 4 }}>{NOMBRE_FASE[n.fase]}</span>}
+        {n.confianza === "baja" && <span className="chico">tendencia</span>}
+      </div>
+      <h3 style={{ margin: 0, fontFamily: "Barlow", fontSize: 18 }}>{NOMBRE_VARIABLE[n.variable] ?? n.variable}</h3>
+      <div className="chico">Desde {fmtFechaHora(n.desde)} · valor {num(n.valor, 1)}{n.umbral != null && ` · umbral ${num(n.umbral, 1)}`}</div>
+      {texto && <p style={{ margin: 0, lineHeight: 1.5 }}>{texto}</p>}
+      {r && (
+        <details style={{ borderTop: "1px solid var(--borde)", paddingTop: 8 }}>
+          <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 14 }}>Fuente · {TIPO_FUENTE[r.tipo]}</summary>
+          <p className="chico" style={{ margin: "8px 0 0" }}>{r.fuente}</p>
+        </details>
+      )}
+    </article>
   );
 }

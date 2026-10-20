@@ -58,7 +58,7 @@ const router = createHashRouter([
       { index: true, element: <Eventos /> },
       { path: "evento/nuevo", element: <EventoForm /> },
       { path: "evento/:id/editar", element: <EventoForm /> },
-      { path: "evento/:id", element: <EventoVista /> },
+      { path: "evento/:id/:pestana?", element: <EventoVista /> },
       { path: "equipo", element: <Equipo /> },
       { path: "*", element: <Navigate to="/" replace /> },
     ],

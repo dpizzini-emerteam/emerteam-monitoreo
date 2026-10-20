@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { supabase } from "../datos";
 import { BotonTema } from "./BotonTema";
 
-export function Barra({ titulo, subtitulo, children }: { titulo: string; subtitulo?: string; children?: ReactNode }) {
+export function Barra({ titulo, subtitulo, children, abajo }: { titulo: string; subtitulo?: string; children?: ReactNode; abajo?: ReactNode }) {
   return (
     <header className="barra">
       <div className="contenedor">
@@ -24,6 +24,7 @@ export function Barra({ titulo, subtitulo, children }: { titulo: string; subtitu
           </button>
         </nav>
       </div>
+      {abajo}
     </header>
   );
 }
