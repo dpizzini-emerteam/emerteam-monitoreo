@@ -4,6 +4,8 @@ import type { Ctx } from "../main";
 import { Barra } from "../componentes/Barra";
 import { Icono, iconoTiempo, type TipoIcono } from "../componentes/Icono";
 import { Accesos } from "../componentes/Accesos";
+import { Introduccion } from "../componentes/Introduccion";
+import { Resumen } from "../componentes/Resumen";
 import {
   diaLocal, fmtDia, fmtFechaHora, fmtHora, num, supabase,
   type AlertaSMN, type Evento, type Nivel, type Pronostico,
@@ -159,6 +161,8 @@ export function EventoVista() {
       ))}
 
       <main className="contenedor" style={{ paddingTop: 24 }}>
+        <Introduccion />
+        <Resumen vigentes={vigentes} alertas={alertas} />
         <Indicadores vigentes={vigentes} ultimaCorrida={ultimaCorrida as string[]} procesado={procesado} />
         <Dias ev={ev} serie={serie} niveles={niveles} armado={v.armado} desarme={v.desarme} largada={v.largada} />
         <DiaCarrera serie={serie} v={v} />
@@ -195,7 +199,7 @@ function Indicadores({ vigentes, ultimaCorrida, procesado }: { vigentes: Nivel[]
     { label: "Calor del personal", icono: "estructura", n: max((n) => n.variable === "calor_personal") },
   ];
   return (
-    <section className="grilla" aria-label="Estado actual">
+    <section className="grilla" aria-label="Estado actual" style={{ marginTop: 24 }}>
       {tiles.map((t) => (
         <div key={t.label} className="tarjeta" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -347,7 +351,7 @@ function Recomendaciones({ vigentes }: { vigentes: Nivel[] }) {
   }
   const lista = [...grupos.values()].sort((a, b) => b.nivel - a.nivel || a.desde.localeCompare(b.desde));
   return (
-    <section className="seccion">
+    <section className="seccion" id="recomendaciones" style={{ scrollMarginTop: 90 }}>
       <h2>Recomendaciones EMERTEAM</h2>
       {lista.length === 0 && <div className="tarjeta">Sin recomendaciones activas para el horizonte de pronóstico.</div>}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,460px),1fr))", gap: 12 }}>

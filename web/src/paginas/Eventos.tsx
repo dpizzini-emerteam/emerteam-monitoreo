@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useOutletContext } from "react-router-dom";
 import type { Ctx } from "../main";
 import { Barra } from "../componentes/Barra";
+import { Introduccion } from "../componentes/Introduccion";
 import { diaLocal, fmtDia, fmtHora, supabase, type Evento, type Nivel } from "../datos";
 import { COLOR_NIVEL, estiloNivel, NOMBRE_CORTO, NOMBRE_FASE, nombreNivel } from "../reglas";
 
@@ -65,6 +66,7 @@ export function Eventos() {
             Ver también eventos cerrados
           </label>
         )}
+        {!admin && <Introduccion />}
         {eventos === null && <p>Cargando…</p>}
         {eventos?.length === 0 && (
           <div className="tarjeta">

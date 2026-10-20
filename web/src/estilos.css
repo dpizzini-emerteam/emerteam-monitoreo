@@ -98,3 +98,28 @@ thead th { background: var(--fondo); border-top: none; }
 .tabla th { text-align: left; padding: 8px; border-bottom: 2px solid var(--negro); font-family: "Barlow Condensed"; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; }
 .tabla td { padding: 8px; border-bottom: 1px solid var(--borde); vertical-align: middle; }
 .tabla select { min-height: 36px; font: inherit; padding: 0 8px; border: 1px solid var(--borde); border-radius: 6px; background: #fff; }
+
+/* Introducción */
+.intro { margin-bottom: 8px; border-left: 5px solid var(--naranja); }
+.intro-cab { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; }
+.intro h2 { margin: 0; font-size: 24px; font-weight: 800; text-transform: uppercase; }
+.intro-cols { display: grid; gap: 4px 24px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+.intro-cols p { line-height: 1.55; margin: 12px 0 0; }
+.intro-niveles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; margin-top: 16px; }
+.intro-niveles > div { padding: 8px 10px; border-radius: 4px; display: flex; flex-direction: column; gap: 2px; font-size: 13px; line-height: 1.3; }
+.intro-niveles b { font-family: "Barlow Condensed"; font-size: 15px; text-transform: uppercase; letter-spacing: 0.03em; }
+@media (max-width: 700px) { .intro-niveles { grid-template-columns: 1fr; } .intro-niveles > div { flex-direction: row; gap: 8px; align-items: baseline; } }
+.enlace-intro { background: none; border: 0; padding: 0; font: inherit; font-size: 14px; font-weight: 600; color: var(--negro); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; margin-bottom: 4px; }
+.enlace-intro:hover { color: var(--naranja); }
+
+/* Resumen para el organizador */
+.resumen { background: #fff; border: 1px solid var(--borde); border-radius: 10px; }
+.resumen .banda { border-radius: 10px 10px 0 0; }
+.resumen-cuerpo { padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
+.resumen-principal { margin: 0; font-size: 17px; line-height: 1.5; border-left: 5px solid var(--gris-tec); padding: 4px 0 4px 14px; }
+.resumen-fases { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); }
+.resumen-fase { background: var(--fondo); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.resumen-cab { display: flex; flex-wrap: wrap; gap: 6px; justify-content: space-between; align-items: center; }
+.resumen-fase ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.resumen-fase li { display: flex; gap: 8px; align-items: flex-start; line-height: 1.35; font-size: 15px; }
+.punto { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 10px; margin-top: 5px; }
