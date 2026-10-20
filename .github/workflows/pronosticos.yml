@@ -1,0 +1,38 @@
+name: Pronósticos y niveles
+
+on:
+  schedule:
+    # cada 2 horas, minuto 23 (fuera de la hora en punto)
+    - cron: "23 */2 * * *"
+  workflow_dispatch:
+    inputs:
+      forzar:
+        description: "Reprocesar aunque la corrida ya esté guardada"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write   # token OIDC para autenticarse ante la función de ingesta
+
+concurrency:
+  group: pronosticos
+  cancel-in-progress: false
+
+jobs:
+  procesar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: pipeline
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pipeline/requirements.txt
+      - run: pip install -r requirements.txt
+      - name: Procesar
+        run: python -m mon ${{ inputs.forzar && '--forzar' || '' }}
