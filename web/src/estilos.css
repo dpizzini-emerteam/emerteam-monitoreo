@@ -306,3 +306,10 @@ input, select, textarea, button { font-family: inherit; }
 .resultados-ubicacion button:hover, .resultados-ubicacion button:focus-visible { background: var(--uc-fondo); }
 .resultados-ubicacion span { color: var(--texto2, #555); font-size: 14px; }
 .resultados-ubicacion small { margin-left: auto; color: var(--gris-tec); font-size: 12px; }
+
+/* Eliminar evento */
+.zona-riesgo { border-left: 4px solid var(--rojo); }
+.boton.peligro { background: var(--rojo); border-color: var(--rojo); color: #fff; }
+.boton.peligro:disabled { opacity: 0.45; cursor: not-allowed; }
+.confirmar-borrado { display: flex; flex-direction: column; gap: 12px; max-width: 560px; }
+.confirmar-borrado label { display: flex; flex-direction: column; gap: 6px; font-size: 15px; }

@@ -4,6 +4,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Ctx } from "../main";
 import { Barra } from "../componentes/Barra";
+import { EliminarEvento } from "../componentes/EliminarEvento";
 import { supabase, type Evento, type Modalidad } from "../datos";
 import { buscarUbicacion, leerCoordenadas, type Resultado } from "../geocodificar";
 
@@ -231,6 +232,7 @@ export function EventoForm() {
             <Link className="boton" to="/">Cancelar</Link>
           </div>
         </form>
+        {id && f.nombre && <div style={{ marginTop: 36 }}><EliminarEvento id={id} nombre={f.nombre} /></div>}
       </main>
     </>
   );
