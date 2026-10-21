@@ -27,13 +27,13 @@ function Copiar({ texto, etiqueta = "Copiar" }: { texto: string; etiqueta?: stri
   );
 }
 
-/** Texto sugerido para comunicar a los corredores, listo para copiar en cada canal */
-export function Comunicacion({ c }: { c: Comunicado }) {
+/** Texto sugerido para comunicar a los participantes (corredores, atletas, nadadores o ciclistas), listo para copiar en cada canal */
+export function Comunicacion({ c, quien = "corredores" }: { c: Comunicado; quien?: string }) {
   const [f, setF] = useState<Formato>("redes");
   const texto = f === "redes" ? c.redes : f === "whatsapp" ? c.whatsapp : c.mail.cuerpo;
   return (
     <section className="seccion tarjeta comunicacion" id="comunicacion" aria-labelledby="comunicacion-t">
-      <div className="rotulo" id="comunicacion-t">Texto sugerido para comunicar a los corredores</div>
+      <div className="rotulo" id="comunicacion-t">Texto sugerido para comunicar a los {quien}</div>
       <p className="chico" style={{ marginTop: 4 }}>
         Aviso preventivo por: {c.motivos.join(", ").toLowerCase()}. Elegí el canal, copiá el texto y adaptalo a la voz de tu marca.
       </p>

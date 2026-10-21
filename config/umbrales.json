@@ -95,35 +95,40 @@
       "participantes": "corredores",
       "calor": "wbgt",
       "agua": false,
-      "wct": false
+      "wct": false,
+      "singular": "corredor"
     },
     "triatlon": {
       "nombre": "Triatlón",
-      "participantes": "triatletas",
+      "participantes": "atletas",
       "calor": "wbgt_wt",
       "agua": true,
-      "wct": true
+      "wct": true,
+      "singular": "atleta"
     },
     "aguas_abiertas": {
       "nombre": "Aguas abiertas",
       "participantes": "nadadores",
       "calor": "wbgt",
       "agua": true,
-      "wct": false
+      "wct": false,
+      "singular": "nadador"
     },
     "ciclismo": {
       "nombre": "Ciclismo",
       "participantes": "ciclistas",
       "calor": "wbgt_uci",
       "agua": false,
-      "wct": true
+      "wct": true,
+      "singular": "ciclista"
     },
     "montana": {
       "nombre": "Carreras de montaña",
       "participantes": "corredores",
       "calor": "wbgt",
       "agua": false,
-      "wct": true
+      "wct": true,
+      "singular": "corredor"
     }
   },
   "wbgt_wt": {

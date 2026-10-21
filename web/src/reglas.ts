@@ -1,5 +1,9 @@
 // Biblioteca de recomendaciones y fuentes. Textos sujetos a validación única de EMERTEAM.
-import { esVariableCalor, estiloCalor, ESCALAS } from "./disciplinas";
+import { adaptar, esVariableCalor, estiloCalor, ESCALAS } from "./disciplinas";
+
+// Disciplina del evento que se está mirando: adapta «corredores» a atletas, nadadores o ciclistas en nombres y recomendaciones
+let disciplinaActual: string | null | undefined = null;
+export function fijarDisciplina(d: string | null | undefined) { disciplinaActual = d; }
 
 export type TipoFuente = "NT" | "GI" | "CC" | "EF" | "CI";
 
@@ -69,9 +73,9 @@ export const estiloVariable = (variable: string, n: number) => (esVariableCalor(
 
 export const NOMBRE_WA = ["Riesgo bajo", "Precaución", "Advertencia", "Advertencia severa", "Peligro"];
 
-export const NOMBRE_VARIABLE: Record<string, string> = {
+const NOMBRE_VARIABLE_BASE: Record<string, string> = {
   wbgt: "Estrés térmico de corredores",
-  wbgt_wt: "Estrés térmico de triatletas (World Triathlon)",
+  wbgt_wt: "Estrés térmico de atletas (World Triathlon)",
   wbgt_uci: "Estrés térmico de ciclistas (UCI)",
   calor_personal: "Estrés térmico del personal",
   viento_A: "Viento · estructuras ultralivianas",
@@ -81,9 +85,9 @@ export const NOMBRE_VARIABLE: Record<string, string> = {
   lluvia: "Lluvia y suelo",
 };
 
-export const NOMBRE_CORTO: Record<string, string> = {
+const NOMBRE_CORTO_BASE: Record<string, string> = {
   wbgt: "Calor · corredores",
-  wbgt_wt: "Calor · triatletas",
+  wbgt_wt: "Calor · atletas",
   wbgt_uci: "Calor · ciclistas",
   calor_personal: "Calor · personal",
   viento_A: "Viento · ultralivianas",
@@ -92,6 +96,13 @@ export const NOMBRE_CORTO: Record<string, string> = {
   tormenta: "Tormenta",
   lluvia: "Lluvia y suelo",
 };
+
+/** Nombre de la variable con el vocabulario de la disciplina (por defecto, la del evento abierto) */
+export const nombreVariable = (v: string, d: string | null | undefined = disciplinaActual) => adaptar(NOMBRE_VARIABLE_BASE[v] ?? v, d);
+export const nombreCorto = (v: string, d: string | null | undefined = disciplinaActual) => adaptar(NOMBRE_CORTO_BASE[v] ?? v, d);
+const vista = (f: (v: string) => string) => new Proxy({} as Record<string, string>, { get: (_t, k) => (typeof k === "string" ? f(k) : undefined) });
+export const NOMBRE_VARIABLE = vista((v) => nombreVariable(v));
+export const NOMBRE_CORTO = vista((v) => nombreCorto(v));
 
 export const NOMBRE_FASE: Record<string, string> = {
   armado: "Armado",
@@ -119,7 +130,12 @@ const ELEMENTOS: Record<string, string> = {
 };
 
 /** Texto de recomendación por variable, nivel y fase. null = sin recomendación (nivel 0). */
-export function recomendacion(variable: string, nivel: number, fase: string): string | null {
+export function recomendacion(variable: string, nivel: number, fase: string, d: string | null | undefined = disciplinaActual): string | null {
+  const t = recomendacionBase(variable, nivel, fase);
+  return t == null ? null : adaptar(t, d);
+}
+
+function recomendacionBase(variable: string, nivel: number, fase: string): string | null {
   if (nivel <= 0) return null;
   if (variable === "wbgt") {
     return [
@@ -134,7 +150,7 @@ export function recomendacion(variable: string, nivel: number, fase: string): st
     // Roja y negra: World Triathlon, regla 10.3. Azul y naranja: criterio EMERTEAM (adelantar la largada: James et al., 2025)
     return [
       "",
-      "Vigilar el calor: hidratación y enfriamiento en transiciones y puestos; aviso a los triatletas antes de la largada.",
+      "Vigilar el calor: hidratación y enfriamiento en transiciones y puestos; aviso a los atletas antes de la largada.",
       "Reforzar enfriamiento e hidratación en la carrera a pie, vigilancia del último cuarto y del grupo de mayor riesgo; evaluar adelantar la largada.",
       "Pasar la distancia estándar a sprint o reprogramar la prueba (World Triathlon). Evaluar adelantar la largada.",
       "Reprogramar o cancelar la prueba (World Triathlon).",

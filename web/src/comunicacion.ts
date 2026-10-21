@@ -1,9 +1,9 @@
-// Textos sugeridos para que el organizador comunique a los corredores, en tres formatos:
+// Textos sugeridos para que el organizador comunique a los participantes, en tres formatos:
 // redes sociales (breve), WhatsApp (con formato de WhatsApp) y correo (asunto + cuerpo completo).
 // Solo se arman cuando hay un aviso preventivo para el día de carrera: estrés térmico (escala World Athletics),
 // tormenta, lluvia, o una alerta del SMN vigente durante la ventana del corredor.
 import type { AlertaSMN, Evento, Nivel } from "./datos";
-import { confDisciplina, participantes } from "./disciplinas";
+import { confDisciplina, participante, participantes } from "./disciplinas";
 
 export type Comunicado = {
   motivos: string[];
@@ -122,7 +122,7 @@ export function armarComunicado(ev: Evento, nivelesCarrera: Nivel[], alertas: Al
   const quien = participantes(ev.disciplina);
   // Severidad del texto según la escala: World Triathlon azul ≈ moderado; UCI verde (riesgo bajo) no genera texto
   const nCalor = conf.calor === "wbgt_uci" ? Math.max(0, max("wbgt_uci") - 1) : max(conf.calor);
-  const bloqueCalor = running ? calor(nCalor) : calorGeneral(nCalor, quien, conf.agua);
+  const bloqueCalor = running ? calor(nCalor) : calorGeneral(nCalor, quien, ev.disciplina === "triatlon");
   const bloques = [...enVentana.map(smn), tormenta(max("tormenta")), bloqueCalor, lluvia(max("lluvia"))].filter((b): b is Bloque => !!b);
   if (!bloques.length) return null;
 
@@ -154,7 +154,7 @@ export function armarComunicado(ev: Evento, nivelesCarrera: Nivel[], alertas: Al
     `Te escribimos para compartir las condiciones previstas para ${ev.nombre}, el ${dia} con largada a las ${hl} h, y algunas recomendaciones para que ${running ? "corras" : "compitas"} de forma segura.`,
     "",
     ...bloques.flatMap((b) => [`${b.titulo}`, b.largo, ""]),
-    `Ante cualquier síntoma durante ${running ? "la carrera" : "la prueba"}, detenete y pedí asistencia al personal de la organización. Si ves a ${running ? "otro corredor" : "otro participante"} con dificultades, avisá al puesto más cercano.`,
+    `Ante cualquier síntoma durante ${running ? "la carrera" : "la prueba"}, detenete y pedí asistencia al personal de la organización. Si ves a otro ${participante(ev.disciplina)} con dificultades, avisá al puesto más cercano.`,
     "",
     "Si las condiciones cambian, te lo vamos a informar por este medio y por nuestros canales oficiales.",
     "",

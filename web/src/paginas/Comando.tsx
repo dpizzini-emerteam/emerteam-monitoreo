@@ -6,7 +6,7 @@ import {
   COLOR_SMN, estadoRayosGLM, fmtFechaHora, fmtHora, kmPorTrueno, nivelRayoMedido, num, ordenarAlertas, supabase, tituloAlerta,
   type AlertaSMN, type Evento, type Medicion, type Nivel, type Pronostico, type Uv, type Rayo,
 } from "../datos";
-import { ESTILO_SIN_DATOS, estiloNivel, estiloVariable, NOMBRE_CORTO, NOMBRE_FASE, nombreNivel, recomendacion } from "../reglas";
+import { fijarDisciplina, ESTILO_SIN_DATOS, estiloNivel, estiloVariable, NOMBRE_CORTO, NOMBRE_FASE, nombreNivel, recomendacion } from "../reglas";
 import { Humedad, UvDato } from "../componentes/Uv";
 import { confDisciplina, escalaCalor, estiloCalor, evaluarAguaAbierta, evaluarAguaTriatlon, nombreDisciplina, riesgoWct, wct } from "../disciplinas";
 import { consenso } from "../serie";
@@ -66,6 +66,7 @@ export function Comando() {
   }, [cargar, id]);
 
   const serie = useMemo(() => consenso(pron, uv), [pron, uv]);
+  fijarDisciplina(ev?.disciplina);
   if (!ev) return <div className="comando"><p style={{ padding: 40 }}>Cargando…</p></div>;
   const v = calcular(ev);
   const det = analizarDetector(meds, ahora);

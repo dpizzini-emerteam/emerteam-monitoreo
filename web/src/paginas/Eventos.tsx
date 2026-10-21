@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { nombreDisciplina } from "../disciplinas";
+import { nombreCorto } from "../reglas";
 import { Link, useOutletContext } from "react-router-dom";
 import type { Ctx } from "../main";
 import { Barra } from "../componentes/Barra";
 import { Introduccion } from "../componentes/Introduccion";
 import { diaLocal, fmtDia, fmtHora, supabase, type Evento, type Nivel } from "../datos";
-import { COLOR_NIVEL, ESTILO_SIN_DATOS, estiloNivel, estiloVariable, NOMBRE_CORTO, NOMBRE_FASE, nombreNivel, SIN_PRONOSTICO } from "../reglas";
+import { COLOR_NIVEL, ESTILO_SIN_DATOS, estiloNivel, estiloVariable, NOMBRE_FASE, nombreNivel, SIN_PRONOSTICO } from "../reglas";
 
 type Max = { nivel: number; variable: string; desde: string };
 type Resumen = Record<string, Record<string, Max>>; // evento -> fase -> nivel máximo vigente
@@ -112,7 +113,7 @@ export function Eventos() {
                             ? <span className="badge" style={m ? estiloVariable(m.variable, m.nivel) : estiloNivel(0)}>{m ? nombreNivel(m.variable, m.nivel) : "Bajo umbral"}</span>
                             : <span className="badge" style={ESTILO_SIN_DATOS}>{SIN_PRONOSTICO}</span>}
                           <div className="chico">
-                            {m ? `${NOMBRE_CORTO[m.variable] ?? m.variable} · ${fmtDia(m.desde)} ${fmtHora(m.desde)}`
+                            {m ? `${nombreCorto(m.variable, e.disciplina)} · ${fmtDia(m.desde)} ${fmtHora(m.desde)}`
                               : cub?.has(f) ? "Ninguna variable supera su umbral" : "Fuera del alcance de los modelos"}
                           </div>
                         </div>

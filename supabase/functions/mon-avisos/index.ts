@@ -25,7 +25,7 @@ const COLOR_SMN: Record<string, string> = { amarillo: "#F5C400", naranja: "#FF6A
 const FASE: Record<string, string> = { armado: "Armado", carrera: "Carrera", personal: "Jornada del personal", desarme: "Desarme" };
 const VARIABLE: Record<string, string> = {
   wbgt: "Estrés térmico de corredores", calor_personal: "Estrés térmico del personal",
-  wbgt_wt: "Estrés térmico de triatletas (World Triathlon)", wbgt_uci: "Estrés térmico de ciclistas (UCI)",
+  wbgt_wt: "Estrés térmico de atletas (World Triathlon)", wbgt_uci: "Estrés térmico de ciclistas (UCI)",
   viento_A: "Viento · estructuras ultralivianas", viento_B: "Viento · superficies de vela", viento_C: "Viento · estructuras ingenieriles",
   tormenta: "Tormenta", lluvia: "Lluvia y suelo",
 };
@@ -61,7 +61,7 @@ function recomendacion(variable: string, n: number, fase: string): string {
   ][n];
   if (variable === "wbgt_wt") return [
     "",
-    "Vigilar el calor: hidratación y enfriamiento en transiciones y puestos; aviso a los triatletas antes de la largada.",
+    "Vigilar el calor: hidratación y enfriamiento en transiciones y puestos; aviso a los atletas antes de la largada.",
     "Reforzar enfriamiento e hidratación en la carrera a pie, vigilancia del último cuarto y del grupo de mayor riesgo; evaluar adelantar la largada.",
     "Pasar la distancia estándar a sprint o reprogramar la prueba (World Triathlon). Evaluar adelantar la largada.",
     "Reprogramar o cancelar la prueba (World Triathlon).",
@@ -106,7 +106,19 @@ function textoCorredores(variable: string, n: number): string {
   return "";
 }
 
-type Evento = { id: string; nombre: string; largada: string; organizador_email: string };
+type Evento = { id: string; nombre: string; largada: string; organizador_email: string; disciplina?: string | null };
+
+// Vocabulario por disciplina: los textos se escriben para running y se adaptan (corredores → atletas, nadadores, ciclistas)
+const PARTICIPANTES: Record<string, [string, string]> = {
+  running: ["corredores", "corredor"], montana: ["corredores", "corredor"], triatlon: ["atletas", "atleta"],
+  aguas_abiertas: ["nadadores", "nadador"], ciclismo: ["ciclistas", "ciclista"],
+};
+function adaptar(texto: string, d?: string | null): string {
+  const [pl, sg] = PARTICIPANTES[d ?? "running"] ?? PARTICIPANTES.running;
+  if (pl === "corredores") return texto;
+  const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
+  return texto.replace(/\bcorredores\b/g, pl).replace(/\bCorredores\b/g, cap(pl)).replace(/\bcorredor\b/g, sg).replace(/\bCorredor\b/g, cap(sg));
+}
 type Nivel = { evento_id: string; fase: string; variable: string; desde: string; hasta: string; nivel: number; confianza: string | null };
 type Alerta = { id: string; evento_id: string; fenomeno: string; color: string; desde: string | null; hasta: string | null; estado: string; tipo: string };
 type Estado = { niveles: Record<string, number>; smn: string[]; glm: number };
@@ -128,6 +140,8 @@ function etiqueta(texto: string, fondo: string, color: string) {
 }
 
 function armarCorreo(ev: Evento, cambios: Cambio[]): { asunto: string; html: string; texto: string } {
+  const nombreVar = (v: string) => adaptar(VARIABLE[v] ?? v, ev.disciplina);
+  const running = (ev.disciplina ?? "running") === "running";
   const enlace = `${WEB}/#/evento/${ev.id}`;
   const partes: string[] = [];
   const lineas: string[] = [];
@@ -138,16 +152,17 @@ function armarCorreo(ev: Evento, cambios: Cambio[]): { asunto: string; html: str
       const fondo = paleta[c.ahora];
       const color = ["#1D1D1B", "#111111", "#7A1610", "#2F6FD6"].includes(fondo) ? "#FFFFFF" : "#111111";
       const titulo = c.tipo === "sube"
-        ? `${VARIABLE[c.variable] ?? c.variable} · ${FASE[c.fase] ?? c.fase}`
-        : `${VARIABLE[c.variable] ?? c.variable} · ${FASE[c.fase] ?? c.fase} · vuelve a quedar bajo el umbral`;
-      const reco = c.tipo === "sube" ? recomendacion(c.variable, c.ahora, c.fase) : "Se levantan las medidas indicadas para esta variable. El monitoreo continúa.";
+        ? `${nombreVar(c.variable)} · ${FASE[c.fase] ?? c.fase}`
+        : `${nombreVar(c.variable)} · ${FASE[c.fase] ?? c.fase} · vuelve a quedar bajo el umbral`;
+      const reco = c.tipo === "sube" ? adaptar(recomendacion(c.variable, c.ahora, c.fase), ev.disciplina) : "Se levantan las medidas indicadas para esta variable. El monitoreo continúa.";
       partes.push(`<tr><td style="padding:14px 18px;border-left:5px solid ${c.tipo === "sube" ? (fondo === "#FFFFFF" ? "#1D1D1B" : fondo) : "#2FA34C"};background:#f7f6f4">
         <div style="margin-bottom:6px">${etiqueta(c.tipo === "sube" ? nombreNivel(c.variable, c.ahora) : "Bajo umbral", c.tipo === "sube" ? fondo : "#2FA34C", c.tipo === "sube" ? color : "#111111")}</div>
         <div style="font:700 16px Arial,sans-serif;color:#111">${esc(titulo)}</div>
         <div style="font:13px Arial,sans-serif;color:#555;margin:3px 0 6px">Desde ${esc(fmt(c.desde))}${c.confianza === "baja" ? " · tendencia, se confirma con las próximas actualizaciones" : ""}</div>
         <div style="font:14px/1.5 Arial,sans-serif;color:#222">${esc(reco)}</div></td></tr><tr><td style="height:10px"></td></tr>`);
       lineas.push(`${titulo}: ${c.tipo === "sube" ? nombreNivel(c.variable, c.ahora) : "bajo umbral"} desde ${fmt(c.desde)}. ${reco}`);
-      if (c.tipo === "sube" && c.fase === "carrera") { const t = textoCorredores(c.variable, c.ahora); if (t) corredores.add(t); }
+      // Textos para los participantes escritos para running: en las otras disciplinas están en la web, adaptados
+      if (running && c.tipo === "sube" && c.fase === "carrera") { const t = textoCorredores(c.variable, c.ahora); if (t) corredores.add(t); }
     } else if (c.tipo === "smn_nueva" || c.tipo === "smn_levantada") {
       const a = c.alerta;
       const fondo = COLOR_SMN[a.color] ?? "#F5C400";
@@ -167,8 +182,8 @@ function armarCorreo(ev: Evento, cambios: Cambio[]): { asunto: string; html: str
   }
   const primero = cambios[0];
   const resumen = cambios.length > 1 ? `${cambios.length} novedades`
-    : primero.tipo === "sube" ? `${nombreNivel(primero.variable, primero.ahora)} · ${VARIABLE[primero.variable]} (${FASE[primero.fase]})`
-    : primero.tipo === "normaliza" ? `${VARIABLE[primero.variable]} vuelve a quedar bajo el umbral`
+    : primero.tipo === "sube" ? `${nombreNivel(primero.variable, primero.ahora)} · ${nombreVar(primero.variable)} (${FASE[primero.fase]})`
+    : primero.tipo === "normaliza" ? `${nombreVar(primero.variable)} vuelve a quedar bajo el umbral`
     : primero.tipo === "rayos" ? `Rayos a ${Math.round(primero.km)} km`
     : `${tituloAlerta(primero.alerta)}${primero.tipo === "smn_levantada" ? " · levantada" : ""}`;
   const asunto = `${ev.nombre} · ${resumen}`;
@@ -198,7 +213,7 @@ Deno.serve(async (req) => {
   const ahora = Date.now();
   const prueba = new URL(req.url).searchParams.get("prueba") === "1"; // calcula sin enviar ni guardar estado
 
-  const { data: evs } = await supabase.from("mon_eventos").select("id,nombre,largada,organizador_email")
+  const { data: evs } = await supabase.from("mon_eventos").select("id,nombre,largada,organizador_email,disciplina")
     .eq("estado", "activo")
     .gte("largada", new Date(ahora - 2 * 86400_000).toISOString())
     .lte("largada", new Date(ahora + 16 * 86400_000).toISOString());

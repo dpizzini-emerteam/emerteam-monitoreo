@@ -19,7 +19,7 @@ import {
   COLOR_SMN, estadoRayosGLM, ordenarAlertas, tituloAlerta, diaLocal, fmtDia, fmtFechaHora, fmtHora, num, supabase,
   type AlertaSMN, type Evento, type Rayo, type Nivel, type Pronostico, type Sesgo, type Uv,
 } from "../datos";
-import { estiloNivel, estiloVariable, NOMBRE_CORTO, NOMBRE_FASE, NOMBRE_VARIABLE, REGLAS, TIPO_FUENTE, nombreNivel, recomendacion } from "../reglas";
+import { fijarDisciplina, estiloNivel, estiloVariable, NOMBRE_CORTO, NOMBRE_FASE, NOMBRE_VARIABLE, REGLAS, TIPO_FUENTE, nombreNivel, recomendacion } from "../reglas";
 import { calcular } from "../ventanas";
 
 
@@ -122,6 +122,7 @@ export function EventoVista() {
     return () => clearInterval(t);
   }, [hayAviso, sonido.sonar]);
 
+  fijarDisciplina(ev?.disciplina);
   const v = useMemo(() => (ev ? calcular(ev) : null), [ev]);
   const serie = useMemo(() => consenso(pron, uv), [pron, uv]);
   const uvDia = useMemo(() => uvMaxPorDia(uv), [uv]);
@@ -265,7 +266,7 @@ export function EventoVista() {
           <>
             <DiaCarrera serie={serie} v={v} ev={ev} />
             <Recomendaciones lista={delaFase("carrera")} vacio="Con el pronóstico actual no hay recomendaciones para el día de carrera." />
-            {comunicado && <Comunicacion c={comunicado} />}
+            {comunicado && <Comunicacion c={comunicado} quien={participantes(ev.disciplina)} />}
           </>
         )}
         {actual === "desarme" && (

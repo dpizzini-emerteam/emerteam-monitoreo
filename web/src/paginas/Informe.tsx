@@ -4,7 +4,7 @@ import type { Ctx } from "../main";
 import { Barra } from "../componentes/Barra";
 import { fmtDia, fmtFechaHora, fmtHora, num, supabase, type AlertaSMN, type Evento, type Medicion, type Pronostico, type Rayo, type Uv } from "../datos";
 import { armarInforme, type FaseInforme, type FilaHistorial, type Informe as TInforme, type Pico, type RecoInforme } from "../informe";
-import { estiloVariable, NOMBRE_VARIABLE, nombreNivel } from "../reglas";
+import { fijarDisciplina, estiloVariable, NOMBRE_VARIABLE, nombreNivel } from "../reglas";
 import { categoriaUv } from "../serie";
 import { escalaCalor, participantes } from "../disciplinas";
 
@@ -88,7 +88,7 @@ function Documento({ inf, reg }: { inf: TInforme; reg: Registro | null }) {
       <h2 className="inf-banda" style={{ textTransform: "capitalize" }}>{participantes(inf.evento.disciplina)}</h2>
       <table className="inf-tabla">
         <tbody>
-          <tr><th>Exposición del corredor</th><td>{fmtHora(inf.ventanas.exposicion[0])} a {fmtHora(inf.ventanas.exposicion[1])} · último cuarto {fmtHora(inf.ventanas.ultimoCuarto[0])} a {fmtHora(inf.ventanas.ultimoCuarto[1])}</td></tr>
+          <tr><th>Exposición de los {participantes(inf.evento.disciplina)}</th><td>{fmtHora(inf.ventanas.exposicion[0])} a {fmtHora(inf.ventanas.exposicion[1])} · último cuarto {fmtHora(inf.ventanas.ultimoCuarto[0])} a {fmtHora(inf.ventanas.ultimoCuarto[1])}</td></tr>
           <tr><th>WBGT medido máximo</th><td>{pico(inf.corredores.wbgtMed, "°C", 1)}</td></tr>
           <tr><th>WBGT estimado máximo</th><td>{pico(inf.corredores.wbgtEst, "°C", 1)}</td></tr>
           <tr><th>Temperatura máxima · humedad media</th><td>{pico(inf.corredores.temperaturaMax, "°C")} · {inf.corredores.humedadMedia != null ? `${inf.corredores.humedadMedia} %` : "sin registro"}{inf.corredores.hrMin != null ? ` (mínima ${inf.corredores.hrMin} %, máxima ${inf.corredores.hrMax} %)` : ""}</td></tr>
@@ -213,6 +213,7 @@ export function Informe() {
     void cargar();
   }
 
+  fijarDisciplina(ev?.disciplina);
   if (!ev) return <><Barra titulo="Informe post-evento" /><p className="contenedor" style={{ paddingTop: 26 }}>Cargando…</p></>;
   // El organizador ve la copia aprobada; EMERTEAM ve el borrador con los datos actuales
   const mostrar: TInforme | null = admin ? vivo : reg?.estado === "aprobado" ? reg.contenido : null;
@@ -233,7 +234,7 @@ export function Informe() {
               El informe se arma solo con el pronóstico, las mediciones, los rayos, las alertas y las recomendaciones registradas. Las observaciones son opcionales:
               si quedan vacías, la sección no aparece. Al aprobar se guarda una copia fija y el organizador la ve en la pestaña del evento.
             </p>
-            <label>Observaciones sobre los corredores<textarea rows={3} value={notasC} onChange={(e) => setNotasC(e.target.value)} /></label>
+            <label>Observaciones sobre los {participantes(ev.disciplina)}<textarea rows={3} value={notasC} onChange={(e) => setNotasC(e.target.value)} /></label>
             <label>Observaciones sobre los trabajadores<textarea rows={3} value={notasT} onChange={(e) => setNotasT(e.target.value)} /></label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
               <button className="boton" onClick={() => void guardar(false)}>Guardar borrador</button>

@@ -15,7 +15,7 @@ const KM_MI = 1 / 1.609344; // detector configurado en millas
 
 const SECCIONES: { id: string; titulo: string; icono: TipoIcono }[] = [
   { id: "g-leer", titulo: "Cómo leer la web", icono: "solnube" },
-  { id: "g-calor", titulo: "Calor · corredores", icono: "termometro" },
+  { id: "g-calor", titulo: "Calor · participantes", icono: "termometro" },
   { id: "g-personal", titulo: "Calor · personal", icono: "estructura" },
   { id: "g-viento", titulo: "Viento y estructuras", icono: "viento" },
   { id: "g-tormenta", titulo: "Tormenta eléctrica", icono: "tormenta" },
@@ -110,7 +110,7 @@ export function Guia({ ctx }: { ctx: Contexto }) {
             </tbody>
           </table>
         </div>
-        <p className="chico">El estrés térmico de corredores usa la escala y los colores oficiales de World Athletics; el resto de las variables, el semáforo EMERTEAM. Los dos códigos no se mezclan.</p>
+        <p className="chico">El estrés térmico de los participantes usa la escala y los colores oficiales de World Athletics; el resto de las variables, el semáforo EMERTEAM. Los dos códigos no se mezclan.</p>
 
         <h3>Orden de prioridad de la información</h3>
         <ol className="guia-lista">
@@ -126,7 +126,7 @@ export function Guia({ ctx }: { ctx: Contexto }) {
             <tbody>
               <tr><td><b>Alta</b></td><td>Los dos modelos coinciden y faltan {c.alta_hasta_h} h o menos.</td><td>Base para ajustar el dispositivo.</td></tr>
               <tr><td><b>Media</b></td><td>Diferencias moderadas entre modelos (WBGT ≥ {coma(c.wbgt[0])} °C, ráfaga ≥ {coma(c.rafaga[0])} km/h o viento ≥ {coma(c.viento[0])} km/h), un solo modelo a menos de {c.un_modelo_baja_h} h, o más de {c.alta_hasta_h} h de plazo.</td><td>Preparar medidas; confirmar en la próxima actualización.</td></tr>
-              <tr><td><b>Baja · tendencia</b></td><td>Modelos muy distintos (WBGT ≥ {coma(c.wbgt[1])} °C, ráfaga ≥ {coma(c.rafaga[1])} km/h o viento ≥ {coma(c.viento[1])} km/h) o un solo modelo a más de {c.un_modelo_baja_h} h.</td><td>Aviso anticipado; no comunicar a corredores todavía.</td></tr>
+              <tr><td><b>Baja · tendencia</b></td><td>Modelos muy distintos (WBGT ≥ {coma(c.wbgt[1])} °C, ráfaga ≥ {coma(c.rafaga[1])} km/h o viento ≥ {coma(c.viento[1])} km/h) o un solo modelo a más de {c.un_modelo_baja_h} h.</td><td>Aviso anticipado; no comunicar a los participantes todavía.</td></tr>
             </tbody>
           </table>
         </div>
@@ -138,22 +138,22 @@ export function Guia({ ctx }: { ctx: Contexto }) {
             <thead><tr><th>Fase</th><th>Desde</th><th>Hasta</th><th>Qué se evalúa</th></tr></thead>
             <tbody>
               <tr><td><b>Armado</b></td><td>00 h del primer día de armado</td><td>{w.armado_hasta_antes_largada_min / 60} h antes de la largada</td><td>Viento sobre estructuras, calor del personal, tormenta y lluvia.</td></tr>
-              <tr><td><b>Ventana del corredor</b></td><td>{w.exposicion_antes_min} min antes de la largada</td><td>{w.exposicion_despues_min} min después del último corredor estimado</td><td>Calor de corredores, viento, tormenta y lluvia.</td></tr>
-              <tr><td><b>Último cuarto</b></td><td>Al {Math.round(w.ultimo_cuarto * 100)} % de la duración estimada</td><td>Llegada del último corredor</td><td>Zona crítica: mayor carga térmica acumulada y más asistencias.</td></tr>
-              <tr><td><b>Jornada del personal</b></td><td>{w.personal_antes_min / 60} h antes de la largada</td><td>{w.personal_despues_min / 60} h después del último corredor</td><td>Calor del personal y viento.</td></tr>
-              <tr><td><b>Desarme</b></td><td>Llegada del último corredor</td><td>{w.desarme_min / 60} h después</td><td>Viento sobre estructuras, calor del personal, tormenta y lluvia.</td></tr>
+              <tr><td><b>Ventana de los participantes</b></td><td>{w.exposicion_antes_min} min antes de la largada</td><td>{w.exposicion_despues_min} min después del último participante estimado</td><td>Calor de los participantes, viento, tormenta y lluvia.</td></tr>
+              <tr><td><b>Último cuarto</b></td><td>Al {Math.round(w.ultimo_cuarto * 100)} % de la duración estimada</td><td>Llegada del último participante</td><td>Zona crítica: mayor carga térmica acumulada y más asistencias.</td></tr>
+              <tr><td><b>Jornada del personal</b></td><td>{w.personal_antes_min / 60} h antes de la largada</td><td>{w.personal_despues_min / 60} h después del último participante</td><td>Calor del personal y viento.</td></tr>
+              <tr><td><b>Desarme</b></td><td>Llegada del último participante</td><td>{w.desarme_min / 60} h después</td><td>Viento sobre estructuras, calor del personal, tormenta y lluvia.</td></tr>
             </tbody>
           </table>
         </div>
         <Tecnico>
           <p>Pronóstico: modelos ECMWF IFS (0,25°, cada 3 h hasta 6 días) y NOAA GFS (0,25°, horario hasta 5 días y cada 3 h hasta 7 días), actualizados cada 2 horas. Se toma el punto de grilla de tierra más cercano al evento y se arma una serie de consenso con ECMWF como fuente principal.</p>
           <p>Ajuste local: si hay una estación del SMN a menos de {U.correccion.distancia_max_km} km con al menos {U.correccion.pares_min} horas comparables en las últimas {U.correccion.ventana_h} h, se corrige el sesgo de temperatura (por separado de día y de noche), punto de rocío y viento, y se recalcula el WBGT. El detalle está en «Equipo y fuentes».</p>
-          <p>La duración se estima por distancia (5K ≈ 75 min, 10K ≈ 120 min, 21K ≈ 180 min, 42K ≈ 360 min para el último corredor) más una demora de largada de {w.demora_cada_1000} min cada 1.000 participantes, salvo que el evento tenga una duración propia cargada.</p>
+          <p>La duración se estima por distancia (5K ≈ 75 min, 10K ≈ 120 min, 21K ≈ 180 min, 42K ≈ 360 min para el último corredor; en las demás disciplinas se carga la duración estimada) más una demora de largada de {w.demora_cada_1000} min cada 1.000 participantes, salvo que el evento tenga una duración propia cargada.</p>
         </Tecnico>
       </Seccion>
 
-      <Seccion id="g-calor" titulo="Estrés térmico de corredores" icono="termometro" organizador={
-        <p>El <b>WBGT</b> resume en un solo valor el efecto combinado de temperatura, humedad, sol y viento sobre el corredor. Es el índice que usa World Athletics para decidir medidas por calor. El riesgo se concentra en el <b>último cuarto</b> de la carrera y en el <b>grupo de mayor riesgo: hombres mayores de 35 años</b>.</p>
+      <Seccion id="g-calor" titulo="Estrés térmico de participantes" icono="termometro" organizador={
+        <p>El <b>WBGT</b> resume en un solo valor el efecto combinado de temperatura, humedad, sol y viento sobre quien compite. Es el índice que usa World Athletics para decidir medidas por calor. El riesgo se concentra en el <b>último cuarto</b> de la carrera y en el <b>grupo de mayor riesgo: hombres mayores de 35 años</b>.</p>
       }>
         <EnEsteEvento ctx={ctx} variables={["wbgt"]} />
         <div className="desplaza">
@@ -173,13 +173,13 @@ export function Guia({ ctx }: { ctx: Contexto }) {
         <Fuente regla="wa2020_wbgt" />
         <Tecnico>
           <p>WBGT estimado: método de Liljegren et al. (2008) con temperatura, humedad, presión, viento y radiación solar del pronóstico, hora por hora. Por la radiación, el valor de mediodía puede superar al de la tarde aunque la temperatura sea mayor después.</p>
-          <p>WBGT medido: con termómetro de globo negro, en el recorrido, expuesto al sol y a la altura del torso del corredor. Cuando hay medición reciente en terreno, manda sobre el estimado.</p>
-          <p>Los niveles se evalúan en toda la ventana del corredor y se informa la franja en que se alcanza cada nivel. Un mismo WBGT pesa más en el último cuarto, por la carga térmica acumulada, y en corredores no aclimatados (primeros días de calor de la temporada).</p>
+          <p>WBGT medido: con termómetro de globo negro, en el recorrido, expuesto al sol y a la altura del torso de los participantes. Cuando hay medición reciente en terreno, manda sobre el estimado.</p>
+          <p>Los niveles se evalúan en toda la ventana de los participantes y se informa la franja en que se alcanza cada nivel. Un mismo WBGT pesa más en el último cuarto, por la carga térmica acumulada, y en participantes no aclimatados (primeros días de calor de la temporada).</p>
         </Tecnico>
       </Seccion>
 
       <Seccion id="g-personal" titulo="Estrés térmico del personal" icono="estructura" organizador={
-        <p>El personal de armado, desarme y puestos trabaja más horas y con más esfuerzo físico que el corredor. La referencia es la <b>Resolución SRT 30/2023</b> (valor límite de acción para trabajadores no aclimatados), con el mismo índice WBGT, que la norma llama TGBH.</p>
+        <p>El personal de armado, desarme y puestos trabaja más horas y con más esfuerzo físico que los participantes. La referencia es la <b>Resolución SRT 30/2023</b> (valor límite de acción para trabajadores no aclimatados), con el mismo índice WBGT, que la norma llama TGBH.</p>
       }>
         <EnEsteEvento ctx={ctx} variables={["calor_personal"]} />
         <div className="desplaza">
@@ -407,7 +407,7 @@ export function Guia({ ctx }: { ctx: Contexto }) {
       }>
         <ol className="guia-escalera">
           {[["Continuar con vigilancia", "Seguir la evolución en cada actualización. Dispositivo habitual.", 1],
-            ["Ajustar el dispositivo", "Reforzar hidratación, enfriamiento, lastre o personal; avisar a los corredores.", 2],
+            ["Ajustar el dispositivo", "Reforzar hidratación, enfriamiento, lastre o personal; avisar a los participantes.", 2],
             ["Demorar", "Postergar la largada o una tarea hasta que pase la condición (tormenta, viento).", 3],
             ["Modificar", "Cambiar horario, acortar distancias, retirar estructuras o habilitar el retiro voluntario.", 3],
             ["Suspender", "Suspender o neutralizar la carrera o el trabajo expuesto, y evacuar si corresponde.", 4]].map(([t, d, n]) => (
@@ -415,7 +415,7 @@ export function Guia({ ctx }: { ctx: Contexto }) {
           ))}
         </ol>
         <h3>Comunicación</h3>
-        <p>Cuando hay un aviso preventivo para el día de carrera, la pestaña <b>Día de carrera</b> ofrece un texto sugerido para corredores en tres formatos: redes sociales, WhatsApp y mail. Con confianza baja conviene esperar a que el pronóstico se confirme antes de publicar.</p>
+        <p>Cuando hay un aviso preventivo para el día de carrera, la pestaña <b>Día de carrera</b> ofrece un texto sugerido para los participantes (corredores, atletas, nadadores o ciclistas) en tres formatos: redes sociales, WhatsApp y mail. Con confianza baja conviene esperar a que el pronóstico se confirme antes de publicar.</p>
         <Tecnico>
           <p>Cada decisión tomada y la evolución de los niveles quedan registradas y alimentan el informe post-evento, que EMERTEAM aprueba y comparte con el organizador.</p>
         </Tecnico>
@@ -430,7 +430,7 @@ export function Guia({ ctx }: { ctx: Contexto }) {
             <tbody>
               {Object.entries(REGLAS).map(([k, v]) => (
                 <tr key={k}>
-                  <td>{{ wa2020_wbgt: "Calor · corredores", srt30_2023_tgbh: "Calor · personal", emt_viento_A: "Viento · ultralivianas", emt_viento_B: "Viento · superficies de vela", emt_viento_C: "Viento · estructuras ingenieriles", emt_tormenta_cape: "Tormenta", emt_lluvia_intensidad: "Lluvia intensa", emt_suelo_saturado: "Suelo saturado", wt_wbgt: "Calor · triatletas", uci_wbgt: "Calor · ciclistas" }[k] ?? k}</td>
+                  <td>{{ wa2020_wbgt: "Calor · participantes (World Athletics)", srt30_2023_tgbh: "Calor · personal", emt_viento_A: "Viento · ultralivianas", emt_viento_B: "Viento · superficies de vela", emt_viento_C: "Viento · estructuras ingenieriles", emt_tormenta_cape: "Tormenta", emt_lluvia_intensidad: "Lluvia intensa", emt_suelo_saturado: "Suelo saturado", wt_wbgt: "Calor · atletas de triatlón", uci_wbgt: "Calor · ciclistas" }[k] ?? k}</td>
                   <td style={{ whiteSpace: "nowrap" }}>{TIPO_FUENTE[v.tipo]}</td>
                   <td>{v.fuente}</td>
                 </tr>

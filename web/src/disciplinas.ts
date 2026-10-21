@@ -4,14 +4,26 @@ import U from "../../config/umbrales.json";
 export type Disciplina = "running" | "triatlon" | "aguas_abiertas" | "ciclismo" | "montana";
 export type VariableCalor = "wbgt" | "wbgt_wt" | "wbgt_uci";
 
-type Conf = { nombre: string; participantes: string; calor: VariableCalor; agua: boolean; wct: boolean };
+type Conf = { nombre: string; participantes: string; singular: string; calor: VariableCalor; agua: boolean; wct: boolean };
 const D = U.disciplinas as unknown as Record<Disciplina, Conf>;
 
 export const DISCIPLINAS: Disciplina[] = ["running", "triatlon", "aguas_abiertas", "ciclismo", "montana"];
 export const confDisciplina = (d?: string | null): Conf => D[(d as Disciplina) in D ? (d as Disciplina) : "running"];
 export const nombreDisciplina = (d?: string | null) => confDisciplina(d).nombre;
-/** «corredores», «triatletas», «nadadores», «ciclistas» */
+/** «corredores», «atletas», «nadadores», «ciclistas» */
 export const participantes = (d?: string | null) => confDisciplina(d).participantes;
+/** «corredor», «atleta», «nadador», «ciclista» */
+export const participante = (d?: string | null) => confDisciplina(d).singular;
+
+/** Adapta un texto escrito para running al vocabulario de la disciplina (corredores → atletas, nadadores, ciclistas) */
+export function adaptar(texto: string, d?: string | null): string {
+  const c = confDisciplina(d);
+  if (c.participantes === "corredores") return texto;
+  const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
+  return texto
+    .replace(/\bcorredores\b/g, c.participantes).replace(/\bCorredores\b/g, cap(c.participantes))
+    .replace(/\bcorredor\b/g, c.singular).replace(/\bCorredor\b/g, cap(c.singular));
+}
 
 export type EscalaCalor = {
   variable: VariableCalor;
