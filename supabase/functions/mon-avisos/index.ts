@@ -183,7 +183,7 @@ function disparosEns(filas: EnsProb[], largada: string, ahora: number) {
   return salida;
 }
 const rangoEns = (c: { accion: string; nivel: number }) => (c.accion === "activar" ? 10 : 0) + c.nivel;
-const probTxt = (p: number) => { const r = Math.round(p * 10) * 10; return r <= 0 ? "menos de 10 %" : r >= 100 ? "más de 90 %" : `${r} %`; };
+const probTxt = (p: number) => { const r = Math.round(p * 10) * 10; return r <= 0 ? "menos de 10\u00a0%" : r >= 100 ? "más de 90\u00a0%" : `${r}\u00a0%`; };
 const ventanaTxt = (v: string, d?: string | null) => v === "carrera" ? `exposición de los ${(PARTICIPANTES[d ?? "running"] ?? PARTICIPANTES.running)[0]}` : v.startsWith("ultimo_cuarto") ? `último cuarto${v.includes(":") ? ` (${v.split(":")[1]})` : ""}` : v;
 const faseDeVentana = (v: string) => (v === "armado" || v === "desarme" ? v : "carrera");
 function umbralTxt(variable: string, u: number | null): string {
@@ -267,7 +267,7 @@ function armarCorreo(ev: Evento, cambios: Cambio[]): { asunto: string; html: str
       const color = c.accion === "activar" ? "#FF3B30" : "#C79000";
       const titulo = `${accion} · ${nombreVar(c.variable)} · ${nombreNivel(c.variable, c.nivel)}`;
       const reco = c.variable === "wbgt" && ev.disciplina === "aguas_abiertas" ? CALOR_AGUAS_ABIERTAS[c.nivel] : adaptar(recomendacion(c.variable, c.nivel, faseDeVentana(c.ventana)), ev.disciplina);
-      const detalle = `Probabilidad de alcanzar ${nombreNivel(c.variable, c.nivel).toLowerCase()}${umbralTxt(c.variable, c.umbral)} en ${ventanaTxt(c.ventana, ev.disciplina)}: ${probTxt(c.prob)}. Emisión D-${c.dias} (corrida ${new Date(c.corrida).toISOString().slice(0, 13).replace("T", " ")} UTC, ${c.miembros} miembros de ECMWF ENS y NOAA GEFS).`;
+      const detalle = `Probabilidad de alcanzar ${nombreNivel(c.variable, c.nivel).toLowerCase()}${umbralTxt(c.variable, c.umbral)} en ${ventanaTxt(c.ventana, ev.disciplina)}: ${probTxt(c.prob)}. Calculado ${c.dias === 1 ? "1 día" : `${c.dias} días`} antes de la carrera sobre ${c.miembros} escenarios de ECMWF y NOAA (corrida del ${new Date(c.corrida).toISOString().slice(8, 10)}/${new Date(c.corrida).toISOString().slice(5, 7)} a las ${new Date(c.corrida).toISOString().slice(11, 13)} UTC).`;
       const accionTxt = c.accion === "activar" ? `Ejecutar las medidas de este nivel: ${reco}` : `Dejar listas las medidas de este nivel, sin ejecutarlas todavía: ${reco}`;
       partes.push(`<tr><td style="padding:14px 18px;border-left:5px solid ${color};background:#f7f6f4">
         <div style="margin-bottom:6px">${etiqueta(accion, color, "#111111")}</div>
@@ -298,10 +298,15 @@ function armarCorreo(ev: Evento, cambios: Cambio[]): { asunto: string; html: str
   const html = `<!doctype html><html><body style="margin:0;background:#f2f1ef">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f2f1ef"><tr><td align="center" style="padding:20px 10px">
   <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff">
-    <tr><td style="background:#111111;padding:18px 22px;border-bottom:4px solid #FF6A1A">
-      <div style="font:800 13px Arial,sans-serif;letter-spacing:.12em;color:#FF6A1A;text-transform:uppercase">EMERTEAM · Monitoreo ambiental</div>
-      <div style="font:800 22px Arial,sans-serif;color:#ffffff;text-transform:uppercase;margin-top:4px">${esc(ev.nombre)}</div>
-      <div style="font:13px Arial,sans-serif;color:#cfcfcf;margin-top:2px">Largada ${esc(fmt(ev.largada))}</div></td></tr>
+    <tr><td style="background:#111111;padding:16px 22px;border-bottom:4px solid #FF6A1A">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td style="width:120px;padding-right:16px;border-right:1px solid #3a3a3a;vertical-align:middle">
+          <img src="${WEB}/logo-emerteam.png" width="120" alt="EMERTEAM" style="display:block;width:120px;max-width:120px;height:auto;border:0;color:#FF6A1A;font:800 16px Arial,sans-serif"></td>
+        <td style="padding-left:16px;vertical-align:middle">
+          <div style="font:800 12px Arial,sans-serif;letter-spacing:.12em;color:#FF6A1A;text-transform:uppercase">Monitoreo ambiental</div>
+          <div style="font:800 21px Arial,sans-serif;color:#ffffff;text-transform:uppercase;margin-top:3px">${esc(ev.nombre)}</div>
+          <div style="font:13px Arial,sans-serif;color:#cfcfcf;margin-top:2px">Largada ${esc(fmt(ev.largada))}</div></td>
+      </tr></table></td></tr>
     <tr><td style="padding:18px 22px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${partes.join("")}${bloqueCorredores}</table>
       <a href="${enlace}" style="display:inline-block;background:#FF6A1A;color:#111;font:700 15px Arial,sans-serif;text-decoration:none;padding:11px 18px;border-radius:6px;margin-top:6px">Ver el monitoreo del evento</a>
       <p style="font:12px/1.5 Arial,sans-serif;color:#666;margin:16px 0 0">EMERTEAM recomienda; la decisión final corresponde al organizador. Recibís este aviso porque tu correo está habilitado para el evento.</p></td></tr>

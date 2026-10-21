@@ -17,9 +17,9 @@ type Hora = { valido: string; variable: string; p10: number | null; p50: number 
 /** Probabilidad en múltiplos de 10 %, sin decimales; los extremos se marcan como cota */
 export function fmtProb(p: number): string {
   const r = Math.round(p * 10) * 10;
-  if (r <= 0) return "< 10 %";
-  if (r >= 100) return "> 90 %";
-  return `${r} %`;
+  if (r <= 0) return "< 10\u00a0%";
+  if (r >= 100) return "> 90\u00a0%";
+  return `${r}\u00a0%`;
 }
 /** Categoría de lectura: menos de 10 %, 10–30 %, 30–60 %, más de 60 % */
 function categoria(p: number): number {
@@ -94,7 +94,7 @@ function Celda({ p, color }: { p: number; color: string }) {
   return (
     <td className="pr-celda" style={{ background: c ? `color-mix(in srgb, ${color} ${Math.round(ALFA[c] * 100)}%, transparent)` : undefined,
       color: c >= 2 ? (OSCUROS.has(color) ? "#FFFFFF" : "#111111") : undefined }}
-      title={`${Math.round(p * 100)} % de los miembros (mezcla 50 % por modelo)`}>
+      title={`${Math.round(p * 100)} % de los escenarios (cada modelo pesa la mitad)`}>
       {fmtProb(p)}
     </td>
   );
@@ -154,8 +154,8 @@ export function Probabilistico({ ev, v, fase, quien }: { ev: Evento; v: Ventanas
       <h2 id={`pr-${fase}`}>Probabilidad por umbral</h2>
       <div className="tarjeta pr-cuerpo">
         <p className="chico pr-meta">
-          Emisión {etiquetaD(ultima, ev.largada)} · {Object.entries(corridas).map(([m, c]) => `${m === "ecmwf" ? "ECMWF ENS" : "NOAA GEFS"} ${corridaTxt(c)}`).join(" · ")} · {muestra?.miembros} miembros, mezcla 50 % por modelo.
-          Es la probabilidad de alcanzar cada nivel con el valor máximo de la ventana; no reemplaza al pronóstico de las tarjetas ni a las mediciones.
+          Emisión {etiquetaD(ultima, ev.largada)} · {Object.entries(corridas).map(([m, c]) => `${m === "ecmwf" ? "ECMWF ENS" : "NOAA GEFS"} ${corridaTxt(c)}`).join(" · ")} · calculado sobre {muestra?.miembros} escenarios de ECMWF y NOAA (cada modelo pesa la mitad).
+          Es la probabilidad de alcanzar cada nivel con el valor máximo de la ventana: la proporción de escenarios que lo alcanzan. No reemplaza al pronóstico de las tarjetas ni a las mediciones.
         </p>
 
         {(() => {
@@ -167,7 +167,7 @@ export function Probabilistico({ ev, v, fase, quien }: { ev: Evento; v: Ventanas
               {ds.length ? ds.map((d) => (
                 <div key={`${d.ventana}${d.variable}`} className={`pr-disparo ${d.accion}`}>
                   <b>{d.accion === "activar" ? "Activar" : "Preparar"}</b>
-                  <span>{NOMBRE_VARIABLE[d.variable] ?? d.variable} · {nombreNivel(d.variable, d.nivel)} · {nombreVentana(d.ventana, quien)}: probabilidad {fmtProb(d.prob)}{d.fila.umbral != null ? ` de alcanzar ${umbralTxt(d.variable, d.fila.umbral)}` : ""} (emisión {etiquetaD(d.fila.corrida, ev.largada)}, {d.fila.miembros} miembros).</span>
+                  <span>{NOMBRE_VARIABLE[d.variable] ?? d.variable} · {nombreNivel(d.variable, d.nivel)} · {nombreVentana(d.ventana, quien)}: probabilidad {fmtProb(d.prob)}{d.fila.umbral != null ? ` de alcanzar ${umbralTxt(d.variable, d.fila.umbral)}` : ""} (emisión {etiquetaD(d.fila.corrida, ev.largada)}, {d.fila.miembros} escenarios).</span>
                 </div>
               )) : <p className="chico" style={{ margin: 0 }}>{dias > DISP.preparar.hasta_dias ? `Sin disparadores: se evalúan desde D-${DISP.preparar.hasta_dias}.` : dias < 1 ? "El día de la carrera mandan el pronóstico corregido y las mediciones." : "Ninguna probabilidad alcanza los disparadores."}</p>}
               <p className="chico" style={{ margin: 0 }}>«Preparar» desde D-{DISP.preparar.hasta_dias} con {Math.round(DISP.preparar.prob * 100)} % o más; «Activar» desde D-{DISP.activar.hasta_dias} con {Math.round(DISP.activar.prob * 100)} % o más. Cuenta si supera el valor por {Math.round(DISP.histeresis.margen * 100)} puntos o si lo sostiene en dos emisiones seguidas. Las alertas del SMN tienen prioridad.</p>
@@ -208,7 +208,7 @@ export function Probabilistico({ ev, v, fase, quien }: { ev: Evento; v: Ventanas
           titulo={fase === "carrera" ? `Evolución entre emisiones · calor en la exposición` : `Evolución entre emisiones · ${NOMBRE_VARIABLE.viento_B}`} largada={ev.largada} />
 
         <div className="chico pr-notas">
-          <p>Lectura: menos de 10 %, 10–30 %, 30–60 % y más de 60 %. Con 50 y 31 miembros la resolución real es de pocos puntos: se muestran múltiplos de 10 %. La corrección de sesgo desplaza la distribución pero no calibra su dispersión; los valores cercanos a 0 % y 100 % se leen con cautela.</p>
+          <p>Lectura: menos de 10 %, 10–30 %, 30–60 % y más de 60 %. Con 50 escenarios de ECMWF y 31 de NOAA la resolución real es de pocos puntos: se muestran múltiplos de 10 %. La corrección de sesgo desplaza la distribución pero no calibra su dispersión; los valores cercanos a 0 % y 100 % se leen con cautela.</p>
           {aprox.map((a) => <p key={a}>{a}</p>)}
           <p>Fuentes: ECMWF Ensemble open data (CC BY 4.0) y NOAA GEFS 0,25° (dominio público). Probabilidades calculadas por EMERTEAM; NOAA y ECMWF no avalan este servicio.</p>
         </div>
