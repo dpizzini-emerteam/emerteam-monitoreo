@@ -20,7 +20,7 @@ const SECCIONES: { id: string; titulo: string; icono: TipoIcono }[] = [
   { id: "g-viento", titulo: "Viento y estructuras", icono: "viento" },
   { id: "g-tormenta", titulo: "Tormenta eléctrica", icono: "tormenta" },
   { id: "g-lluvia", titulo: "Lluvia y suelo", icono: "lluvia" },
-  { id: "g-smn", titulo: "Alertas del SMN", icono: "rayo" },
+  { id: "g-smn", titulo: "Alertas del SMN", icono: "alerta" },
   { id: "g-disciplinas", titulo: "Otras disciplinas", icono: "gota" },
   { id: "g-decisiones", titulo: "Decisiones", icono: "corredor" },
   { id: "g-fuentes", titulo: "Fuentes", icono: "gota" },
@@ -298,7 +298,7 @@ export function Guia({ ctx }: { ctx: Contexto }) {
         </Tecnico>
       </Seccion>
 
-      <Seccion id="g-smn" titulo="Alertas del SMN" icono="rayo" organizador={
+      <Seccion id="g-smn" titulo="Alertas del SMN" icono="alerta" organizador={
         <p>Las alertas y avisos del <b>Servicio Meteorológico Nacional</b> son la información oficial y <b>tienen prioridad sobre el pronóstico de esta web</b>. Aparecen arriba de todo, con sonido, y generan un correo a quienes reciben alertas.</p>
       }>
         {ctx && (ctx.alertas.length

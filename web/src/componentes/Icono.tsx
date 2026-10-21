@@ -1,6 +1,6 @@
 export type TipoIcono =
   | "sol" | "solnube" | "nube" | "lluvia" | "tormenta" | "viento" | "termometro"
-  | "gota" | "rayo" | "luna" | "estructura" | "corredor" | "humedad" | "uv";
+  | "gota" | "rayo" | "luna" | "estructura" | "corredor" | "humedad" | "uv" | "alerta";
 
 export function Icono({ tipo, size = 40 }: { tipo: TipoIcono; size?: number }) {
   return (
@@ -102,6 +102,14 @@ export function Icono({ tipo, size = 40 }: { tipo: TipoIcono; size?: number }) {
       )}
       {tipo === "rayo" && <path d="M38 4L14 36h14l-6 24 28-34H35l7-22z" fill="#FFC20E" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" />}
       {tipo === "luna" && <path d="M40 10a22 22 0 1 0 14 34A18 18 0 1 1 40 10z" fill="#9AA0A8" />}
+      {tipo === "alerta" && (
+        <>
+          {/* Triángulo de advertencia (señal de peligro general) */}
+          <path d="M32 6L60 56H4z" fill="#FFC20E" stroke="#111" strokeWidth="4" strokeLinejoin="round" filter="url(#ic-sombra)" />
+          <path d="M32 23v17" stroke="#111" strokeWidth="6" strokeLinecap="round" />
+          <circle cx="32" cy="48" r="3.6" fill="#111" />
+        </>
+      )}
       {tipo === "estructura" && (
         <>
           <g fill="none" stroke="currentColor" strokeWidth="4" strokeLinejoin="round" strokeLinecap="round">
