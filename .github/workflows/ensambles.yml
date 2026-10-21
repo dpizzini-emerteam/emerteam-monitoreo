@@ -1,0 +1,43 @@
+name: Ensambles (exploración)
+
+# Etapa 1 del pronóstico probabilístico: verifica parámetros por miembro, peso de los campos y tiempos
+# de la descarga recortada de ECMWF ENS y NOAA GEFS. No escribe en la base.
+on:
+  workflow_dispatch:
+    inputs:
+      evento:
+        description: "Id del evento (vacío: el próximo evento activo)"
+        type: string
+        default: ""
+      max_pasos:
+        description: "Máximo de pasos de 3 h a descargar en la prueba"
+        type: string
+        default: "6"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  explorar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: pipeline
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pipeline/requirements.txt
+      - run: pip install -r requirements.txt
+      - name: Explorar
+        run: python -m mon.ensambles --evento "${{ inputs.evento }}" --max-pasos "${{ inputs.max_pasos }}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ensambles
+          path: /tmp/ensambles.json
+          if-no-files-found: ignore
