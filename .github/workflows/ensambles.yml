@@ -1,8 +1,12 @@
 name: Ensambles (pronóstico probabilístico)
 
 # Probabilidad de alcanzar cada nivel por evento y ventana con ECMWF ENS (CC BY 4.0) y NOAA GEFS.
-# Programación pendiente de definir: el repositorio es privado y los minutos de Actions tienen tope mensual.
+# Dos veces por día, después de que ECMWF publica el ensamble de 00 y 12 UTC hasta +144 h (~07:40 y ~19:40 UTC).
+# Si la corrida ya está procesada para todos los eventos, termina en segundos.
 on:
+  schedule:
+    - cron: "47 8 * * *"
+    - cron: "47 20 * * *"
   workflow_dispatch:
     inputs:
       modo:
@@ -43,8 +47,8 @@ jobs:
           cache-dependency-path: pipeline/requirements.txt
       - run: pip install -r requirements.txt
       - name: Procesar
-        if: inputs.modo != 'explorar'
+        if: github.event_name == 'schedule' || inputs.modo != 'explorar'
         run: python -m mon.probabilistico ${{ inputs.forzar && '--forzar' || '' }}
       - name: Explorar
-        if: inputs.modo == 'explorar'
+        if: github.event_name != 'schedule' && inputs.modo == 'explorar'
         run: python -m mon.ensambles --evento "${{ inputs.evento }}"
