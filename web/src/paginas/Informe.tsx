@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useOutletContext, useParams } from "react-router-dom";
 import type { Ctx } from "../main";
 import { Barra } from "../componentes/Barra";
-import { fmtDia, fmtFechaHora, fmtHora, num, supabase, type AlertaSMN, type Evento, type Medicion, type Pronostico, type Rayo, type Uv } from "../datos";
+import { fmtDia, fmtFechaHora, fmtHora, num, supabase, type AlertaSMN, type Evento, type Medicion, type Pronostico, type Rayo, type Sesgo, type Uv } from "../datos";
 import { armarInforme, type FaseInforme, type FilaHistorial, type Informe as TInforme, type Pico, type RecoInforme } from "../informe";
 import { fijarDisciplina, estiloVariable, NOMBRE_VARIABLE, nombreNivel } from "../reglas";
 import { categoriaUv } from "../serie";
@@ -138,7 +138,7 @@ function Documento({ inf, reg }: { inf: TInforme; reg: Registro | null }) {
       <div className="inf-final">
       <h2 className="inf-banda">Fuentes y método</h2>
       <div className="inf-recuadro inf-chico">
-        <p>Pronóstico: modelos ECMWF IFS y NOAA GFS. WBGT estimado hora por hora por el método de Liljegren et al. (2008); el WBGT medido en terreno reemplaza al estimado. Escala de estrés térmico: World Athletics (2020), Competition Medical Guidelines, tabla 1.</p>
+        <p>Pronóstico: modelos ECMWF IFS, NOAA GFS y WRF del SMN (Fuente: Servicio Meteorológico Nacional), combinados según su error medido en la zona. WBGT estimado hora por hora por el método de Liljegren et al. (2008); el WBGT medido en terreno reemplaza al estimado. Escala de estrés térmico: World Athletics (2020), Competition Medical Guidelines, tabla 1.</p>
         <p>Tormenta eléctrica: satélite GOES-19, Geostationary Lightning Mapper (NOAA), y detector y trueno en terreno; distancias de acción según NWS: 24 km alerta, 19 km preparación o demora, 13 km o trueno audible suspensión. Alertas: Servicio Meteorológico Nacional (CAP).</p>
         <p>Viento sobre estructuras y lluvia: criterios EMERTEAM. Estrés térmico del personal: Res. SRT 30/2023.</p>
         <p>Índice UV con cielo despejado: MET Norway, Locationforecast 2.0 (licencia CC BY 4.0); categorías según OMS (2002), Global Solar UV Index. Humedad relativa: modelos, corregida con la estación del SMN más cercana cuando corresponde.</p>
@@ -178,16 +178,17 @@ export function Informe() {
     setNotasC(registro?.notas_corredores ?? "");
     setNotasT(registro?.notas_trabajadores ?? "");
     if (admin) {
-      const [p, h, m, ry, a, u] = await Promise.all([
+      const [p, h, m, ry, a, u, sg] = await Promise.all([
         supabase.from("mon_pronosticos").select("*").eq("evento_id", id).order("valido").limit(5000),
         supabase.from("mon_niveles_historial").select("*").eq("evento_id", id).limit(10000),
         supabase.from("mon_mediciones").select("*").eq("evento_id", id).limit(1000),
         supabase.from("mon_rayos").select("*").eq("evento_id", id).limit(10000),
         supabase.from("mon_alertas_smn").select("*").eq("evento_id", id),
         supabase.from("mon_uv").select("evento_id,valido,uv,interpolado").eq("evento_id", id).order("valido").limit(2000),
+        supabase.from("mon_sesgos").select("*").eq("evento_id", id),
       ]);
       setVivo(armarInforme(e.data as Evento, (p.data as Pronostico[]) ?? [], (h.data as FilaHistorial[]) ?? [],
-        (m.data as Medicion[]) ?? [], (ry.data as Rayo[]) ?? [], (a.data as AlertaSMN[]) ?? [], (u.data as Uv[]) ?? []));
+        (m.data as Medicion[]) ?? [], (ry.data as Rayo[]) ?? [], (a.data as AlertaSMN[]) ?? [], (u.data as Uv[]) ?? [], (sg.data as Sesgo[]) ?? []));
     }
   }, [id, admin]);
 

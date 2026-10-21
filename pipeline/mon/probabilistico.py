@@ -11,8 +11,14 @@ Cada miembro pasa por la misma cadena que el pronóstico determinístico:
 * WBGT por Liljegren (thermofeel, Apache 2.0): fracción directa por Erbs y viento de 10 m llevado a 2 m
   dentro de thermofeel (perfil de Liljegren), por eso aquí no se escala el viento;
 * corrección de sesgo del determinístico de la misma fuente (ECMWF → ENS, GFS → GEFS), igual para todos los
-  miembros: desplaza la distribución pero no corrige su dispersión (los ensambles suelen ser subdispersivos
-  en superficie; las probabilidades cercanas a 0 % y 100 % se leen con cautela).
+  miembros: desplaza la distribución pero no corrige su dispersión;
+* calibración de la dispersión («dressing» con núcleo gaussiano; Roulston y Smith, 2003; Wang y Bishop, 2005):
+  los ensambles globales son subdispersivos en superficie porque no representan el error local de un punto
+  (celda de 25 km frente a una estación). Cuando hay error medido contra el SMN, cada miembro se reemplaza
+  por una normal centrada en su valor con desvío igual al error cuadrático medio del determinístico ya
+  corregido (temperatura llevada a WBGT con la sensibilidad ∂WBGT/∂T del propio miembro; viento medio llevado
+  a ráfaga con el factor de ráfaga del miembro). El crecimiento del error con la anticipación lo sigue
+  representando la dispersión del ensamble. Sin error medido no se calibra.
 
 Limitaciones que se guardan con cada probabilidad (columna `aproximacion`):
 * último cuarto (running): del 10 % más rápido entrando al último 25 % del recorrido a la llegada del 90 %
@@ -39,6 +45,7 @@ import traceback
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from statistics import NormalDist
 
 import eccodes
 
@@ -289,6 +296,8 @@ def serie_miembro(modelo: str, datos: dict, m: int, ev: str, lat: float, lon: fl
         cape = lin("cape")
         f["viento"] = viento * 3.6 if viento is not None else None
         f["rafaga"] = rafaga * 3.6 if rafaga is not None else None
+        f["sig_t"] = float((sesgo or {}).get("rmse_t_corr") or 0.0)
+        f["sig_v"] = float((sesgo or {}).get("rmse_viento_corr") or 0.0)
         f["cape"] = cape
         f["acc3"] = acc3
         f["precip"] = acc3 / PASO if acc3 is not None else None
@@ -313,6 +322,10 @@ def serie_miembro(modelo: str, datos: dict, m: int, ev: str, lat: float, lon: fl
                     ssrd = ssrd_media * cos_cenit(lat, lon, h) / mc if mc > 0.01 else 0.0
                     f["t"] = tc
                     f["wbgt"] = wbgt_liljegren(tc, hr, sp / 100, viento * float(fv or 1.0), ssrd, lat, lon, h)
+                    # sensibilidad del WBGT a +1 °C con el rocío fijo (para llevar el error de T a WBGT)
+                    hr1 = hr_desde_rocio(tc + 1, tdc) if tdc is not None else hr
+                    w1 = wbgt_liljegren(tc + 1, hr1, sp / 100, viento * float(fv or 1.0), ssrd, lat, lon, h) if hr1 is not None else None
+                    f["dwdt"] = (w1 - f["wbgt"]) if w1 is not None and f["wbgt"] is not None else None
         salida[h] = f
     return salida
 
@@ -334,26 +347,66 @@ def evaluar_miembro(serie: dict, ventana: Ventana, var_calor: str, nivel_calor) 
     if not hs:
         return out
     if "calor" in ventana.variables:
-        w = [x["wbgt"] for x in hs if x.get("wbgt") is not None]
+        w = [x for x in hs if x.get("wbgt") is not None]
         if w:
-            mx = max(w)
-            out[var_calor] = (mx, nivel_calor(mx)[0] or 0)
+            x = max(w, key=lambda y: y["wbgt"])
+            mx = x["wbgt"]
+            out[var_calor] = (mx, nivel_calor(mx)[0] or 0, sigma_wbgt(x))
     if "viento" in ventana.variables:
-        r = [x["rafaga"] for x in hs if x.get("rafaga") is not None]
+        r = [x for x in hs if x.get("rafaga") is not None]
         if r:
-            mx = max(r)
+            x = max(r, key=lambda y: y["rafaga"])
+            mx = x["rafaga"]
             for cat in ("A", "B", "C"):
-                out[f"viento_{cat}"] = (mx, nivel_viento(cat, mx)[0] or 0)
+                out[f"viento_{cat}"] = (mx, nivel_viento(cat, mx)[0] or 0, sigma_rafaga(x))
     if "tormenta" in ventana.variables:
         nv = [(nivel_tormenta(x["cape"], x["precip"])[0] or 0, x["cape"]) for x in hs if x.get("cape") is not None and x.get("precip") is not None]
         if nv:
-            out["tormenta"] = (max(c for _, c in nv), max(n for n, _ in nv))
+            out["tormenta"] = (max(c for _, c in nv), max(n for n, _ in nv), 0.0)
     if "lluvia" in ventana.variables:
         acc = [x["acc3"] for x in hs if x.get("acc3") is not None]
         if acc:
             mx = max(acc)
-            out["lluvia"] = (mx, 2 if mx >= LLUVIA_MM else 0)
+            out["lluvia"] = (mx, 2 if mx >= LLUVIA_MM else 0, 0.0)
     return out
+
+
+def sigma_wbgt(x: dict) -> float:
+    """Desvío del núcleo para el WBGT de un miembro: error local de T × ∂WBGT/∂T."""
+    return abs(x.get("dwdt") or 0.0) * x.get("sig_t", 0.0)
+
+
+def sigma_rafaga(x: dict) -> float:
+    """Desvío del núcleo para la ráfaga: error local del viento medio × factor de ráfaga del miembro."""
+    v, r = x.get("viento"), x.get("rafaga")
+    factor = min(2.5, max(1.2, r / v)) if v and r and v >= 5 else 1.5
+    return x.get("sig_v", 0.0) * factor
+
+
+_N = NormalDist()
+
+
+def _p_supera(v: float, sig: float, umbral: float) -> float:
+    """P(valor ≥ umbral) para un miembro: puntual sin error medido, normal con él."""
+    if sig <= 1e-6:
+        return 1.0 if v >= umbral else 0.0
+    return 1.0 - _N.cdf((umbral - v) / sig)
+
+
+def _cuantil_mezcla(trios: list[tuple[float, float, float]], q: float) -> float | None:
+    """Cuantil de la mezcla de normales (valor, desvío, peso); sin desvíos, cuantil ponderado de los miembros."""
+    if not trios:
+        return None
+    if all(s <= 1e-6 for _, s, _ in trios):
+        return _cuantil([(v, w) for v, _, w in trios], q)
+    tot = sum(w for _, _, w in trios)
+    lo = min(v - 5 * s for v, s, _ in trios)
+    hi = max(v + 5 * s for v, s, _ in trios)
+    for _ in range(50):
+        m = (lo + hi) / 2
+        cdf = sum(w * (1.0 - _p_supera(v, s, m)) for v, s, w in trios) / tot
+        lo, hi = (m, hi) if cdf < q else (lo, m)
+    return (lo + hi) / 2
 
 
 def _cuantil(pares: list[tuple[float, float]], q: float) -> float | None:
@@ -399,17 +452,25 @@ def probabilidades(resultados: dict[str, dict[int, dict]], ventana: Ventana, var
         suma = sum(pesos.values())
         for modelo, filas in list(por_modelo.items()) + [("mezcla", None)]:
             if modelo == "mezcla":
-                pares = [(v, pesos[m] / suma / len(fs)) for m, fs in por_modelo.items() for v, _ in fs]
-                niveles = [(n, pesos[m] / suma / len(fs)) for m, fs in por_modelo.items() for _, n in fs]
+                trios = [(v, sg, pesos[m] / suma / len(fs)) for m, fs in por_modelo.items() for v, _, sg in fs]
+                niveles = [(n, pesos[m] / suma / len(fs)) for m, fs in por_modelo.items() for _, n, _ in fs]
                 miembros = sum(len(fs) for fs in por_modelo.values())
             else:
-                pares = [(v, 1 / len(filas)) for v, _ in filas]
-                niveles = [(n, 1 / len(filas)) for _, n in filas]
+                trios = [(v, sg, 1 / len(filas)) for v, _, sg in filas]
+                niveles = [(n, 1 / len(filas)) for _, n, _ in filas]
                 miembros = len(filas)
-            probs = {n: round(sum(p for nv, p in niveles if nv >= n), 4) for n, _ in niveles_de(variable, var_calor)}
+            calibrada = any(sg > 1e-6 for _, sg, _ in trios)
+            probs = {}
+            for n, corte in niveles_de(variable, var_calor):
+                if calibrada and corte is not None:
+                    probs[n] = round(sum(w * _p_supera(v, sg, corte) for v, sg, w in trios), 4)
+                else:
+                    probs[n] = round(sum(p for nv, p in niveles if nv >= n), 4)
+            sig_med = sum(sg * w for _, sg, w in trios) / sum(w for _, _, w in trios) if calibrada else 0.0
             salida.setdefault(modelo, {})[variable] = {
                 "probs": probs, "umbrales": dict(niveles_de(variable, var_calor)), "miembros": miembros,
-                "p10": _cuantil(pares, 0.1), "p50": _cuantil(pares, 0.5), "p90": _cuantil(pares, 0.9),
+                "p10": _cuantil_mezcla(trios, 0.1), "p50": _cuantil_mezcla(trios, 0.5), "p90": _cuantil_mezcla(trios, 0.9),
+                "sigma": sig_med,
             }
     return salida
 
@@ -497,6 +558,10 @@ def procesar(eventos: list[dict], sesgos_lista: list[dict], ahora: datetime, for
                     aprox = APROX_LLUVIA if variable == "lluvia" else APROX_TORMENTA if variable == "tormenta" else None
                     if variable.startswith("viento_") and modelo in ("ecmwf", "mezcla") and (x.ini - ce).total_seconds() / 3600 <= 90:
                         aprox = APROX_RAFAGA_ECMWF
+                    if d.get("sigma"):
+                        u = "°C" if variable == p["var_calor"] else "km/h"
+                        cal = f"Calibrada con el error local medido contra el SMN (desvío medio ±{d['sigma']:.1f} {u})."
+                        aprox = f"{aprox} {cal}" if aprox else cal
                     for nivel, prob in d["probs"].items():
                         prob_filas.append({
                             "evento_id": ev_id, "corrida": ce.isoformat(), "modelo": modelo, "variable": variable,
@@ -512,8 +577,9 @@ def procesar(eventos: list[dict], sesgos_lista: list[dict], ahora: datetime, for
         for variable, clave, horas in ((p["var_calor"], "wbgt", sorted(p["horas_calor"])), ("rafaga", "rafaga", p["horas"])):
             for h in horas:
                 por_modelo = {}
+                sigma = sigma_wbgt if clave == "wbgt" else sigma_rafaga
                 for modelo, por_m in series.items():
-                    vals = [s[h][clave] for s in por_m.values() if h in s and s[h].get(clave) is not None]
+                    vals = [(s[h][clave], sigma(s[h])) for s in por_m.values() if h in s and s[h].get(clave) is not None]
                     if vals:
                         por_modelo[modelo] = vals
                 if not por_modelo:
@@ -521,16 +587,16 @@ def procesar(eventos: list[dict], sesgos_lista: list[dict], ahora: datetime, for
                 suma = sum(PESOS[m] for m in por_modelo)
                 for modelo in list(por_modelo) + ["mezcla"]:
                     if modelo == "mezcla":
-                        pares = [(v, PESOS[m] / suma / len(vs)) for m, vs in por_modelo.items() for v in vs]
+                        trios = [(v, sg, PESOS[m] / suma / len(vs)) for m, vs in por_modelo.items() for v, sg in vs]
                     else:
-                        pares = [(v, 1 / len(por_modelo[modelo])) for v in por_modelo[modelo]]
+                        trios = [(v, sg, 1 / len(por_modelo[modelo])) for v, sg in por_modelo[modelo]]
                     probs = None
                     if clave == "wbgt":
-                        probs = {str(i + 1): round(sum(w for v, w in pares if v >= c), 4) for i, c in enumerate(cortes)}
+                        probs = {str(i + 1): round(sum(w * _p_supera(v, sg, c) for v, sg, w in trios), 4) for i, c in enumerate(cortes)}
                     horas_filas.append({
                         "evento_id": ev_id, "corrida": ce.isoformat(), "modelo": modelo, "variable": variable,
-                        "valido": h.isoformat(), "p10": _r(_cuantil(pares, 0.1)), "p50": _r(_cuantil(pares, 0.5)),
-                        "p90": _r(_cuantil(pares, 0.9)), "probs": probs, "miembros": len(pares), "emitido_en": emitido,
+                        "valido": h.isoformat(), "p10": _r(_cuantil_mezcla(trios, 0.1)), "p50": _r(_cuantil_mezcla(trios, 0.5)),
+                        "p90": _r(_cuantil_mezcla(trios, 0.9)), "probs": probs, "miembros": len(trios), "emitido_en": emitido,
                     })
         log.info("%s: %d probabilidades, %d horas", ev["nombre"], sum(1 for f in prob_filas if f["evento_id"] == ev_id),
                  sum(1 for f in horas_filas if f["evento_id"] == ev_id))

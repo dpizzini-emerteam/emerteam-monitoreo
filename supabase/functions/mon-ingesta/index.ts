@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
       const porEvento: Record<string, Record<string, string>> = {};
       for (const ev of eventos ?? []) {
         porEvento[ev.id] = {};
-        for (const fuente of ["gfs", "ecmwf"]) {
+        for (const fuente of ["gfs", "ecmwf", "wrf_smn"]) {
           const { data } = await supabase.from("mon_pronosticos").select("corrida")
             .eq("evento_id", ev.id).eq("fuente", fuente).order("corrida", { ascending: false }).limit(1);
           if (data?.[0]) porEvento[ev.id][fuente] = data[0].corrida;
@@ -125,24 +125,24 @@ Deno.serve(async (req) => {
         }
         respuesta.pronosticos = pron;
 
-        // Estación del SMN más cercana a cada evento (hasta 60 km) y sus observaciones de los últimos 4 días
+        // Estaciones del SMN a 60 km o menos de cada evento (las dos más cercanas) y sus observaciones de los últimos 4 días
         const { data: est } = await supabase.from("mon_estado").select("valor").eq("clave", "smn_estaciones").maybeSingle();
         const lista = est ? (JSON.parse(String(est.valor)) as { nombre: string; lat: number; lon: number }[]) : [];
         const estaciones: Record<string, { nombre: string; lat: number; lon: number; km: number }> = {};
+        const estacionesEvento: Record<string, { nombre: string; lat: number; lon: number; km: number }[]> = {};
         for (const ev of eventos) {
-          let mejor: { nombre: string; lat: number; lon: number; km: number } | null = null;
-          for (const e of lista) {
-            const km = distanciaKm({ lat: Number(ev.lat), lon: Number(ev.lon) }, e);
-            if (km <= 60 && (!mejor || km < mejor.km)) mejor = { nombre: e.nombre, lat: e.lat, lon: e.lon, km: Math.round(km * 10) / 10 };
-          }
-          if (mejor) estaciones[ev.id] = mejor;
+          const cerca = lista.map((e) => ({ nombre: e.nombre, lat: e.lat, lon: e.lon,
+            km: Math.round(distanciaKm({ lat: Number(ev.lat), lon: Number(ev.lon) }, e) * 10) / 10 }))
+            .filter((e) => e.km <= 60).sort((a, b) => a.km - b.km).slice(0, 2);
+          if (cerca.length) { estaciones[ev.id] = cerca[0]; estacionesEvento[ev.id] = cerca; }
         }
         respuesta.estaciones = estaciones;
-        const nombres = [...new Set(Object.values(estaciones).map((e) => e.nombre))];
+        respuesta.estaciones_evento = estacionesEvento;
+        const nombres = [...new Set(Object.values(estacionesEvento).flat().map((e) => e.nombre))];
         const observaciones: Record<string, unknown[]> = {};
         if (nombres.length) {
           const { data: obs, error: e4 } = await supabase.from("mon_observaciones").select("estacion,valido,temp,hr,viento,dir_viento")
-            .in("estacion", nombres).gte("valido", new Date(Date.now() - 4 * 86400_000).toISOString()).order("valido").limit(5000);
+            .in("estacion", nombres).gte("valido", new Date(Date.now() - 4 * 86400_000).toISOString()).order("valido").limit(10000);
           if (e4) throw e4;
           for (const o of obs ?? []) (observaciones[o.estacion as string] ??= []).push(o);
         }

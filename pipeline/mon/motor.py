@@ -14,7 +14,14 @@ from .reglas import calor_participantes, nivel_calor_personal, nivel_lluvia, niv
 from .reglas import U
 
 HORIZONTE_H = U["confianza"]["horizonte_niveles_h"]  # más allá: solo tendencia, sin niveles
-PRIORIDAD = ["ecmwf", "gfs", "icon"]
+PRIORIDAD = ["ecmwf", "gfs", "wrf_smn", "icon"]
+# Combinación de modelos: promedio ponderado por la inversa del error cuadrático medido contra estaciones del
+# SMN en la zona (después de corregir). Sin error medido para todas las fuentes, pesos iguales. τ evita que una
+# fuente con pocos pares y error casualmente bajo se lleve todo el peso. Las variables de tormenta (CAPE,
+# precipitación) y la dirección del viento siguen saliendo de la fuente prioritaria, para no mezclar criterios.
+MEZCLA_T = ("t2m", "td2m", "hr", "wbgt_est", "presion", "radiacion")
+MEZCLA_V = ("viento10",)
+TAU = {"t": 0.25, "v": 4.0}  # °C² y (km/h)²
 
 
 def _hora(dt: str) -> datetime:
@@ -24,8 +31,36 @@ def _hora(dt: str) -> datetime:
 VARIABLES = ("t2m", "td2m", "hr", "viento10", "rafaga10", "dir_viento", "cape", "radiacion", "presion", "wbgt_est", "precip")
 
 
-def serie_consenso(pron: list[dict]) -> dict[datetime, dict]:
-    """Serie horaria: valores de la fuente prioritaria disponible y dispersión entre fuentes."""
+def pesos_fuentes(sesgos: list[dict] | None) -> dict[str, dict[str, float]]:
+    """{fuente: {'t': ecm, 'v': ecm}} con el error cuadrático medio después de corregir (solo si se aplicó)."""
+    out: dict[str, dict[str, float]] = {}
+    for s in sesgos or []:
+        if not s.get("aplicado"):
+            continue
+        d = {}
+        if s.get("rmse_t_corr") is not None:
+            d["t"] = float(s["rmse_t_corr"]) ** 2
+        if s.get("rmse_viento_corr") is not None:
+            d["v"] = float(s["rmse_viento_corr"]) ** 2
+        out[s["fuente"]] = d
+    return out
+
+
+def _pesos(disponibles: list[str], ecm: dict[str, dict[str, float]], fam: str) -> dict[str, float]:
+    if disponibles and all(fam in ecm.get(f, {}) for f in disponibles):
+        return {f: 1.0 / (ecm[f][fam] + TAU[fam]) for f in disponibles}
+    return {f: 1.0 for f in disponibles}
+
+
+def _media_pond(vals: list[tuple[float, float]]) -> float | None:
+    w = sum(p for _, p in vals)
+    return sum(v * p for v, p in vals) / w if w > 0 else None
+
+
+def serie_consenso(pron: list[dict], ecm: dict[str, dict[str, float]] | None = None) -> dict[datetime, dict]:
+    """Serie horaria: promedio ponderado de las fuentes disponibles (ver MEZCLA_*), variables de tormenta y
+    dirección de la fuente prioritaria, y dispersión entre fuentes."""
+    ecm = ecm or {}
     por_fuente: dict[str, dict[datetime, dict]] = {}
     for p in pron:
         por_fuente.setdefault(p["fuente"], {})[_hora(p["valido"])] = p
@@ -53,17 +88,6 @@ def serie_consenso(pron: list[dict]) -> dict[datetime, dict]:
             continue
         base = dict(por_fuente[disponibles[0]][h])
         base["fuente_principal"] = disponibles[0]
-        # Ráfaga faltante en la fuente principal (ECMWF no la publica más allá de ~90 h): se estima con el
-        # viento medio de la propia fuente y el factor de ráfaga (ráfaga / viento medio) de la otra fuente,
-        # para no mezclar el viento de un modelo con la ráfaga de otro
-        if base.get("rafaga10") is None and base.get("viento10") is not None:
-            for f in disponibles[1:]:
-                o = por_fuente[f][h]
-                if o.get("rafaga10") is not None and o.get("viento10") and float(o["viento10"]) >= 5:
-                    factor = min(2.5, max(1.2, float(o["rafaga10"]) / float(o["viento10"])))
-                    base["rafaga10"] = round(float(base["viento10"]) * factor, 1)
-                    base.setdefault("completado", []).append(f"rafaga10:factor_{f}")
-                    break
         # Otra variable faltante en la fuente principal: siguiente fuente
         for c in VARIABLES:
             if base.get(c) is None:
@@ -72,6 +96,27 @@ def serie_consenso(pron: list[dict]) -> dict[datetime, dict]:
                         base[c] = por_fuente[f][h][c]
                         base.setdefault("completado", []).append(f"{c}:{f}")
                         break
+        if len(disponibles) > 1:
+            pt, pv = _pesos(disponibles, ecm, "t"), _pesos(disponibles, ecm, "v")
+            for c in MEZCLA_T + MEZCLA_V:
+                pp = pv if c in MEZCLA_V else pt
+                vals = [(float(por_fuente[f][h][c]), pp[f]) for f in disponibles if por_fuente[f][h].get(c) is not None]
+                if len(vals) > 1:
+                    base[c] = _media_pond(vals)
+            # Ráfaga: promedio ponderado de las fuentes que la publican, llevado al viento medio combinado con el
+            # factor de ráfaga de esas mismas fuentes (no mezcla el viento de un modelo con la ráfaga de otro)
+            con = [f for f in disponibles if por_fuente[f][h].get("rafaga10") is not None and por_fuente[f][h].get("viento10") is not None]
+            if con:
+                r = _media_pond([(float(por_fuente[f][h]["rafaga10"]), pv[f]) for f in con])
+                vm = _media_pond([(float(por_fuente[f][h]["viento10"]), pv[f]) for f in con])
+                if base.get("viento10") is not None and vm and vm >= 5:
+                    r = float(base["viento10"]) * min(2.5, max(1.2, r / vm))
+                base["rafaga10"] = round(r, 1)
+            base["fuente_principal"] = "mezcla"
+            base["pesos"] = {f: round(pt[f] / sum(pt.values()), 2) for f in disponibles}
+        # Ráfaga faltante en todas las fuentes que tienen la hora: no hay de dónde estimarla
+        if base.get("rafaga10") is None and base.get("viento10") is not None:
+            base.setdefault("completado", []).append("rafaga10:sin_dato")
         wb = [float(por_fuente[f][h]["wbgt_est"]) for f in disponibles if por_fuente[f][h].get("wbgt_est") is not None]
         rf = [float(por_fuente[f][h]["rafaga10"]) for f in disponibles if por_fuente[f][h].get("rafaga10") is not None]
         base["disp_wbgt"] = (max(wb) - min(wb)) if len(wb) > 1 else None
@@ -102,8 +147,8 @@ def _en(t: datetime, rango: tuple[datetime, datetime]) -> bool:
     return rango[0] <= t < rango[1]
 
 
-def niveles_evento(ev: dict, pron: list[dict], ahora: datetime) -> list[dict]:
-    serie = serie_consenso(pron)
+def niveles_evento(ev: dict, pron: list[dict], ahora: datetime, ecm: dict[str, dict[str, float]] | None = None) -> list[dict]:
+    serie = serie_consenso(pron, ecm)
     v = vt.calcular(ev)
     var_calor, nivel_calor = calor_participantes(ev.get("disciplina"))
     crudos: list[tuple] = []  # (fase, variable, hora, nivel, valor, umbral, regla, confianza)

@@ -146,7 +146,7 @@ export function Guia({ ctx }: { ctx: Contexto }) {
           </table>
         </div>
         <Tecnico>
-          <p>Pronóstico: modelos ECMWF IFS (0,25°, cada 3 h hasta 6 días) y NOAA GFS (0,25°, horario hasta 5 días y cada 3 h hasta 7 días), actualizados cada 2 horas. Se toma el punto de grilla de tierra más cercano al evento y se arma una serie de consenso con ECMWF como fuente principal.</p>
+          <p>Pronóstico: modelos ECMWF IFS (0,25°, cada 3 h hasta 6 días), NOAA GFS (0,25°, horario hasta 5 días y cada 3 h hasta 7 días) y WRF del SMN (4 km, horario hasta 72 h, temperatura y viento calibrados por el SMN; Fuente: Servicio Meteorológico Nacional), revisados cada hora. Se toma el punto de grilla de tierra más cercano al evento, cada modelo se corrige con las observaciones horarias de hasta dos estaciones del SMN y la serie de consenso es un promedio ponderado por el error que cada modelo tuvo en la zona en las últimas 72 h. Tormenta, precipitación y dirección del viento salen del modelo prioritario (ECMWF).</p>
           <p>Ajuste local: si hay una estación del SMN a menos de {U.correccion.distancia_max_km} km con al menos {U.correccion.pares_min} horas comparables en las últimas {U.correccion.ventana_h} h, se corrige el sesgo de temperatura (por separado de día y de noche), punto de rocío y viento, y se recalcula el WBGT. El detalle está en «Equipo y fuentes».</p>
           <p>La duración se estima por distancia (5K ≈ 75 min, 10K ≈ 120 min, 21K ≈ 180 min, 42K ≈ 360 min para el último corredor; en las demás disciplinas se carga la duración estimada) más una demora de largada de {w.demora_cada_1000} min cada 1.000 participantes, salvo que el evento tenga una duración propia cargada.</p>
         </Tecnico>
@@ -469,6 +469,7 @@ export function Guia({ ctx }: { ctx: Contexto }) {
             ["CAPE", "Energía disponible para el desarrollo de tormentas, en J/kg. Valores altos favorecen tormentas fuertes."],
             ["GLM", "Sensor de rayos del satélite GOES-19 de NOAA."],
             ["ECMWF / GFS", "Modelos globales de pronóstico del Centro Europeo y de la NOAA de Estados Unidos."],
+            ["WRF SMN", "Modelo regional del Servicio Meteorológico Nacional, con celdas de 4 km: representa mejor la ciudad y la costa en los primeros 3 días."],
             ["Confianza", "Qué tan firme es el pronóstico, según el plazo y el acuerdo entre modelos."],
             ["Tendencia", "Pronóstico con confianza baja: anticipa una posibilidad que todavía puede cambiar."],
             ["Sesgo", "Error sistemático de un modelo en un lugar (por ejemplo, pronosticar siempre 2 °C de menos). Se corrige con observaciones."],

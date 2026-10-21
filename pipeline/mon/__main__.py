@@ -15,9 +15,9 @@ from datetime import datetime, timedelta, timezone
 
 from . import correccion, motor, ventanas
 from .api import Ingesta
-from .fuentes import ecmwf, gfs, metno
+from .fuentes import ecmwf, gfs, metno, wrf_smn
 
-FUENTES = {"gfs": gfs, "ecmwf": ecmwf}
+FUENTES = {"gfs": gfs, "ecmwf": ecmwf, "wrf_smn": wrf_smn}
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("mon")
@@ -33,7 +33,7 @@ def anotar(titulo: str) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--forzar", action="store_true", help="reprocesar aunque la corrida ya esté guardada")
-    ap.add_argument("--fuentes", default="gfs,ecmwf")
+    ap.add_argument("--fuentes", default="gfs,ecmwf,wrf_smn")
     args = ap.parse_args()
 
     ahora = datetime.now(timezone.utc)
@@ -52,7 +52,7 @@ def main() -> int:
     for nombre in [f.strip() for f in args.fuentes.split(",") if f.strip()]:
         mod = FUENTES[nombre]
         try:
-            disponible = mod.ultima_corrida(ahora) if nombre == "gfs" else mod.ultima_corrida()
+            disponible = mod.ultima_corrida() if nombre == "ecmwf" else mod.ultima_corrida(ahora)
             if disponible is None:
                 continue
             # Eventos que todavía no tienen esta corrida (los recién cargados o con fecha/lugar cambiados)
@@ -97,28 +97,27 @@ def _niveles(api: Ingesta, ahora: datetime) -> None:
     """Corrección de sesgo con observaciones del SMN y niveles con todas las fuentes guardadas."""
     completo = api.estado(incluir_pronosticos=True)
     pron = completo.get("pronosticos") or []
-    estaciones = completo.get("estaciones") or {}
+    estaciones = completo.get("estaciones_evento") or {k: [v] for k, v in (completo.get("estaciones") or {}).items()}
     observaciones = completo.get("observaciones") or {}
     por_evento, correcciones, sesgos = {}, [], []
     for ev in completo.get("eventos") or []:
         filas_ev = [p for p in pron if p["evento_id"] == ev["id"]]
-        est = estaciones.get(ev["id"])
-        obs = observaciones.get(est["nombre"], []) if est else []
         try:
-            corregidas, s = correccion.aplicar(ev, filas_ev, est, obs, ahora)
+            corregidas, s = correccion.aplicar(ev, filas_ev, estaciones.get(ev["id"]) or [], observaciones, ahora)
             sesgos += s
             correcciones += [{k: f.get(k) for k in ("evento_id", "fuente", "corrida", "valido", "t2m_corr", "td2m_corr",
                                                      "hr_corr", "viento10_corr", "rafaga10_corr", "wbgt_corr")} for f in corregidas]
             for x in s:
                 log.info("%s · %s: estación %s (%s km), %d pares, sesgo T día %s / noche %s, factor viento %s, "
-                         "error T %s → %s, aplicado %s", ev["nombre"], x["fuente"], x["estacion"], x["distancia_km"],
-                         x["pares"], x["sesgo_t_dia"], x["sesgo_t_noche"], x["factor_viento"], x["error_t"],
-                         x["error_t_corr"], x["aplicado"])
+                         "error T %s → %s, atenuación %s, aplicado %s", ev["nombre"], x["fuente"], x["estacion"],
+                         x["distancia_km"], x["pares"], x["sesgo_t_dia"], x["sesgo_t_noche"], x["factor_viento"],
+                         x["error_t"], x["error_t_corr"], x["atenuacion"], x["aplicado"])
             filas_ev = [correccion.con_correccion(f) for f in corregidas]
         except Exception:  # noqa: BLE001
             log.exception("Corrección de %s", ev["nombre"])
             anotar(f"Corrección {ev['nombre']}")
-        por_evento[ev["id"]] = motor.niveles_evento(ev, filas_ev, ahora)
+        ecm = motor.pesos_fuentes([x for x in sesgos if x["evento_id"] == ev["id"]])
+        por_evento[ev["id"]] = motor.niveles_evento(ev, filas_ev, ahora, ecm)
         log.info("%s: %d tramos de nivel", ev["nombre"], len(por_evento[ev["id"]]))
     if correcciones:
         log.info("correcciones: %s", api.correcciones(correcciones))

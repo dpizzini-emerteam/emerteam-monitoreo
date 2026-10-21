@@ -13,7 +13,7 @@ import { Resumen } from "../componentes/Resumen";
 import { Mediciones } from "../componentes/Mediciones";
 import { AguaPanel } from "../componentes/Agua";
 import { Probabilistico } from "../componentes/Probabilistico";
-import { categoriaUv, consenso, FUENTE_UV, PRIORIDAD, UV_CATEGORIAS, uvMaxPorDia } from "../serie";
+import { categoriaUv, consenso, FUENTE_UV, NOMBRE_FUENTE, pesosFuentes, PRIORIDAD, UV_CATEGORIAS, uvMaxPorDia } from "../serie";
 import { UvDato } from "../componentes/Uv";
 import { confDisciplina, escalaCalor, estiloCalor, nombreDisciplina, participantes, riesgoWct, wct } from "../disciplinas";
 import {
@@ -128,7 +128,7 @@ export function EventoVista() {
 
   fijarDisciplina(ev?.disciplina);
   const v = vAlertas;
-  const serie = useMemo(() => consenso(pron, uv), [pron, uv]);
+  const serie = useMemo(() => consenso(pron, uv, sesgos), [pron, uv, sesgos]);
   const uvDia = useMemo(() => uvMaxPorDia(uv), [uv]);
   const ahora = Date.now();
   // Solo cuentan los niveles que caen dentro de las fases del evento (si se cambió la fecha o el lugar,
@@ -143,7 +143,10 @@ export function EventoVista() {
 
   const faltan = v.largada.getTime() - ahora;
   const cuenta = faltan > 0 ? `faltan ${Math.floor(faltan / 86400_000)} d ${Math.floor((faltan % 86400_000) / 3600_000)} h` : "en curso o finalizado";
-  const ultimaCorrida = PRIORIDAD.map((f) => pron.filter((p) => p.fuente === f).map((p) => p.corrida).sort().at(-1)).filter(Boolean) as string[];
+  const ultimaCorrida = PRIORIDAD.map((f) => {
+    const c = pron.filter((p) => p.fuente === f).map((p) => p.corrida).sort().at(-1);
+    return c ? `${NOMBRE_FUENTE[f] ?? f} ${fmtFechaHora(c)}` : null;
+  }).filter(Boolean) as string[];
   const procesado = pron.map((p) => p.procesado_en).sort().at(-1);
 
   // Fase que corresponde por fecha: armado hasta el día previo, carrera ese día, desarme después
@@ -298,10 +301,11 @@ export function EventoVista() {
             <section className="seccion tarjeta" id="fuentes">
               <div className="rotulo">Fuentes y metodología</div>
               <p className="chico" style={{ marginBottom: 0 }}>
-                Modelos ECMWF IFS (CC BY 4.0) y NOAA GFS, comparados por separado; avisos oficiales del SMN. WBGT estimado hora por hora por el método de Liljegren et al. (2008). Índice UV con cielo despejado: MET Norway, Locationforecast 2.0 (CC BY 4.0), categorías OMS (2002).
+                Modelos ECMWF IFS (CC BY 4.0), NOAA GFS y WRF del SMN a 4 km hasta 72 h (Fuente: Servicio Meteorológico Nacional, CC BY 2.5 AR); avisos oficiales del SMN. WBGT estimado hora por hora por el método de Liljegren et al. (2008). Índice UV con cielo despejado: MET Norway, Locationforecast 2.0 (CC BY 4.0), categorías OMS (2002).
                 Escala de estrés térmico: World Athletics (2020). Cada recomendación indica su fuente y su tipo.
-                Se usa el punto de grilla de tierra más cercano al evento y, cuando hay una estación del SMN a menos de 40 km con al menos 12 horas comparables,
-                se corrige el sesgo de temperatura (por separado de día y de noche), punto de rocío y viento con las observaciones de las últimas 72 h, y se recalcula el WBGT.
+                Cada modelo se corrige con las observaciones de hasta dos estaciones del SMN a menos de 60 km (sesgo de temperatura de día y de noche, punto de rocío y viento, últimas 72 h, con al menos 12 horas comparables);
+                la corrección se atenúa con la distancia (completa hasta 25 km, la mitad a 60 km) y se recalcula el WBGT. Los modelos se combinan con un promedio ponderado por su error medido en la zona;
+                tormenta, precipitación y dirección del viento salen del modelo prioritario.
               </p>
             </section>
           </>
@@ -330,9 +334,9 @@ function DatosVigentes({ ultimaCorrida, procesado, ajuste }: { ultimaCorrida: st
     <p className="chico" style={{ marginTop: 18 }}>
       <span style={{ color: "var(--ok-texto)", fontWeight: 600 }}>● Se actualiza sola</span>
       {" · "}
-      {ultimaCorrida.length ? `Modelos de ${ultimaCorrida.map((c) => fmtFechaHora(c)).join(" y ")}` : "Esperando la primera corrida de los modelos"}
+      {ultimaCorrida.length ? `Modelos: ${ultimaCorrida.join(" · ")}` : "Esperando la primera corrida de los modelos"}
       {procesado && ` · procesado ${fmtFechaHora(procesado)}`}
-      {ajuste?.estacion && ` · ajustado con observaciones de ${ajuste.estacion} (SMN, ${num(ajuste.distancia_km, 0)} km)`}
+      {ajuste?.estacion && ` · ajustado con observaciones de ${ajuste.estacion.split(" + ").map(titulo).join(" y ")} (SMN)`}
     </p>
   );
 }
@@ -712,7 +716,8 @@ function TarjetaReco({ n }: { n: Nivel }) {
   );
 }
 
-const NOMBRE_MODELO: Record<string, string> = { ecmwf: "ECMWF", gfs: "GFS" };
+const NOMBRE_MODELO = NOMBRE_FUENTE;
+const titulo = (s: string) => s.toLowerCase().replace(/(^|\s|\()\S/g, (m) => m.toUpperCase());
 
 function kmEntre(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
   const r = Math.PI / 180;
@@ -725,17 +730,20 @@ function AjusteLocal({ ev, sesgos, pron }: { ev: Evento; sesgos: Sesgo[]; pron: 
   const fuentes = [...new Set(pron.map((p) => p.fuente))].sort();
   if (!fuentes.length) return null;
   const firma = (x: number | null) => (x == null ? "—" : `${x > 0 ? "+" : ""}${num(x, 1)} °C`);
+  const pw = pesosFuentes(fuentes, sesgos, "t");
+  const tot = Object.values(pw).reduce((a, b) => a + b, 0);
+  const pesosT = Object.fromEntries(fuentes.map((f) => [f, pw[f] / tot]));
   return (
     <section className="seccion tarjeta" id="ajuste-local">
       <div className="rotulo">Ajuste local y error medido</div>
       <p className="chico" style={{ marginTop: 4 }}>
-        Cuánto se equivocó cada modelo en la zona del evento en las últimas 72 h, comparado con la estación del SMN más cercana, y la corrección que se aplica al pronóstico.
-        Un sesgo positivo indica que el modelo pronosticaba más temperatura que la observada.
+        Cuánto se equivocó cada modelo en la zona del evento en las últimas 72 h, comparado con hasta dos estaciones del SMN (observación de cada hora), la corrección que se aplica
+        y el peso de cada modelo en el pronóstico combinado: el que menos se equivoca, más pesa. Un sesgo positivo indica que el modelo pronosticaba más temperatura que la observada.
       </p>
       <div className="desplaza">
         <table className="tabla">
           <thead>
-            <tr><th>Modelo</th><th>Punto de grilla</th><th>Estación SMN</th><th>Horas comparadas</th><th>Sesgo T día / noche</th><th>Factor viento</th><th>Error T sin / con ajuste</th><th>Error viento sin / con ajuste</th><th>Estado</th></tr>
+            <tr><th>Modelo</th><th>Punto de grilla</th><th>Estación SMN</th><th>Horas comparadas</th><th>Sesgo T día / noche</th><th>Factor viento</th><th>Error T sin / con ajuste</th><th>Error viento sin / con ajuste</th><th>Peso</th><th>Estado</th></tr>
           </thead>
           <tbody>
             {fuentes.map((f) => {
@@ -748,12 +756,15 @@ function AjusteLocal({ ev, sesgos, pron }: { ev: Evento; sesgos: Sesgo[]; pron: 
                 <tr key={f}>
                   <td><b>{NOMBRE_MODELO[f] ?? f}</b></td>
                   <td>{punto}</td>
-                  <td>{s?.estacion ? `${s.estacion} · ${num(s.distancia_km, 0)} km` : "Sin estación a menos de 60 km"}</td>
+                  <td>{s?.estaciones?.length
+                    ? s.estaciones.map((e) => `${titulo(e.estacion)} · ${num(e.km, 0)} km`).join(" / ") + (s.atenuacion != null && s.atenuacion < 1 ? ` (se aplica el ${num(s.atenuacion * 100, 0)} %)` : "")
+                    : s?.estacion ? `${titulo(s.estacion)} · ${num(s.distancia_km, 0)} km` : "Sin estación a menos de 60 km"}</td>
                   <td>{s?.pares ?? 0}</td>
                   <td>{s ? `${firma(s.sesgo_t_dia)} / ${firma(s.sesgo_t_noche)}` : "—"}</td>
                   <td>{s?.factor_viento != null ? `× ${num(s.factor_viento, 2)}` : "—"}</td>
                   <td>{s?.error_t != null ? `${num(s.error_t, 1)} / ${num(s.error_t_corr, 1)} °C` : "—"}</td>
                   <td>{s?.error_viento != null ? `${num(s.error_viento, 0)} / ${num(s.error_viento_corr, 0)} km/h` : "—"}</td>
+                  <td>{fuentes.length > 1 ? `${num(pesosT[f] * 100, 0)} %` : "—"}</td>
                   <td>{s?.aplicado ? "Corrección aplicada" : s?.pares ? "Midiendo (faltan horas comparables)" : "Sin datos todavía"}</td>
                 </tr>
               );
@@ -763,6 +774,7 @@ function AjusteLocal({ ev, sesgos, pron }: { ev: Evento; sesgos: Sesgo[]; pron: 
       </div>
       <p className="chico" style={{ marginBottom: 0 }}>
         El error "con ajuste" se mide sobre las mismas horas usadas para calcular la corrección: es una referencia de cuánto mejora, no una garantía para el día de la carrera.
+        Mientras algún modelo no tenga error medido, todos pesan lo mismo. El WRF del SMN cubre las primeras 72 h.
         La corrección no reemplaza las mediciones en terreno ni las alertas del SMN.
       </p>
     </section>

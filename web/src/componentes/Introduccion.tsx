@@ -47,7 +47,7 @@ export function Introduccion() {
       </div>
       <div className="intro-cols">
         <p>
-          EMERTEAM sigue de forma automática, cada dos horas, el pronóstico de los modelos meteorológicos ECMWF y GFS y las alertas
+          EMERTEAM sigue de forma automática, cada hora, el pronóstico de los modelos meteorológicos ECMWF, GFS y WRF del SMN, ajustado con las observaciones de las estaciones del SMN cercanas, y las alertas
           oficiales del Servicio Meteorológico Nacional para el lugar y la fecha de tu evento. No hace falta actualizar la página.
         </p>
         <p>

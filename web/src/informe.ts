@@ -1,6 +1,6 @@
 // Armado del informe post-evento a partir de los datos registrados.
 // El resultado es un objeto serializable: al aprobarse se guarda como copia fija (mon_informes.contenido).
-import { kmPorTrueno, nivelRayoMedido, type AlertaSMN, type Evento, type Medicion, type Pronostico, type Rayo, type Uv } from "./datos";
+import { kmPorTrueno, nivelRayoMedido, type AlertaSMN, type Evento, type Medicion, type Pronostico, type Rayo, type Sesgo, type Uv } from "./datos";
 import { consenso } from "./serie";
 import { calcular } from "./ventanas";
 
@@ -64,9 +64,9 @@ function recosDe(hist: FilaHistorial[], fases: string[]): RecoInforme[] {
   return out.sort((a, b) => b.nivel - a.nivel || a.desde.localeCompare(b.desde));
 }
 
-export function armarInforme(ev: Evento, pron: Pronostico[], hist: FilaHistorial[], meds: Medicion[], rayos: Rayo[], alertas: AlertaSMN[], uv: Uv[] = []): Informe {
+export function armarInforme(ev: Evento, pron: Pronostico[], hist: FilaHistorial[], meds: Medicion[], rayos: Rayo[], alertas: AlertaSMN[], uv: Uv[] = [], sesgos: Sesgo[] = []): Informe {
   const v = calcular(ev);
-  const serie = [...consenso(pron, uv).entries()];
+  const serie = [...consenso(pron, uv, sesgos).entries()];
   const rangoHr = (ps: Pronostico[]) => { const x = ps.map((p) => p.hr).filter((h): h is number => h != null); return x.length ? { hrMin: Math.round(Math.min(...x)), hrMax: Math.round(Math.max(...x)) } : { hrMin: null, hrMax: null }; };
   const uvEn = (a: Date, b: Date) => maximo(uv.filter((u) => enVentana(u.valido, a, b)).map((u) => ({ ...u, uv: Number(u.uv) })), (u) => u.uv, (u) => u.valido);
   // Horas que representa cada paso, para acumular lluvia

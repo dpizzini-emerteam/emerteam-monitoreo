@@ -2,8 +2,10 @@ name: Pronósticos y niveles
 
 on:
   schedule:
-    # cada 2 horas, minuto 23 (fuera de la hora en punto)
-    - cron: "23 */2 * * *"
+    # cada hora, minuto 23 (fuera de la hora en punto): GitHub demora o descarta corridas programadas en horas
+    # de carga; con un intento por hora la corrección con observaciones y las corridas nuevas entran antes.
+    # Si no hay corrida nueva solo se recalculan la corrección y los niveles.
+    - cron: "23 * * * *"
   workflow_dispatch:
     inputs:
       forzar:

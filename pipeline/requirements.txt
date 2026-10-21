@@ -4,3 +4,4 @@ thermofeel==2.3.0
 eccodes==2.39.0
 ecmwf-opendata==0.3.20
 eccodeslib==2.50.0.33
+h5py==3.12.1

@@ -328,7 +328,7 @@ export function Probabilistico({ ev, v, fase, quien }: { ev: Evento; v: Ventanas
           titulo={fase === "carrera" ? `Evolución entre emisiones · calor en la exposición` : `Evolución entre emisiones · ${NOMBRE_VARIABLE.viento_B}`} largada={ev.largada} />
 
         <div className="chico pr-notas">
-          <p>Lectura: menos de 10 %, 10–30 %, 30–60 % y más de 60 %. Con 50 escenarios de ECMWF y 31 de NOAA la resolución real es de pocos puntos: se muestran múltiplos de 10 %. La corrección de sesgo desplaza la distribución pero no calibra su dispersión; los valores cercanos a 0 % y 100 % se leen con cautela.</p>
+          <p>Lectura: menos de 10 %, 10–30 %, 30–60 % y más de 60 %. Con 50 escenarios de ECMWF y 31 de NOAA la resolución real es de pocos puntos: se muestran múltiplos de 10 %. La corrección de sesgo desplaza la distribución; cuando hay error medido contra las estaciones del SMN, además se ensancha cada escenario con ese error local (los ensambles globales no lo representan y tienden a ser demasiado seguros). Sin error medido, los valores cercanos a 0 % y 100 % se leen con cautela.</p>
           {aprox.map((a) => <p key={a}>{a}</p>)}
           <p>Fuentes: ECMWF Ensemble open data (CC BY 4.0) y NOAA GEFS 0,25° (dominio público). Probabilidades calculadas por EMERTEAM; NOAA y ECMWF no avalan este servicio.</p>
         </div>

@@ -87,6 +87,10 @@ export type Sesgo = {
   error_t_corr: number | null;
   error_viento: number | null;
   error_viento_corr: number | null;
+  rmse_t_corr: number | null;
+  rmse_viento_corr: number | null;
+  atenuacion: number | null;
+  estaciones: { estacion: string; km: number | null; pares: number; sesgo_t_dia: number | null; sesgo_t_noche: number | null }[] | null;
   aplicado: boolean;
   calculado_en: string;
 };
