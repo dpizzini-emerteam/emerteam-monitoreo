@@ -5,8 +5,12 @@ import { BotonTema } from "../componentes/BotonTema";
 
 export function Login() {
   const [email, setEmail] = useState("");
-  const [estado, setEstado] = useState<"" | "enviando" | "enviado" | "error">("");
-  const [error, setError] = useState("");
+  // Error traído por el enlace del correo (vencido o ya usado): se muestra una vez
+  const [errorEnlace] = useState(() => {
+    try { const m = sessionStorage.getItem("mon_error_enlace") ?? ""; sessionStorage.removeItem("mon_error_enlace"); return m; } catch { return ""; }
+  });
+  const [estado, setEstado] = useState<"" | "enviando" | "enviado" | "error">(errorEnlace ? "error" : "");
+  const [error, setError] = useState(errorEnlace);
   const [espera, setEspera] = useState(() => restante());
   const redirect = window.location.origin + window.location.pathname;
 
@@ -53,7 +57,7 @@ export function Login() {
           {estado === "enviado" ? (
             <>
               <p>
-                Te enviamos un enlace a <b>{email}</b>. Abrilo desde este dispositivo para ingresar. Puede tardar unos minutos;
+                Te enviamos un enlace a <b>{email}</b>. Abrilo en el teléfono o la computadora donde vas a usar la web. Puede tardar unos minutos;
                 revisá también la carpeta de correo no deseado.
               </p>
               <button className="boton" style={{ justifyContent: "center", width: "100%" }} disabled={espera > 0}

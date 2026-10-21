@@ -106,7 +106,8 @@ function Raiz() {
   );
 }
 
-const router = createHashRouter([
+// Se crea después de procesar el enlace del correo, para que lea la ruta ya limpia
+const crearRouter = () => createHashRouter([
   {
     path: "/",
     element: <Raiz />,
@@ -126,8 +127,28 @@ const router = createHashRouter([
   },
 ]);
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <RouterProvider router={router} />
-  </StrictMode>,
-);
+// Vuelta desde el enlace del correo: el # trae la sesión (o el error) y no una ruta. Se deja que Supabase lo procese,
+// se guarda el error para mostrarlo en el ingreso y se limpia la barra antes de montar el ruteo.
+async function procesarEnlace() {
+  const h = window.location.hash;
+  if (!/access_token=|error_description=|error_code=/.test(h)) return;
+  const p = new URLSearchParams(h.replace(/^#\/?/, ""));
+  const codigo = p.get("error_code") ?? "";
+  if (p.get("error") || codigo) {
+    try {
+      sessionStorage.setItem("mon_error_enlace", codigo === "otp_expired"
+        ? "El enlace venció o ya se usó. Pedí uno nuevo y abrí solo el último que te llegue."
+        : "No se pudo completar el ingreso con ese enlace. Pedí uno nuevo.");
+    } catch { /* sin almacenamiento */ }
+  }
+  try { await supabase.auth.getSession(); } catch { /* el ingreso muestra el formulario */ }
+  window.history.replaceState(null, "", window.location.origin + window.location.pathname + "#/");
+}
+
+void procesarEnlace().finally(() => {
+  createRoot(document.getElementById("root")!).render(
+    <StrictMode>
+      <RouterProvider router={crearRouter()} />
+    </StrictMode>,
+  );
+});

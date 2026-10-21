@@ -3,8 +3,11 @@ import { createClient } from "@supabase/supabase-js";
 export const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL as string,
   import.meta.env.VITE_SUPABASE_ANON_KEY as string,
-  // PKCE: el enlace vuelve con ?code= (no con #access_token, que choca con el ruteo por #)
-  { auth: { persistSession: true, detectSessionInUrl: true, flowType: "pkce" } },
+  // Flujo implícito: el enlace trae la sesión en el propio #access_token, así funciona aunque se abra en otro
+  // navegador o dispositivo (en iPhone el correo suele abrir el enlace en el navegador interno de Gmail o en Safari,
+  // donde no está la clave PKCE guardada al pedirlo, y el ingreso volvía a la pantalla de correo).
+  // El # del enlace se procesa en main.tsx antes de crear el ruteo.
+  { auth: { persistSession: true, detectSessionInUrl: true, flowType: "implicit" } },
 );
 
 export type Modalidad = { id?: string; nombre: string; distancia_km: number; participantes: number | null; largada?: string | null };
