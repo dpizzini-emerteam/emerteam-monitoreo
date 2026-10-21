@@ -334,6 +334,11 @@ def main() -> int:
             f.write("## Exploración de ensambles\n\n```json\n" + texto + "\n```\n")
     with open(os.path.join(tempfile.gettempdir(), "ensambles.json"), "w", encoding="utf-8") as f:
         f.write(texto)
+    # Anotaciones de GitHub Actions: se leen por API sin descargar los registros
+    compacto = json.dumps(informe, ensure_ascii=False, separators=(",", ":"), default=str)
+    for i in range(0, min(len(compacto), 9 * 3800), 3800):
+        trozo = compacto[i:i + 3800].replace("%", "%25").replace("\n", " ")
+        print(f"::notice title=ensambles {i // 3800}::{trozo}", flush=True)
     return 0
 
 
