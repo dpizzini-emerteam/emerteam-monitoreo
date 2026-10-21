@@ -504,3 +504,5 @@ input, select, textarea, button { font-family: inherit; }
 .pr-disparo { display: flex; gap: 10px; align-items: baseline; padding: 8px 12px; border-radius: 6px; border-left: 5px solid #C79000; background: var(--superficie2); }
 .pr-disparo.activar { border-left-color: #FF3B30; }
 .pr-disparo b { font-family: "Barlow Condensed"; font-weight: 800; font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; }
+.dc-estimado { margin: -2px 14px 8px; font-size: 12px; font-weight: 700; color: var(--texto2); }
+.dc-h.uc .dc-estimado { color: #FF6A1A; }

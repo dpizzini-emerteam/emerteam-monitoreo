@@ -474,7 +474,10 @@ function DiaCarrera({ serie, v, ev }: { serie: Map<number, Pronostico & { n: num
   const cerca = todas.filter(([t]) => t >= ini.getTime() - 6 * 3600_000 && t <= fin.getTime() + 6 * 3600_000);
   const pasos = cerca.slice(1).map(([t], i) => t - cerca[i][0]).filter((x) => x > 0);
   const paso = pasos.length ? [...pasos].sort((a, b) => a - b)[Math.floor(pasos.length / 2)] : 3600_000;
-  const toca = (t: number, a: number, b: number) => t - paso / 2 < b && t + paso / 2 > a;
+  // Cada dato se lee como la hora que empieza en su horario [t, t + 1 h): un dato de las 21:00 no representa
+  // un último cuarto de 20:00 a 20:30 aunque sea el más cercano
+  const H = 3600_000;
+  const toca = (t: number, a: number, b: number) => t < b && t + H > a;
   const enExp = (t: number) => toca(t, ini.getTime(), fin.getTime());
   const enNat = (t: number) => !!nat && toca(t, nat[0].getTime(), nat[1].getTime());
   const enUc = (t: number) => toca(t, v.inicioUltimoCuarto.getTime(), v.finCarrera.getTime());
@@ -482,13 +485,39 @@ function DiaCarrera({ serie, v, ev }: { serie: Map<number, Pronostico & { n: num
   const iDentro = dentro.length ? todas.findIndex(([t]) => t === dentro[0][0]) : -1;
   const antes = iDentro > 0 ? [todas[iDentro - 1]] : [];
   const despues = iDentro >= 0 && todas[iDentro + dentro.length] ? [todas[iDentro + dentro.length]] : [];
-  const horas = [...antes, ...dentro, ...despues];
+  // Con pronóstico cada 3 h, las horas críticas (último cuarto, natación) que caen entre dos datos se estiman
+  // interpolando linealmente entre el dato anterior y el siguiente, y se rotulan como estimadas
+  type Fila = Pronostico & { n: number; entre?: [number, number] };
+  const criticas: [number, Fila][] = [];
+  const marcar = (a: Date, b: Date) => {
+    for (let h = Math.floor(a.getTime() / H) * H; h < b.getTime(); h += H) {
+      if (serie.has(h) || criticas.some(([x]) => x === h)) continue;
+      const prev = [...todas].reverse().find(([t]) => t < h);
+      const sig = todas.find(([t]) => t > h);
+      if (!prev || !sig) continue;
+      const w = (h - prev[0]) / (sig[0] - prev[0]);
+      const pa = prev[1] as Fila, pb = sig[1] as Fila;
+      const li = (x: number | null | undefined, y: number | null | undefined) => (x == null || y == null ? (w < 0.5 ? x : y) ?? null : x + (y - x) * w);
+      const k = { ...(w < 0.5 ? pa : pb) } as Fila & Record<string, unknown>;
+      for (const c of ["t2m", "td2m", "hr", "viento10", "rafaga10", "wbgt_est", "radiacion", "nubosidad", "cape", "presion", "uv"] as const) {
+        (k as Record<string, unknown>)[c] = li((pa as unknown as Record<string, number | null>)[c], (pb as unknown as Record<string, number | null>)[c]);
+      }
+      k.precip = pb.precip;
+      k.valido = new Date(h).toISOString();
+      k.entre = [prev[0], sig[0]];
+      criticas.push([h, k]);
+    }
+  };
+  marcar(v.inicioUltimoCuarto, v.finCarrera);
+  if (nat) marcar(nat[0], nat[1]);
+  const horas = [...antes, ...dentro, ...despues, ...criticas].sort((a, b) => a[0] - b[0]) as [number, Fila][];
   const fase = (t: number): { txt: string; tipo: "fuera" | "exp" | "uc" } => {
     if (!enExp(t)) return { txt: t < ini.getTime() ? "Antes" : "Después", tipo: "fuera" };
     if (enNat(t)) return { txt: "Natación", tipo: "uc" };
     if (enUc(t)) return { txt: "Último cuarto", tipo: "uc" };
-    if (t < v.largada.getTime()) return { txt: "Convocatoria", tipo: "exp" };
-    if (t <= v.finCarrera.getTime()) return { txt: "Carrera", tipo: "exp" };
+    if (t + H <= v.largada.getTime()) return { txt: "Convocatoria", tipo: "exp" };
+    if (t <= v.largada.getTime()) return { txt: "Largada", tipo: "exp" };
+    if (t < v.finCarrera.getTime()) return { txt: "Carrera", tipo: "exp" };
     return { txt: "Desconcentración", tipo: "exp" };
   };
   const maxW = dentro.length ? Math.max(...dentro.map(([, p]) => p.wbgt_est ?? -99)) : null;
@@ -532,6 +561,7 @@ function DiaCarrera({ serie, v, ev }: { serie: Map<number, Pronostico & { n: num
                       <b>{fmtHora(p.valido)}</b>
                       <span className={`dc-chip ${f.tipo}`}>{f.txt}</span>
                     </div>
+                    {p.entre && <div className="dc-estimado">Estimado entre {fmtHora(new Date(p.entre[0]).toISOString())} y {fmtHora(new Date(p.entre[1]).toISOString())}</div>}
                     <div className="dc-wbgt" style={estiloCalor(escala.variable, n)}>
                       <span className="lab"><small>WBGT</small>{escala.niveles[n]}</span>
                       <span className="val">{num(p.wbgt_est, 1)}<small>°C</small></span>
