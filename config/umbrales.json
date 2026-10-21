@@ -469,5 +469,23 @@
         "Extremo"
       ]
     ]
+  },
+  "ens_disparadores": {
+    "_fuente": "Criterio interno EMERTEAM (aprobado por Diego, 21/10/2026): lógica costo-pérdida; acciones baratas con probabilidad baja y anticipación larga, caras con probabilidad alta y anticipación corta.",
+    "_tipo": "CI",
+    "preparar": {
+      "hasta_dias": 3,
+      "prob": 0.3
+    },
+    "activar": {
+      "hasta_dias": 1,
+      "prob": 0.6
+    },
+    "histeresis": {
+      "margen": 0.1,
+      "_nota": "El disparo cuenta si supera el valor por 10 puntos o si lo sostiene en dos emisiones seguidas."
+    },
+    "por_variable": {},
+    "_por_variable": "Valores propios por variable o ventana, con la misma forma: {\"wbgt|carrera\": {\"preparar\": {...}, \"activar\": {...}}}. El día de la carrera no se dispara: mandan el determinístico corregido y las mediciones."
   }
 }

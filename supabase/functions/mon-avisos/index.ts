@@ -155,6 +155,45 @@ function enFases(a: { desde: string | null; hasta: string | null }, ev: Evento, 
   return t1 >= v0 && t0 <= v1;
 }
 
+// Disparadores del pronóstico probabilístico (réplica de config/umbrales.json → ens_disparadores; criterio interno EMERTEAM)
+const DISP = { preparar: { dias: 3, prob: 0.3 }, activar: { dias: 1, prob: 0.6 }, margen: 0.1 };
+const diaAR = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }).format(new Date(iso));
+function disparosEns(filas: EnsProb[], largada: string, ahora: number) {
+  const corridas = [...new Set(filas.map((f) => f.corrida))].sort().reverse();
+  const [c0, c1] = corridas;
+  if (!c0) return [];
+  const dias = Math.round((Date.parse(diaAR(largada)) - Date.parse(new Date(c0).toISOString().slice(0, 10))) / 86400_000);
+  if (dias < 1) return []; // el día de la carrera mandan el determinístico corregido y las mediciones
+  const previa = (f: EnsProb) => filas.find((x) => x.corrida === c1 && x.ventana === f.ventana && x.variable === f.variable && x.nivel === f.nivel)?.prob;
+  const grupos = new Map<string, EnsProb[]>();
+  for (const f of filas.filter((x) => x.corrida === c0 && Date.parse(x.ventana_hasta) > ahora)) {
+    const k = `${f.ventana}|${f.variable}`;
+    grupos.set(k, [...(grupos.get(k) ?? []), f]);
+  }
+  const salida: Extract<Cambio, { tipo: "ens" }>[] = [];
+  for (const [k, fs] of grupos) {
+    const [ventana, variable] = k.split("|");
+    for (const accion of ["activar", "preparar"] as const) {
+      const r = DISP[accion];
+      if (dias > r.dias) continue;
+      const f = fs.filter((x) => x.prob >= r.prob + DISP.margen || (x.prob >= r.prob && (previa(x) ?? -1) >= r.prob)).sort((a, b) => b.nivel - a.nivel)[0];
+      if (f) { salida.push({ tipo: "ens", accion, ventana, variable, nivel: f.nivel, prob: f.prob, umbral: f.umbral, miembros: f.miembros, corrida: f.corrida, dias }); break; }
+    }
+  }
+  return salida;
+}
+const rangoEns = (c: { accion: string; nivel: number }) => (c.accion === "activar" ? 10 : 0) + c.nivel;
+const probTxt = (p: number) => { const r = Math.round(p * 10) * 10; return r <= 0 ? "menos de 10 %" : r >= 100 ? "más de 90 %" : `${r} %`; };
+const ventanaTxt = (v: string, d?: string | null) => v === "carrera" ? `exposición de los ${(PARTICIPANTES[d ?? "running"] ?? PARTICIPANTES.running)[0]}` : v.startsWith("ultimo_cuarto") ? `último cuarto${v.includes(":") ? ` (${v.split(":")[1]})` : ""}` : v;
+const faseDeVentana = (v: string) => (v === "armado" || v === "desarme" ? v : "carrera");
+function umbralTxt(variable: string, u: number | null): string {
+  if (u == null) return "";
+  if (variable.startsWith("viento_")) return ` (ráfaga de ${u} km/h)`;
+  if (variable === "tormenta") return ` (CAPE ${u} J/kg con precipitación)`;
+  if (variable === "lluvia") return ` (${u} mm en 3 h)`;
+  return ` (WBGT ${String(u).replace(".", ",")} °C)`;
+}
+
 // Vocabulario por disciplina: los textos se escriben para running y se adaptan (corredores → atletas, nadadores, ciclistas)
 const PARTICIPANTES: Record<string, [string, string]> = {
   running: ["corredores", "corredor"], montana: ["corredores", "corredor"], triatlon: ["atletas", "atleta"],
@@ -168,11 +207,13 @@ function adaptar(texto: string, d?: string | null): string {
 }
 type Nivel = { evento_id: string; fase: string; variable: string; desde: string; hasta: string; nivel: number; confianza: string | null };
 type Alerta = { id: string; evento_id: string; fenomeno: string; color: string; desde: string | null; hasta: string | null; estado: string; tipo: string };
-type Estado = { niveles: Record<string, number>; smn: string[]; glm: number };
+type Estado = { niveles: Record<string, number>; smn: string[]; glm: number; ens?: Record<string, string> };
+type EnsProb = { evento_id: string; corrida: string; variable: string; nivel: number; ventana: string; ventana_hasta: string; umbral: number | null; prob: number; miembros: number };
 type Cambio =
   | { tipo: "sube" | "normaliza"; fase: string; variable: string; antes: number; ahora: number; desde: string; confianza: string | null }
   | { tipo: "smn_nueva" | "smn_levantada"; alerta: Alerta }
-  | { tipo: "rayos"; nivel: number; km: number };
+  | { tipo: "rayos"; nivel: number; km: number }
+  | { tipo: "ens"; accion: "preparar" | "activar"; ventana: string; variable: string; nivel: number; prob: number; umbral: number | null; miembros: number; corrida: string; dias: number };
 
 const fmt = (iso: string) => new Intl.DateTimeFormat("es-AR", { timeZone: "America/Argentina/Buenos_Aires", weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(iso));
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -221,6 +262,20 @@ function armarCorreo(ev: Evento, cambios: Cambio[]): { asunto: string; html: str
         <div style="font:800 17px Arial,sans-serif;color:#111;text-transform:uppercase">${esc(titulo)}</div>
         <div style="font:13px Arial,sans-serif;color:#111;margin-top:4px">${c.tipo === "smn_nueva" ? `Vigencia: ${esc(vig)}. Tiene prioridad sobre el pronóstico.` : "El SMN dejó de incluir esta alerta para la zona del evento."}</div></td></tr><tr><td style="height:10px"></td></tr>`);
       lineas.push(`${titulo}. ${c.tipo === "smn_nueva" ? `Vigencia: ${vig}.` : ""}`);
+    } else if (c.tipo === "ens") {
+      const accion = c.accion === "activar" ? "Activar" : "Preparar";
+      const color = c.accion === "activar" ? "#FF3B30" : "#C79000";
+      const titulo = `${accion} · ${nombreVar(c.variable)} · ${nombreNivel(c.variable, c.nivel)}`;
+      const reco = c.variable === "wbgt" && ev.disciplina === "aguas_abiertas" ? CALOR_AGUAS_ABIERTAS[c.nivel] : adaptar(recomendacion(c.variable, c.nivel, faseDeVentana(c.ventana)), ev.disciplina);
+      const detalle = `Probabilidad de alcanzar ${nombreNivel(c.variable, c.nivel).toLowerCase()}${umbralTxt(c.variable, c.umbral)} en ${ventanaTxt(c.ventana, ev.disciplina)}: ${probTxt(c.prob)}. Emisión D-${c.dias} (corrida ${new Date(c.corrida).toISOString().slice(0, 13).replace("T", " ")} UTC, ${c.miembros} miembros de ECMWF ENS y NOAA GEFS).`;
+      const accionTxt = c.accion === "activar" ? `Ejecutar las medidas de este nivel: ${reco}` : `Dejar listas las medidas de este nivel, sin ejecutarlas todavía: ${reco}`;
+      partes.push(`<tr><td style="padding:14px 18px;border-left:5px solid ${color};background:#f7f6f4">
+        <div style="margin-bottom:6px">${etiqueta(accion, color, "#111111")}</div>
+        <div style="font:700 16px Arial,sans-serif;color:#111">${esc(`${nombreVar(c.variable)} · ${nombreNivel(c.variable, c.nivel)}`)}</div>
+        <div style="font:13px Arial,sans-serif;color:#555;margin:3px 0 6px">${esc(detalle)}</div>
+        <div style="font:14px/1.5 Arial,sans-serif;color:#222">${esc(accionTxt)}</div>
+        <div style="font:12px Arial,sans-serif;color:#666;margin-top:6px">Disparador por probabilidad (criterio interno EMERTEAM). Las alertas del SMN tienen prioridad sobre este aviso.</div></td></tr><tr><td style="height:10px"></td></tr>`);
+      lineas.push(`${titulo}. ${detalle} ${accionTxt}`);
     } else if (c.tipo === "rayos") {
       const accion = c.nivel >= 4 ? "Suspender la actividad al aire libre y evacuar a refugio" : c.nivel === 3 ? "Preparar la evacuación o demorar la largada" : "Alerta por tormenta eléctrica";
       partes.push(`<tr><td style="padding:14px 18px;background:${COLOR[c.nivel]};border-left:5px solid #111">
@@ -234,6 +289,7 @@ function armarCorreo(ev: Evento, cambios: Cambio[]): { asunto: string; html: str
     : primero.tipo === "sube" ? `${nombreNivel(primero.variable, primero.ahora)} · ${nombreVar(primero.variable)} (${FASE[primero.fase]})`
     : primero.tipo === "normaliza" ? `${nombreVar(primero.variable)} vuelve a quedar bajo el umbral`
     : primero.tipo === "rayos" ? `Rayos a ${Math.round(primero.km)} km`
+    : primero.tipo === "ens" ? `${primero.accion === "activar" ? "Activar" : "Preparar"} · ${nombreVar(primero.variable)} · ${nombreNivel(primero.variable, primero.nivel)}`
     : `${tituloAlerta(primero.alerta)}${primero.tipo === "smn_levantada" ? " · levantada" : ""}`;
   const asunto = `${ev.nombre} · ${resumen}`;
   const bloqueCorredores = corredores.size ? `<tr><td style="padding:14px 18px;border:1px dashed #7C7C7C">
@@ -280,12 +336,16 @@ Deno.serve(async (req) => {
     supabase.from("mon_admins").select("email").eq("rol", "editor"),
     supabase.rpc("mon_credencial_smtp"),
   ]);
+  const { data: ens } = await supabase.from("mon_ens_prob").select("evento_id,corrida,variable,nivel,ventana,ventana_hasta,umbral,prob,miembros")
+    .in("evento_id", ids).eq("modelo", "mezcla").gte("corrida", new Date(ahora - 3 * 86400_000).toISOString()).limit(20000);
   const smtp = cred as { usuario: string | null; clave: string | null; remitente: string } | null;
   // Envío de prueba: un correo de muestra (con acentos y asunto largo) solo a los editores de EMERTEAM, sin tocar el estado
   if (new URL(req.url).searchParams.get("envio_prueba") === "1") {
     if (!smtp?.usuario || !smtp?.clave) return json({ ok: false, error: "sin credencial" });
     const ev = eventos[0];
-    const muestra: Cambio[] = [{ tipo: "sube", fase: "desarme", variable: "calor_personal", antes: 0, ahora: 2, desde: new Date(ahora + 86400_000).toISOString(), confianza: "media" }];
+    const muestra: Cambio[] = new URL(req.url).searchParams.get("muestra") === "ens"
+      ? [{ tipo: "ens", accion: "preparar", ventana: "carrera", variable: "wbgt", nivel: 1, prob: 0.42, umbral: 21, miembros: 81, corrida: new Date(ahora - 6 * 3600_000).toISOString(), dias: 3 }]
+      : [{ tipo: "sube", fase: "desarme", variable: "calor_personal", antes: 0, ahora: 2, desde: new Date(ahora + 86400_000).toISOString(), confianza: "media" }];
     const correo = armarCorreo(ev, muestra);
     const t = nodemailer.createTransport({ host: "smtp.gmail.com", port: 465, secure: true, auth: { user: smtp.usuario, pass: smtp.clave } });
     const envios: Record<string, string> = {};
@@ -313,14 +373,27 @@ Deno.serve(async (req) => {
     const rayosEv = ((rays ?? []) as { evento_id: string; distancia_km: number }[]).filter((r) => r.evento_id === ev.id);
     const km = rayosEv.length ? Math.min(...rayosEv.map((r) => Number(r.distancia_km))) : null;
     const glm = km == null ? 0 : km < 13 ? 4 : km < 19 ? 3 : km < 24 ? 2 : 1;
-    const actual: Estado = { niveles: {}, smn: vigentes.map((a) => a.id), glm };
+    const actual: Estado = { niveles: {}, smn: vigentes.map((a) => a.id), glm, ens: {} };
+    const disparos = disparosEns(((ens ?? []) as EnsProb[]).filter((f) => f.evento_id === ev.id), ev.largada, ahora);
 
     const previo = estadoDe.get(`avisos:${ev.id}`);
     const cambios: Cambio[] = [];
     if (!previo) {
       // Primera corrida para este evento: se registra el estado sin avisar (evita una ráfaga de correos al activar)
       for (const [k, v] of Object.entries(niveles)) actual.niveles[k] = v;
+      for (const d of disparos) actual.ens![`${d.ventana}|${d.variable}`] = `${d.accion}:${d.nivel}`;
     } else {
+      // Disparadores del ensamble: se avisa cuando aparece uno nuevo o sube (Preparar → Activar, o nivel mayor);
+      // lo ya avisado se conserva mientras la ventana siga abierta, para no repetir correos entre emisiones
+      const previoEns = previo.ens ?? {};
+      const rango = (v?: string) => (v ? rangoEns({ accion: v.split(":")[0], nivel: Number(v.split(":")[1]) }) : -1);
+      for (const d of disparos) {
+        const k = `${d.ventana}|${d.variable}`;
+        if (rangoEns(d) > rango(previoEns[k])) { cambios.push(d); actual.ens![k] = `${d.accion}:${d.nivel}`; }
+        else actual.ens![k] = previoEns[k];
+      }
+      const abiertas = new Set(((ens ?? []) as EnsProb[]).filter((f) => f.evento_id === ev.id && Date.parse(f.ventana_hasta) > ahora).map((f) => `${f.ventana}|${f.variable}`));
+      for (const [k, v] of Object.entries(previoEns)) if (!(k in actual.ens!) && abiertas.has(k)) actual.ens![k] = v;
       for (const k of new Set([...Object.keys(niveles), ...Object.keys(previo.niveles)])) {
         const antes = previo.niveles[k] ?? 0;
         const ahoraN = niveles[k] ?? 0;
@@ -346,7 +419,8 @@ Deno.serve(async (req) => {
       if (glm >= 2 && glm > (previo.glm ?? 0) && km != null) cambios.push({ tipo: "rayos", nivel: glm, km });
     }
     // Orden: rayos y SMN primero, después subas de mayor nivel, al final normalizaciones
-    const peso = (c: Cambio) => c.tipo === "rayos" ? 100 : c.tipo === "smn_nueva" ? 90 : c.tipo === "sube" ? 10 * c.ahora : c.tipo === "smn_levantada" ? 5 : 1;
+    const peso = (c: Cambio) => c.tipo === "rayos" ? 100 : c.tipo === "smn_nueva" ? 90 : c.tipo === "sube" ? 10 * c.ahora
+      : c.tipo === "ens" ? (c.accion === "activar" ? 8 : 4) + c.nivel / 10 : c.tipo === "smn_levantada" ? 5 : 1;
     cambios.sort((a, b) => peso(b) - peso(a));
 
     let enviados = 0;

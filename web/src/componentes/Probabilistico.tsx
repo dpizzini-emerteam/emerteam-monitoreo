@@ -3,6 +3,7 @@ import { diaLocal, fmtHora, num, supabase, type Evento } from "../datos";
 import { escalaCalor, estiloCalor } from "../disciplinas";
 import { nombreNivel, NOMBRE_VARIABLE } from "../reglas";
 import type { Ventanas } from "../ventanas";
+import U from "../../../config/umbrales.json";
 
 /** Fila de mon_ens_prob (probabilidad de alcanzar un nivel con el máximo de la ventana) */
 type Prob = {
@@ -40,6 +41,53 @@ function etiquetaD(corrida: string, largada: string): string {
 }
 const nombreVentana = (v: string, quien: string) =>
   v === "carrera" ? `Exposición de los ${quien}` : v.startsWith("ultimo_cuarto") ? `Último cuarto${v.includes(":") ? ` · ${v.split(":")[1]}` : ""}` : v === "armado" ? "Armado" : v === "desarme" ? "Desarme" : v;
+
+type Disparo = { accion: "preparar" | "activar"; ventana: string; variable: string; nivel: number; prob: number; dias: number; fila: Prob };
+type ReglaDisparo = { hasta_dias: number; prob: number };
+const DISP = U.ens_disparadores as { preparar: ReglaDisparo; activar: ReglaDisparo; histeresis: { margen: number }; por_variable: Record<string, { preparar?: ReglaDisparo; activar?: ReglaDisparo }> };
+
+/** Días entre la corrida (fecha UTC) y el día local de la largada */
+function diasA(corrida: string, largada: string): number {
+  return Math.round((Date.parse(diaLocal(largada)) - Date.parse(new Date(corrida).toISOString().slice(0, 10))) / 86400_000);
+}
+
+/**
+ * Disparadores de acción (criterio interno EMERTEAM): «Preparar» desde D-3 con 30 % o más y «Activar» desde D-1 con 60 % o más.
+ * Histéresis: supera el valor por 10 puntos o lo sostiene en la emisión anterior. El día de la carrera no dispara.
+ */
+export function disparos(filas: Prob[], largada: string): Disparo[] {
+  const corridas = [...new Set(filas.map((f) => f.corrida))].sort().reverse();
+  const [c0, c1] = corridas;
+  if (!c0) return [];
+  const dias = diasA(c0, largada);
+  if (dias < 1) return [];
+  const previa = (f: Prob) => filas.find((x) => x.corrida === c1 && x.ventana === f.ventana && x.variable === f.variable && x.nivel === f.nivel)?.prob;
+  const grupos = new Map<string, Prob[]>();
+  for (const f of filas.filter((x) => x.corrida === c0 && Date.parse(x.ventana_hasta) > Date.now())) {
+    const k = `${f.ventana}|${f.variable}`;
+    grupos.set(k, [...(grupos.get(k) ?? []), f]);
+  }
+  const salida: Disparo[] = [];
+  for (const [k, fs] of grupos) {
+    const [ventana, variable] = k.split("|");
+    const propio = DISP.por_variable[`${variable}|${ventana.split(":")[0]}`] ?? DISP.por_variable[variable] ?? {};
+    for (const accion of ["activar", "preparar"] as const) {
+      const r = propio[accion] ?? DISP[accion];
+      if (dias > r.hasta_dias) continue;
+      const cumple = fs.filter((f) => f.prob >= r.prob + DISP.histeresis.margen || (f.prob >= r.prob && (previa(f) ?? -1) >= r.prob))
+        .sort((a, b) => b.nivel - a.nivel)[0];
+      if (cumple) { salida.push({ accion, ventana, variable, nivel: cumple.nivel, prob: cumple.prob, dias, fila: cumple }); break; }
+    }
+  }
+  return salida.sort((a, b) => (a.accion === b.accion ? b.nivel - a.nivel : a.accion === "activar" ? -1 : 1));
+}
+
+function umbralTxt(variable: string, u: number): string {
+  if (variable.startsWith("viento_")) return `${num(u)} km/h de ráfaga`;
+  if (variable === "tormenta") return `CAPE ${num(u)} J/kg con precipitación`;
+  if (variable === "lluvia") return `${num(u)} mm en 3 h`;
+  return `${num(u, 1)} °C de WBGT`;
+}
 
 function Celda({ p, color }: { p: number; color: string }) {
   const c = categoria(p);
@@ -109,6 +157,23 @@ export function Probabilistico({ ev, v, fase, quien }: { ev: Evento; v: Ventanas
           Emisión {etiquetaD(ultima, ev.largada)} · {Object.entries(corridas).map(([m, c]) => `${m === "ecmwf" ? "ECMWF ENS" : "NOAA GEFS"} ${corridaTxt(c)}`).join(" · ")} · {muestra?.miembros} miembros, mezcla 50 % por modelo.
           Es la probabilidad de alcanzar cada nivel con el valor máximo de la ventana; no reemplaza al pronóstico de las tarjetas ni a las mediciones.
         </p>
+
+        {(() => {
+          const ds = disparos(filas, ev.largada).filter((d) => fase === "carrera" ? (d.ventana === "carrera" || d.ventana.startsWith("ultimo_cuarto")) : d.ventana === fase);
+          const dias = diasA(ultima, ev.largada);
+          return (
+            <div className="pr-disparos">
+              <div className="rotulo">Disparadores · criterio interno EMERTEAM</div>
+              {ds.length ? ds.map((d) => (
+                <div key={`${d.ventana}${d.variable}`} className={`pr-disparo ${d.accion}`}>
+                  <b>{d.accion === "activar" ? "Activar" : "Preparar"}</b>
+                  <span>{NOMBRE_VARIABLE[d.variable] ?? d.variable} · {nombreNivel(d.variable, d.nivel)} · {nombreVentana(d.ventana, quien)}: probabilidad {fmtProb(d.prob)}{d.fila.umbral != null ? ` de alcanzar ${umbralTxt(d.variable, d.fila.umbral)}` : ""} (emisión {etiquetaD(d.fila.corrida, ev.largada)}, {d.fila.miembros} miembros).</span>
+                </div>
+              )) : <p className="chico" style={{ margin: 0 }}>{dias > DISP.preparar.hasta_dias ? `Sin disparadores: se evalúan desde D-${DISP.preparar.hasta_dias}.` : dias < 1 ? "El día de la carrera mandan el pronóstico corregido y las mediciones." : "Ninguna probabilidad alcanza los disparadores."}</p>}
+              <p className="chico" style={{ margin: 0 }}>«Preparar» desde D-{DISP.preparar.hasta_dias} con {Math.round(DISP.preparar.prob * 100)} % o más; «Activar» desde D-{DISP.activar.hasta_dias} con {Math.round(DISP.activar.prob * 100)} % o más. Cuenta si supera el valor por {Math.round(DISP.histeresis.margen * 100)} puntos o si lo sostiene en dos emisiones seguidas. Las alertas del SMN tienen prioridad.</p>
+            </div>
+          );
+        })()}
 
         {fase === "carrera" && horas.length > 1 && <Curva horas={horas} escala={escala} v={v} />}
 

@@ -500,3 +500,7 @@ input, select, textarea, button { font-family: inherit; }
 .pr-notas { display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--borde); padding-top: 10px; }
 .pr-notas p { margin: 0; line-height: 1.45; }
 .pr-curva svg { min-width: 620px; }
+.pr-disparos { display: flex; flex-direction: column; gap: 6px; }
+.pr-disparo { display: flex; gap: 10px; align-items: baseline; padding: 8px 12px; border-radius: 6px; border-left: 5px solid #C79000; background: var(--superficie2); }
+.pr-disparo.activar { border-left-color: #FF3B30; }
+.pr-disparo b { font-family: "Barlow Condensed"; font-weight: 800; font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; }
