@@ -486,3 +486,17 @@ input, select, textarea, button { font-family: inherit; }
   .dc-escala .marca { top: -12px; left: auto; right: 6px; }
   .dc-escala.con-marca { margin-top: 14px; }
 }
+
+/* ---------- Probabilidad por umbral (ensambles) ---------- */
+.pr-cuerpo { display: flex; flex-direction: column; gap: 18px; }
+.pr-meta { margin: 0; line-height: 1.5; }
+.pr-tabla { width: 100%; min-width: 520px; }
+.pr-tabla caption { text-align: left; padding-bottom: 8px; }
+.pr-tabla th, .pr-tabla td { vertical-align: middle; }
+.pr-tabla thead th { white-space: nowrap; }
+.pr-celda { text-align: center; font-weight: 700; white-space: nowrap; min-width: 84px; border-radius: 4px; }
+.pr-curva { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.pr-curva svg { width: 100%; height: auto; display: block; background: var(--superficie); border: 1px solid var(--borde); border-radius: 8px; }
+.pr-notas { display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--borde); padding-top: 10px; }
+.pr-notas p { margin: 0; line-height: 1.45; }
+.pr-curva svg { min-width: 620px; }

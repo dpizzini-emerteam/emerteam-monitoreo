@@ -12,6 +12,7 @@ import { Introduccion } from "../componentes/Introduccion";
 import { Resumen } from "../componentes/Resumen";
 import { Mediciones } from "../componentes/Mediciones";
 import { AguaPanel } from "../componentes/Agua";
+import { Probabilistico } from "../componentes/Probabilistico";
 import { categoriaUv, consenso, FUENTE_UV, PRIORIDAD, UV_CATEGORIAS, uvMaxPorDia } from "../serie";
 import { UvDato } from "../componentes/Uv";
 import { confDisciplina, escalaCalor, estiloCalor, nombreDisciplina, participantes, riesgoWct, wct } from "../disciplinas";
@@ -262,12 +263,14 @@ export function EventoVista() {
           <>
             <Dias titulo="Armado" serie={serie} uvDia={uvDia} conWct={confDisciplina(ev.disciplina).wct} niveles={nivelesFase("armado")} desde={v.armado[0]} hasta={v.armado[1]} franjaSegura
               nota={`${ev.ubicacion} · armado desde ${fmtFechaHora(v.armado[0].toISOString())} hasta ${fmtFechaHora(v.armado[1].toISOString())}`} />
+            <Probabilistico ev={ev} v={v} fase="armado" quien={participantes(ev.disciplina)} />
             <Recomendaciones lista={delaFase("armado")} vacio="Con el pronóstico actual no hay recomendaciones para el armado." />
           </>
         )}
         {actual === "carrera" && (
           <>
             <DiaCarrera serie={serie} v={v} ev={ev} />
+            <Probabilistico ev={ev} v={v} fase="carrera" quien={participantes(ev.disciplina)} />
             <Recomendaciones lista={delaFase("carrera")} vacio="Con el pronóstico actual no hay recomendaciones para el día de carrera." />
             {comunicado && <Comunicacion c={comunicado} quien={participantes(ev.disciplina)} />}
           </>
@@ -276,6 +279,7 @@ export function EventoVista() {
           <>
             <Dias titulo="Desarme" serie={serie} uvDia={uvDia} conWct={confDisciplina(ev.disciplina).wct} niveles={nivelesFase("desarme")} desde={v.desarme[0]} hasta={v.desarme[1]} franjaSegura
               nota={`${ev.ubicacion} · desarme desde ${fmtFechaHora(v.desarme[0].toISOString())} hasta ${fmtFechaHora(v.desarme[1].toISOString())}`} />
+            <Probabilistico ev={ev} v={v} fase="desarme" quien={participantes(ev.disciplina)} />
             <Recomendaciones lista={delaFase("desarme")} vacio="Con el pronóstico actual no hay recomendaciones para el desarme." />
           </>
         )}

@@ -33,6 +33,7 @@ export type EscalaCalor = {
   fondo: string[];
   texto: string[];
   nivel: (w: number | null | undefined) => number | null;
+  cortes: number[];            // umbral de entrada a cada nivel 1..4 (°C)
 };
 
 const WA = U.wbgt_wa.cortes;
@@ -48,6 +49,7 @@ export const ESCALAS: Record<VariableCalor, EscalaCalor> = {
     fondo: ["#FFFFFF", "#B8D484", "#FBBC43", "#E83F43", "#1D1D1B"],
     texto: ["#111111", "#111111", "#111111", "#111111", "#FFFFFF"],
     nivel: (w) => (w == null ? null : w >= WA[3] ? 4 : w >= WA[2] ? 3 : w >= WA[1] ? 2 : w >= WA[0] ? 1 : 0),
+    cortes: [...WA],
   },
   // World Triathlon, regla 10.3: banderas WBGT
   wbgt_wt: {
@@ -58,6 +60,7 @@ export const ESCALAS: Record<VariableCalor, EscalaCalor> = {
     fondo: ["#2FA34C", "#2F6FD6", "#FF6A1A", "#FF3B30", "#111111"],
     texto: ["#111111", "#FFFFFF", "#111111", "#111111", "#FFFFFF"],
     nivel: (w) => (w == null ? null : w > WT.negra_mayor_que ? 4 : w >= WT.cortes[2] ? 3 : w >= WT.cortes[1] ? 2 : w >= WT.cortes[0] ? 1 : 0),
+    cortes: [...WT.cortes, WT.negra_mayor_que],
   },
   // UCI, Parte 2, Anexo C: Protocolo de Alta Temperatura
   wbgt_uci: {
@@ -67,6 +70,7 @@ export const ESCALAS: Record<VariableCalor, EscalaCalor> = {
     fondo: ["#FFFFFF", "#2FA34C", "#F5C400", "#FF6A1A", "#FF3B30"],
     texto: ["#111111", "#111111", "#111111", "#111111", "#111111"],
     nivel: (w) => (w == null ? null : w >= UCI[3] ? 4 : w >= UCI[2] ? 3 : w >= UCI[1] ? 2 : w >= UCI[0] ? 1 : 0),
+    cortes: [...UCI],
   },
 };
 

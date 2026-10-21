@@ -17,7 +17,8 @@ log = logging.getLogger(__name__)
 
 PASO = 3
 HORIZONTE_MAX = 144
-PARAMS = ["2t", "2d", "10u", "10v", "10fg", "tp", "sp", "ssrd", "tcc", "mucape"]
+# 10fg: ráfaga máxima de la última hora (hasta +90 h); 10fg3: máxima de las últimas 3 h (desde +93 h)
+PARAMS = ["2t", "2d", "10u", "10v", "10fg", "10fg3", "tp", "sp", "ssrd", "tcc", "mucape"]
 
 
 def _cliente() -> Client:
@@ -94,6 +95,8 @@ def _fila(ev, punto, corrida, valido, d, prev, pm: grib.Punto | None = None) -> 
     viento_ms = math.hypot(u, v) if u is not None and v is not None else None
     direccion = (math.degrees(math.atan2(-u, -v)) % 360) if viento_ms else None
     rafaga_ms = d.get("10fg", d.get("fg10"))
+    if rafaga_ms is None:
+        rafaga_ms = d.get("10fg3", d.get("fg310"))
     pres_hpa = d["sp"] / 100 if d.get("sp") is not None else None
     ssrd = None
     if d.get("ssrd") is not None:
