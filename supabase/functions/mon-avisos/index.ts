@@ -1,9 +1,9 @@
 // EMERTEAM Monitoreo Ambiental · correos de aviso
-// Cada 5 minutos compara el estado de cada evento con el último avisado y envía un correo cuando:
-//  · el SMN emite, modifica o levanta una alerta para la zona del evento;
-//  · sube el nivel de alguna variable en alguna fase (dentro del horizonte confiable de 5 días);
-//  · el satélite detecta rayos a menos de 24 km;
-//  · una variable que estaba por encima del umbral vuelve a quedar por debajo (un único aviso de normalización).
+// Cada 5 minutos compara el estado de cada evento con el último avisado. Por decisión de EMERTEAM (21/10/2026)
+// solo se envía correo cuando el SMN emite, modifica o levanta una alerta o un aviso a corto plazo que toca alguna
+// fase del evento. Los demás cambios (subas de nivel del pronóstico, normalizaciones, rayos satelitales y
+// disparadores del ensamble) se siguen registrando en el estado para no acumularse, pero no generan correo:
+// se consultan en la web.
 // Histéresis: las bajadas parciales no generan correo. Sin credencial de envío (o si fallan todos los envíos)
 // el estado no avanza y los cambios quedan pendientes para la próxima corrida.
 
@@ -427,16 +427,19 @@ Deno.serve(async (req) => {
     const peso = (c: Cambio) => c.tipo === "rayos" ? 100 : c.tipo === "smn_nueva" ? 90 : c.tipo === "sube" ? 10 * c.ahora
       : c.tipo === "ens" ? (c.accion === "activar" ? 8 : 4) + c.nivel / 10 : c.tipo === "smn_levantada" ? 5 : 1;
     cambios.sort((a, b) => peso(b) - peso(a));
+    // Solo alertas y avisos a corto plazo oficiales del SMN generan correo
+    const CORREO = new Set(["smn_nueva", "smn_levantada"]);
+    const enviar = cambios.filter((c) => CORREO.has(c.tipo));
 
     let enviados = 0;
     let avanzar = true;
-    if (cambios.length && !prueba && !puedeEnviar) {
+    if (enviar.length && !prueba && !puedeEnviar) {
       // Sin credencial no se registra ni se avanza el estado: los cambios salen juntos cuando se cargue la clave
       avanzar = false;
-    } else if (cambios.length && !prueba) {
+    } else if (enviar.length && !prueba) {
       const destinatarios = [...new Set([ev.organizador_email, ...((accesos ?? []).filter((a) => a.evento_id === ev.id).map((a) => a.email as string)),
         ...((equipo ?? []).map((e) => e.email as string))].map((e) => e.trim().toLowerCase()).filter(Boolean))];
-      const correo = armarCorreo(ev, cambios);
+      const correo = armarCorreo(ev, enviar);
       const registros: Record<string, unknown>[] = [];
       let cliente: ReturnType<typeof nodemailer.createTransport> | null = null;
       if (puedeEnviar) {
@@ -455,7 +458,7 @@ Deno.serve(async (req) => {
             error = String(e).slice(0, 500);
           }
         }
-        registros.push({ evento_id: ev.id, tipo: cambios.map((c) => c.tipo).join(","), destinatario: d, asunto: correo.asunto, estado, error, detalle: { cambios } });
+        registros.push({ evento_id: ev.id, tipo: enviar.map((c) => c.tipo).join(","), destinatario: d, asunto: correo.asunto, estado, error, detalle: { cambios: enviar } });
       }
       if (cliente) { try { cliente.close(); } catch { /* conexión ya cerrada */ } }
       if (cliente && destinatarios.length && enviados === 0) avanzar = false; // fallaron todos: se reintenta en la próxima corrida
@@ -467,7 +470,7 @@ Deno.serve(async (req) => {
     if (!prueba && (avanzar || !previo)) {
       await supabase.from("mon_estado").upsert({ clave: `avisos:${ev.id}`, valor: JSON.stringify(actual), actualizado_en: new Date().toISOString() });
     }
-    resultado.push({ evento: ev.nombre, cambios: cambios.length, enviados, primera_vez: !previo, pendientes: !avanzar, ...(prueba && cambios.length ? { asunto: armarCorreo(ev, cambios).asunto } : {}) });
+    resultado.push({ evento: ev.nombre, cambios: cambios.length, con_correo: enviar.length, enviados, primera_vez: !previo, pendientes: !avanzar, ...(prueba && enviar.length ? { asunto: armarCorreo(ev, enviar).asunto } : {}) });
   }
   return json({ ok: true, credencial: puedeEnviar, resultado });
 });

@@ -54,7 +54,7 @@ export function Accesos({ eventoId, eventoNombre, cupo, puedeGestionar, esEditor
   return (
     <section className="seccion tarjeta" aria-labelledby="accesos-t">
       <div className="rotulo" id="accesos-t">Equipo con acceso</div>
-      <p className="chico" style={{ marginTop: 4 }}>Ingresan sin contraseña con el correo habilitado. Quienes reciben alertas son notificados por correo ante cambios de nivel y alertas del SMN.</p>
+      <p className="chico" style={{ marginTop: 4 }}>Ingresan sin contraseña con el correo habilitado. Quienes reciben alertas son notificados por correo cuando el SMN emite, modifica o levanta una alerta o un aviso a corto plazo para la zona del evento. Los cambios del pronóstico se consultan en la web.</p>
       <p className="chico" style={{ marginTop: 4, fontWeight: 600 }}>
         {lista.length} de {cupo} {cupo === 1 ? "persona habilitada" : "personas habilitadas"}
         {esEditor && lista.length > cupo ? " · por encima del cupo, habilitadas por EMERTEAM" : ""}
