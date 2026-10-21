@@ -12,8 +12,8 @@ import { Introduccion } from "../componentes/Introduccion";
 import { Resumen } from "../componentes/Resumen";
 import { Mediciones } from "../componentes/Mediciones";
 import { AguaPanel } from "../componentes/Agua";
-import { consenso, FUENTE_UV, PRIORIDAD, uvMaxPorDia } from "../serie";
-import { Humedad, UvDato } from "../componentes/Uv";
+import { categoriaUv, consenso, FUENTE_UV, PRIORIDAD, UV_CATEGORIAS, uvMaxPorDia } from "../serie";
+import { UvDato } from "../componentes/Uv";
 import { confDisciplina, escalaCalor, estiloCalor, nombreDisciplina, participantes, riesgoWct, wct } from "../disciplinas";
 import {
   COLOR_SMN, estadoRayosGLM, ordenarAlertas, tituloAlerta, diaLocal, fmtDia, fmtFechaHora, fmtHora, num, supabase,
@@ -456,70 +456,172 @@ function franjaFavorable(dia: string, niveles: Nivel[], desde: Date, hasta: Date
   return { texto: `${hh(mejor[0])} a ${hh(mejor[1])} h`, nivel: minimo };
 }
 
+const CARDINAL = ["N", "NE", "E", "SE", "S", "SO", "O", "NO"];
+const cardinal = (dir: number | null) => (dir == null ? "" : CARDINAL[Math.round((((dir % 360) + 360) % 360) / 45) % 8]);
+const horaDec = (d: Date) => d.getTime();
+
 function DiaCarrera({ serie, v, ev }: { serie: Map<number, Pronostico & { n: number }>; v: ReturnType<typeof calcular>; ev: Evento }) {
   const escala = escalaCalor(ev.disciplina);
   const conWct = confDisciplina(ev.disciplina).wct;
   const nat = v.natacion;
   const [ini, fin] = v.exposicion;
-  const horas = [...serie.entries()].filter(([t]) => t >= ini.getTime() - 3600_000 && t <= fin.getTime() + 3600_000);
-  // Natación del triatlón: la hora que se superpone con el segmento también es zona crítica
-  const enNat = (t: number) => !!nat && t + 3600_000 > nat[0].getTime() && t < nat[1].getTime();
-  const uc = (t: number) => enNat(t) || (t >= v.inicioUltimoCuarto.getTime() && t <= v.finCarrera.getTime() + 3600_000);
-  const fase = (t: number) =>
-    t < v.largada.getTime() && !enNat(t) ? "Convocatoria" : enNat(t) ? "Natación" : t <= v.inicioUltimoCuarto.getTime() ? "Carrera" : t <= v.finCarrera.getTime() + 3600_000 ? "Último cuarto" : "Desconcentración";
+  const todas = [...serie.entries()].sort((a, b) => a[0] - b[0]);
+  // Paso del pronóstico en esta franja (1 h cerca, 3 h a varios días): cada dato representa ± medio paso
+  const cerca = todas.filter(([t]) => t >= ini.getTime() - 6 * 3600_000 && t <= fin.getTime() + 6 * 3600_000);
+  const pasos = cerca.slice(1).map(([t], i) => t - cerca[i][0]).filter((x) => x > 0);
+  const paso = pasos.length ? [...pasos].sort((a, b) => a - b)[Math.floor(pasos.length / 2)] : 3600_000;
+  const toca = (t: number, a: number, b: number) => t - paso / 2 < b && t + paso / 2 > a;
+  const enExp = (t: number) => toca(t, ini.getTime(), fin.getTime());
+  const enNat = (t: number) => !!nat && toca(t, nat[0].getTime(), nat[1].getTime());
+  const enUc = (t: number) => toca(t, v.inicioUltimoCuarto.getTime(), v.finCarrera.getTime());
+  const dentro = todas.filter(([t]) => enExp(t));
+  const iDentro = dentro.length ? todas.findIndex(([t]) => t === dentro[0][0]) : -1;
+  const antes = iDentro > 0 ? [todas[iDentro - 1]] : [];
+  const despues = iDentro >= 0 && todas[iDentro + dentro.length] ? [todas[iDentro + dentro.length]] : [];
+  const horas = [...antes, ...dentro, ...despues];
+  const fase = (t: number): { txt: string; tipo: "fuera" | "exp" | "uc" } => {
+    if (!enExp(t)) return { txt: t < ini.getTime() ? "Antes" : "Después", tipo: "fuera" };
+    if (enNat(t)) return { txt: "Natación", tipo: "uc" };
+    if (enUc(t)) return { txt: "Último cuarto", tipo: "uc" };
+    if (t < v.largada.getTime()) return { txt: "Convocatoria", tipo: "exp" };
+    if (t <= v.finCarrera.getTime()) return { txt: "Carrera", tipo: "exp" };
+    return { txt: "Desconcentración", tipo: "exp" };
+  };
+  const maxW = dentro.length ? Math.max(...dentro.map(([, p]) => p.wbgt_est ?? -99)) : null;
+  const nMax = maxW != null && maxW > -99 ? escala.nivel(maxW) : null;
+  const pasoH = Math.round(paso / 3600_000);
+  const quien = participantes(ev.disciplina);
+
   return (
-    <section className="seccion" style={{ background: "var(--superficie)", border: "1px solid var(--borde)", borderRadius: 10 }}>
-      <div className="banda" style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 8 }}>
+    <section className="seccion dc" style={{ background: "var(--superficie)", border: "1px solid var(--borde)", borderRadius: 12, overflow: "hidden" }}>
+      <div className="banda dc-banda">
         <h2>Día de carrera · {fmtDia(v.largada.toISOString())}</h2>
-        <span className="chico" style={{ color: "#cfcfcf" }}>Duración estimada {Math.floor(v.duracionMin / 60)} h {Math.round(v.duracionMin % 60)} min · demora de largada {Math.round(v.demoraMin)} min</span>
+        <span className="dc-pills">
+          {horas.length > 0 && <span className="dc-pill">Pronóstico cada {pasoH} h</span>}
+          <span className="dc-pill">Escala {escala.autor}</span>
+        </span>
       </div>
-      <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
-        <div className="grilla" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))" }}>
-          <div><div className="rotulo">Exposición de los {participantes(ev.disciplina)}</div><b>{fmtHora(ini.toISOString())} → {fmtHora(fin.toISOString())}</b></div>
-          <div><div className="rotulo">Carrera</div><b>{fmtHora(v.largada.toISOString())} → {fmtHora(v.finCarrera.toISOString())}</b></div>
-          {nat && <div><div className="rotulo">Natación · zona crítica</div><b>{fmtHora(nat[0].toISOString())} → {fmtHora(nat[1].toISOString())}</b></div>}
-          <div><div className="rotulo">Último cuarto · zona crítica</div><b>{fmtHora(v.inicioUltimoCuarto.toISOString())} → {fmtHora(v.finCarrera.toISOString())}</b></div>
-          <div><div className="rotulo">Jornada del personal</div><b>{fmtHora(v.personal[0].toISOString())} → {fmtHora(v.personal[1].toISOString())}</b></div>
+      <div className="dc-cuerpo">
+        {v.duracionMin < 15 && (
+          <div className="dc-revisar"><b>Revisar dato</b><span>La duración del evento es de {Math.round(v.duracionMin)} min: la carrera y el último cuarto quedan casi sin ventana. Corregila en Editar.</span></div>
+        )}
+        <div>
+          <div className="rotulo" style={{ marginBottom: 10 }}>Ventanas del día</div>
+          <Gantt v={v} ev={ev} puntos={todas.map(([t]) => t)} enTarjetas={new Set(horas.map(([t]) => t))} quien={quien} />
         </div>
-        {horas.length === 0 ? (
-          <p className="chico">El pronóstico horario del día de carrera aparece cuando la largada entra en el horizonte de los modelos (6 días).</p>
-        ) : (
-          <div className="desplaza">
-            <div style={{ display: "grid", gridTemplateColumns: `repeat(${horas.length}, minmax(104px, 1fr))`, gap: 8, minWidth: horas.length * 112 }}>
+        <div>
+          <div className="rotulo" style={{ marginBottom: 10 }}>Hora por hora</div>
+          {horas.length === 0 ? (
+            <p className="chico" style={{ margin: 0 }}>El pronóstico del día de carrera aparece cuando la largada entra en el horizonte de los modelos (6 días).</p>
+          ) : (
+            <div className="dc-horas">
               {horas.map(([t, p]) => {
+                const f = fase(t);
                 const n = escala.nivel(p.wbgt_est) ?? 0;
                 const st = conWct ? wct(p.t2m, p.viento10) : null;
-                const noche = (p.radiacion ?? 0) < 5;
+                const icono = iconoTiempo(p, (p.radiacion ?? 0) < 5);
+                const cat = p.uv != null ? categoriaUv(p.uv) : null;
+                const iCat = cat ? UV_CATEGORIAS.indexOf(cat) : -1;
                 return (
-                  <div key={t} style={{ borderRadius: 10, padding: "12px 8px", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, textAlign: "center", background: uc(t) ? "var(--uc-fondo)" : "var(--superficie2)", border: `2px solid ${uc(t) ? "#FF6A1A" : "transparent"}` }}>
-                    <b className="condensada" style={{ fontSize: 22 }}>{fmtHora(p.valido)}</b>
-                    <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--texto2)" }}>{fase(t)}</span>
-                    <Icono tipo={iconoTiempo(p, noche)} size={48} />
-                    <b className="condensada" style={{ fontSize: 24 }}>{num(p.t2m)}<small className="unidad">°C</small></b>
-                    <span style={{ alignSelf: "stretch", ...estiloCalor(escala.variable, n), fontWeight: 700, fontSize: 14, padding: "4px 6px", borderRadius: 4 }}>WBGT {num(p.wbgt_est, 1)} °C</span>
-                    <span style={{ fontSize: 14, fontWeight: 600 }}>
-                      <span style={{ display: "inline-block", transform: `rotate(${(p.dir_viento ?? 0) + 180}deg)` }}>↑</span> {num(p.viento10)}/{num(p.rafaga10)}
-                    </span>
-                    <span className="chico"><Humedad texto={`${num(p.hr)} %`} size={16} /></span>
-                    <UvDato uv={p.uv} compacto />
-                    {st != null && <span className="chico" title={`Sensación térmica por viento: riesgo ${riesgoWct(st).toLowerCase()} (informativo)`}>ST {num(st)} °C</span>}
-                    <span className="chico">{num(p.precip, 1)} mm/h</span>
-                  </div>
+                  <article key={t} className={`dc-h ${f.tipo}`}>
+                    <div className="dc-h-cab">
+                      <b>{fmtHora(p.valido)}</b>
+                      <span className={`dc-chip ${f.tipo}`}>{f.txt}</span>
+                    </div>
+                    <div className="dc-wbgt" style={estiloCalor(escala.variable, n)}>
+                      <span className="lab"><small>WBGT</small>{escala.niveles[n]}</span>
+                      <span className="val">{num(p.wbgt_est, 1)}<small>°C</small></span>
+                    </div>
+                    <div className="dc-cielo">
+                      <Icono tipo={icono} size={40} />
+                      <span className="t">{num(p.t2m)}<small>°C</small></span>
+                      <span className="c">{CONDICION[icono] ?? ""}</span>
+                    </div>
+                    <div className="dc-datos">
+                      <div>
+                        <span className="rotulo">Viento</span>
+                        <span className="v"><span className="flecha" style={{ transform: `rotate(${(p.dir_viento ?? 0) + 180}deg)` }}>↑</span>{num(p.viento10)} <small>km/h</small></span>
+                        <span className="sub">ráfaga {num(p.rafaga10)}{p.dir_viento != null ? ` · del ${cardinal(p.dir_viento)}` : ""}</span>
+                      </div>
+                      <div><span className="rotulo">Humedad</span><span className="v">{num(p.hr)} <small>%</small></span></div>
+                      <div>
+                        <span className="rotulo">UV</span>
+                        <span className="v">{p.uv != null ? Math.round(p.uv) : "—"} <small>{cat ? (p.uv! < 0.5 ? "Sin sol" : cat.nombre) : "sin dato"}</small></span>
+                        <span className="dc-uvb" aria-hidden>{UV_CATEGORIAS.map((c, k) => <i key={c.nombre} style={p.uv != null && p.uv >= 0.5 && k <= iCat ? { background: c.oms } : undefined} />)}</span>
+                      </div>
+                      <div><span className="rotulo">Lluvia</span><span className="v">{num(p.precip, 1)} <small>mm/h</small></span></div>
+                      {st != null && (
+                        <div className="ancho" title={`Sensación térmica por viento: riesgo ${riesgoWct(st).toLowerCase()} (informativo)`}>
+                          <span className="rotulo">Sensación térmica</span><span className="v">{num(st)} <small>°C · informativa</small></span>
+                        </div>
+                      )}
+                    </div>
+                  </article>
                 );
               })}
             </div>
-          </div>
-        )}
-        <div className="leyenda-wbgt">
-          {escala.rangos.map((r, i) => (
-            <div key={r} style={estiloCalor(escala.variable, i)}>
-              <b>{escala.niveles[i]}</b> <span>{r}</span>
-            </div>
-          ))}
+          )}
         </div>
-        <span className="chico">Escala y colores WBGT: {escala.variable === "wbgt" ? "World Athletics (2020), Tabla 1; «Riesgo bajo» corresponde a «Almost Safe»" : escala.variable === "wbgt_wt" ? "World Triathlon, regla 10.3 (banderas)" : "UCI, Parte 2, Anexo C (zonas)"}{conWct ? " · ST: sensación térmica por viento, informativa (sin umbral de decisión)" : ""} · viento medio / ráfaga en km/h a 10 m · gota con %: humedad relativa · {FUENTE_UV}</span>
+        <div>
+          <div className="rotulo" style={{ marginBottom: 10 }}>Escala WBGT{nMax != null ? ` · máximo previsto en la exposición de los ${quien}` : ""}</div>
+          <div className={`dc-escala${nMax != null ? " con-marca" : ""}`}>
+            {escala.rangos.map((r, i) => (
+              <div key={r} style={{ ...estiloCalor(escala.variable, i), ...(i === nMax ? { outline: "3px solid #FF6A1A", outlineOffset: -3 } : {}) }}>
+                {i === nMax && <span className="marca">{num(maxW, 1)} °C</span>}
+                <b>{escala.niveles[i]}</b><span>{r}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <span className="chico">Escala y colores WBGT: {escala.variable === "wbgt" ? "World Athletics (2020), Tabla 1; «Riesgo bajo» corresponde a «Almost Safe»" : escala.variable === "wbgt_wt" ? "World Triathlon, regla 10.3 (banderas)" : "UCI, Parte 2, Anexo C (zonas)"}{conWct ? " · sensación térmica por viento informativa (sin umbral de decisión)" : ""} · viento medio y ráfaga en km/h a 10 m, con la dirección de donde viene · {FUENTE_UV} · las horas fuera de la exposición se muestran atenuadas como contexto.</span>
       </div>
     </section>
+  );
+}
+
+/** Ventanas del día como carriles sobre una misma escala horaria */
+function Gantt({ v, ev, puntos, enTarjetas, quien }: { v: ReturnType<typeof calcular>; ev: Evento; puntos: number[]; enTarjetas: Set<number>; quien: string }) {
+  const H = 3600_000;
+  const t0 = Math.floor(horaDec(v.personal[0]) / H) * H;
+  const t1 = Math.ceil(horaDec(v.personal[1]) / H) * H;
+  const total = t1 - t0;
+  const pos = (t: number) => `${((t - t0) / total) * 100}%`;
+  const ancho = (a: Date, b: Date) => `max(6px, ${((b.getTime() - a.getTime()) / total) * 100}%)`;
+  const horasTot = total / H;
+  const cada = horasTot > 12 ? 3 : 2;
+  const marcas: number[] = [];
+  for (let t = t0; t <= t1; t += H) if (Math.round((t - t0) / H) % cada === 0) marcas.push(t);
+  const fondo = { ["--h" as string]: `${100 / horasTot}%` } as React.CSSProperties;
+  const fila = (lab: string, a: Date, b: Date, extra: React.ReactNode, clase = "") => (
+    <>
+      <div className={`dc-g-lab ${clase}`}><b>{lab}</b><span>{fmtHora(a.toISOString())} → {fmtHora(b.toISOString())}</span></div>
+      <div className="dc-g-carril" style={fondo}>{extra}</div>
+    </>
+  );
+  const pts = puntos.filter((t) => t >= t0 && t <= t1);
+  return (
+    <div className="dc-gantt">
+      <div />
+      <div className="dc-g-eje">{marcas.map((t) => <span key={t} style={{ left: pos(t) }}>{fmtHora(new Date(t).toISOString())}</span>)}</div>
+      {fila("Personal", v.personal[0], v.personal[1], <div className="dc-g-barra personal" style={{ left: pos(horaDec(v.personal[0])), width: ancho(v.personal[0], v.personal[1]) }} />)}
+      {fila(`Exposición`, v.exposicion[0], v.exposicion[1], <div className="dc-g-barra exp" style={{ left: pos(horaDec(v.exposicion[0])), width: ancho(v.exposicion[0], v.exposicion[1]) }} title={`Exposición de los ${quien}`} />)}
+      {v.natacion && fila("Natación", v.natacion[0], v.natacion[1], <div className="dc-g-barra uc" style={{ left: pos(horaDec(v.natacion[0])), width: ancho(v.natacion[0], v.natacion[1]) }} />, "uc")}
+      {fila(ev.disciplina === "running" || !ev.disciplina ? "Carrera" : "Prueba", v.largada, v.finCarrera, <>
+        <div className="dc-g-barra carrera" style={{ left: pos(horaDec(v.largada)), width: ancho(v.largada, v.finCarrera) }} />
+        <div className="dc-g-barra uc" style={{ left: pos(horaDec(v.inicioUltimoCuarto)), width: ancho(v.inicioUltimoCuarto, v.finCarrera), borderRadius: "0 5px 5px 0" }} />
+      </>)}
+      {fila("Último cuarto", v.inicioUltimoCuarto, v.finCarrera, <>
+        <div className="dc-g-barra uc" style={{ left: pos(horaDec(v.inicioUltimoCuarto)), width: ancho(v.inicioUltimoCuarto, v.finCarrera) }} />
+        <span className="dc-g-zona" style={{ left: `calc(${pos(horaDec(v.finCarrera))} + 8px)` }}>Zona crítica</span>
+      </>, "uc")}
+      <div className="dc-g-lab"><b>Pronóstico</b><span>● horas detalladas</span></div>
+      <div className="dc-g-carril pron" style={fondo}>
+        {pts.map((t) => <i key={t} className={enTarjetas.has(t) ? "lleno" : ""} style={{ left: pos(t) }} title={fmtHora(new Date(t).toISOString())} />)}
+      </div>
+      <div className="dc-g-largada" style={{ ["--x" as string]: `${(horaDec(v.largada) - t0) / total}` } as React.CSSProperties}>
+        <span>Largada {fmtHora(v.largada.toISOString())}</span>
+      </div>
+    </div>
   );
 }
 
