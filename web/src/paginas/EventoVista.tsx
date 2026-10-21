@@ -11,13 +11,15 @@ import { armarComunicado } from "../comunicacion";
 import { Introduccion } from "../componentes/Introduccion";
 import { Resumen } from "../componentes/Resumen";
 import { Mediciones } from "../componentes/Mediciones";
+import { AguaPanel } from "../componentes/Agua";
 import { consenso, FUENTE_UV, PRIORIDAD, uvMaxPorDia } from "../serie";
 import { Humedad, UvDato } from "../componentes/Uv";
+import { confDisciplina, escalaCalor, estiloCalor, nombreDisciplina, participantes, riesgoWct, wct } from "../disciplinas";
 import {
   COLOR_SMN, estadoRayosGLM, ordenarAlertas, tituloAlerta, diaLocal, fmtDia, fmtFechaHora, fmtHora, num, supabase,
   type AlertaSMN, type Evento, type Rayo, type Nivel, type Pronostico, type Sesgo, type Uv,
 } from "../datos";
-import { estiloNivel, estiloVariable, estiloWA, NOMBRE_CORTO, NOMBRE_FASE, NOMBRE_VARIABLE, NOMBRE_WA, REGLAS, TIPO_FUENTE, nombreNivel, recomendacion } from "../reglas";
+import { estiloNivel, estiloVariable, NOMBRE_CORTO, NOMBRE_FASE, NOMBRE_VARIABLE, REGLAS, TIPO_FUENTE, nombreNivel, recomendacion } from "../reglas";
 import { calcular } from "../ventanas";
 
 
@@ -56,6 +58,7 @@ export function EventoVista() {
   const [informeAprobado, setInformeAprobado] = useState(false);
   const [sesgos, setSesgos] = useState<Sesgo[]>([]);
   const [uv, setUv] = useState<Uv[]>([]);
+  const [refrescoAgua, setRefrescoAgua] = useState(0);
   const [error, setError] = useState("");
   const [descarteSonido, setDescarteSonido] = useState(false);
   const sonido = useSonido();
@@ -165,7 +168,7 @@ export function EventoVista() {
 
   return (
     <>
-      <Barra titulo={ev.nombre} subtitulo={`${fmtFechaHora(ev.largada)} · ${cuenta}`} abajo={pestanas}>
+      <Barra titulo={ev.nombre} subtitulo={`${ev.disciplina && ev.disciplina !== "running" ? `${nombreDisciplina(ev.disciplina)} · ` : ""}${fmtFechaHora(ev.largada)} · ${cuenta}`} abajo={pestanas}>
         {alertas.length > 0 && <a href="#alerta-smn" className="boton-osc alerta" style={{ background: COLOR_SMN[alertas[0].color], color: "#111", borderColor: "#fff", fontWeight: 800 }}>Alerta SMN</a>}
         {admin && <Link className="boton-osc" to={`/evento/${ev.id}/dashboard`}>Dashboard</Link>}
         {(admin || informeAprobado) && <Link className="boton-osc" to={`/evento/${ev.id}/informe`}>Informe</Link>}
@@ -241,9 +244,10 @@ export function EventoVista() {
             <TiraDias serie={serie} uvDia={uvDia} niveles={niveles} desde={v.armado[0]} hasta={v.desarme[1]} largada={v.largada} eventoId={ev.id} />
             <Introduccion />
             <Resumen vigentes={vigentes} alertas={alertas} eventoId={ev.id} />
+            {confDisciplina(ev.disciplina).agua && <AguaPanel ev={ev} />}
             {comunicado && (
               <section className="seccion tarjeta" style={{ borderLeft: "4px solid var(--naranja)", display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
-                <span><b>Aviso preventivo para corredores</b> por {comunicado.motivos.join(", ").toLowerCase()}. Hay un texto sugerido para redes sociales, WhatsApp y mail.</span>
+                <span><b>Aviso preventivo para {participantes(ev.disciplina)}</b> por {comunicado.motivos.join(", ").toLowerCase()}. Hay un texto sugerido para redes sociales, WhatsApp y mail.</span>
                 <Link className="boton primario" to={`/evento/${ev.id}/carrera#comunicacion`}>Ver textos</Link>
               </section>
             )}
@@ -252,27 +256,32 @@ export function EventoVista() {
         )}
         {actual === "armado" && (
           <>
-            <Dias titulo="Armado" serie={serie} uvDia={uvDia} niveles={nivelesFase("armado")} desde={v.armado[0]} hasta={v.armado[1]} franjaSegura
+            <Dias titulo="Armado" serie={serie} uvDia={uvDia} conWct={confDisciplina(ev.disciplina).wct} niveles={nivelesFase("armado")} desde={v.armado[0]} hasta={v.armado[1]} franjaSegura
               nota={`${ev.ubicacion} · armado desde ${fmtFechaHora(v.armado[0].toISOString())} hasta ${fmtFechaHora(v.armado[1].toISOString())}`} />
             <Recomendaciones lista={delaFase("armado")} vacio="Con el pronóstico actual no hay recomendaciones para el armado." />
           </>
         )}
         {actual === "carrera" && (
           <>
-            <DiaCarrera serie={serie} v={v} />
+            <DiaCarrera serie={serie} v={v} ev={ev} />
             <Recomendaciones lista={delaFase("carrera")} vacio="Con el pronóstico actual no hay recomendaciones para el día de carrera." />
             {comunicado && <Comunicacion c={comunicado} />}
           </>
         )}
         {actual === "desarme" && (
           <>
-            <Dias titulo="Desarme" serie={serie} uvDia={uvDia} niveles={nivelesFase("desarme")} desde={v.desarme[0]} hasta={v.desarme[1]} franjaSegura
+            <Dias titulo="Desarme" serie={serie} uvDia={uvDia} conWct={confDisciplina(ev.disciplina).wct} niveles={nivelesFase("desarme")} desde={v.desarme[0]} hasta={v.desarme[1]} franjaSegura
               nota={`${ev.ubicacion} · desarme desde ${fmtFechaHora(v.desarme[0].toISOString())} hasta ${fmtFechaHora(v.desarme[1].toISOString())}`} />
             <Recomendaciones lista={delaFase("desarme")} vacio="Con el pronóstico actual no hay recomendaciones para el desarme." />
           </>
         )}
         {actual === "guia" && <Guia ctx={{ niveles: vigentes, alertas }} />}
-        {actual === "mediciones" && <Mediciones eventoId={ev.id} puedeCargar={admin} miEmail={miEmail} />}
+        {actual === "mediciones" && (
+          <>
+            {confDisciplina(ev.disciplina).agua && <AguaPanel ev={ev} refresco={refrescoAgua} />}
+            <Mediciones eventoId={ev.id} puedeCargar={admin} miEmail={miEmail} disciplina={ev.disciplina} onGuardada={() => setRefrescoAgua((x) => x + 1)} />
+          </>
+        )}
         {actual === "equipo" && (
           <>
             <Accesos eventoId={ev.id} eventoNombre={ev.nombre} cupo={ev.cupo_equipo ?? 3} puedeGestionar={editor || ev.organizador_email.toLowerCase() === miEmail} esEditor={editor} miEmail={miEmail} />
@@ -329,8 +338,8 @@ function iconoAlerta(f: string): TipoIcono {
   return "nube";
 }
 
-function Dias({ titulo, serie, uvDia, niveles, desde, hasta, nota, franjaSegura }: {
-  titulo: string; serie: Map<number, Pronostico & { n: number }>; uvDia: Map<string, number>; niveles: Nivel[];
+function Dias({ titulo, serie, uvDia, conWct, niveles, desde, hasta, nota, franjaSegura }: {
+  titulo: string; serie: Map<number, Pronostico & { n: number }>; uvDia: Map<string, number>; conWct?: boolean; niveles: Nivel[];
   desde: Date; hasta: Date; nota: string; franjaSegura?: boolean;
 }) {
   const dias = new Map<string, (Pronostico & { n: number })[]>();
@@ -355,6 +364,8 @@ function Dias({ titulo, serie, uvDia, niveles, desde, hasta, nota, franjaSegura 
           const raf = Math.max(...ps.map((p) => p.rafaga10 ?? 0));
           const hrs = ps.map((p) => p.hr).filter((x): x is number => x != null);
           const uvMax = uvDia.get(d);
+          const sts = conWct ? ps.map((p) => wct(p.t2m, p.viento10)).filter((x): x is number => x != null) : [];
+          const stMin = sts.length ? Math.min(...sts) : null;
           const lluvia = ps.reduce((a, p) => a + (p.precip ?? 0) * (horasPaso.get(new Date(p.valido).getTime()) ?? 1), 0);
           const delDia = niveles.filter((n) => diaLocal(n.desde) <= d && diaLocal(n.hasta) >= d);
           const peorDia = delDia.reduce<Nivel | null>((m, n) => (!m || n.nivel > m.nivel ? n : m), null);
@@ -388,6 +399,7 @@ function Dias({ titulo, serie, uvDia, niveles, desde, hasta, nota, franjaSegura 
                 <div className="dia-dato"><Icono tipo="humedad" size={30} /><div><div className="v">{hrs.length ? `${num(Math.min(...hrs))}–${num(Math.max(...hrs))}` : "—"}<small>%</small></div><div className="e">Humedad</div></div></div>
                 <div className="dia-dato"><UvDato uv={uvMax} /></div>
               </div>
+              {stMin != null && <div className="dia-st">Sensación térmica mínima <b>{num(stMin)} °C</b> · riesgo {riesgoWct(stMin).toLowerCase()} <span className="chico">(informativo)</span></div>}
               <div className="dia-op">
                 {peorDia && nivelDia > 0 ? (
                   <div className="dia-accion" style={{ borderColor: colorNivel }}>
@@ -440,13 +452,17 @@ function franjaFavorable(dia: string, niveles: Nivel[], desde: Date, hasta: Date
   return { texto: `${hh(mejor[0])} a ${hh(mejor[1])} h`, nivel: minimo };
 }
 
-function DiaCarrera({ serie, v }: { serie: Map<number, Pronostico & { n: number }>; v: ReturnType<typeof calcular> }) {
+function DiaCarrera({ serie, v, ev }: { serie: Map<number, Pronostico & { n: number }>; v: ReturnType<typeof calcular>; ev: Evento }) {
+  const escala = escalaCalor(ev.disciplina);
+  const conWct = confDisciplina(ev.disciplina).wct;
+  const nat = v.natacion;
   const [ini, fin] = v.exposicion;
   const horas = [...serie.entries()].filter(([t]) => t >= ini.getTime() - 3600_000 && t <= fin.getTime() + 3600_000);
-  const uc = (t: number) => t >= v.inicioUltimoCuarto.getTime() && t <= v.finCarrera.getTime() + 3600_000;
+  // Natación del triatlón: la hora que se superpone con el segmento también es zona crítica
+  const enNat = (t: number) => !!nat && t + 3600_000 > nat[0].getTime() && t < nat[1].getTime();
+  const uc = (t: number) => enNat(t) || (t >= v.inicioUltimoCuarto.getTime() && t <= v.finCarrera.getTime() + 3600_000);
   const fase = (t: number) =>
-    t < v.largada.getTime() ? "Convocatoria" : t <= v.inicioUltimoCuarto.getTime() ? "Carrera" : t <= v.finCarrera.getTime() + 3600_000 ? "Último cuarto" : "Desconcentración";
-  const nivelWA = (w: number | null) => (w == null ? 0 : w >= 30 ? 4 : w >= 28 ? 3 : w >= 25 ? 2 : w >= 21 ? 1 : 0);
+    t < v.largada.getTime() && !enNat(t) ? "Convocatoria" : enNat(t) ? "Natación" : t <= v.inicioUltimoCuarto.getTime() ? "Carrera" : t <= v.finCarrera.getTime() + 3600_000 ? "Último cuarto" : "Desconcentración";
   return (
     <section className="seccion" style={{ background: "var(--superficie)", border: "1px solid var(--borde)", borderRadius: 10 }}>
       <div className="banda" style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 8 }}>
@@ -455,8 +471,9 @@ function DiaCarrera({ serie, v }: { serie: Map<number, Pronostico & { n: number 
       </div>
       <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
         <div className="grilla" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))" }}>
-          <div><div className="rotulo">Exposición del corredor</div><b>{fmtHora(ini.toISOString())} → {fmtHora(fin.toISOString())}</b></div>
+          <div><div className="rotulo">Exposición de los {participantes(ev.disciplina)}</div><b>{fmtHora(ini.toISOString())} → {fmtHora(fin.toISOString())}</b></div>
           <div><div className="rotulo">Carrera</div><b>{fmtHora(v.largada.toISOString())} → {fmtHora(v.finCarrera.toISOString())}</b></div>
+          {nat && <div><div className="rotulo">Natación · zona crítica</div><b>{fmtHora(nat[0].toISOString())} → {fmtHora(nat[1].toISOString())}</b></div>}
           <div><div className="rotulo">Último cuarto · zona crítica</div><b>{fmtHora(v.inicioUltimoCuarto.toISOString())} → {fmtHora(v.finCarrera.toISOString())}</b></div>
           <div><div className="rotulo">Jornada del personal</div><b>{fmtHora(v.personal[0].toISOString())} → {fmtHora(v.personal[1].toISOString())}</b></div>
         </div>
@@ -466,7 +483,8 @@ function DiaCarrera({ serie, v }: { serie: Map<number, Pronostico & { n: number 
           <div className="desplaza">
             <div style={{ display: "grid", gridTemplateColumns: `repeat(${horas.length}, minmax(104px, 1fr))`, gap: 8, minWidth: horas.length * 112 }}>
               {horas.map(([t, p]) => {
-                const n = nivelWA(p.wbgt_est);
+                const n = escala.nivel(p.wbgt_est) ?? 0;
+                const st = conWct ? wct(p.t2m, p.viento10) : null;
                 const noche = (p.radiacion ?? 0) < 5;
                 return (
                   <div key={t} style={{ borderRadius: 10, padding: "12px 8px", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, textAlign: "center", background: uc(t) ? "var(--uc-fondo)" : "var(--superficie2)", border: `2px solid ${uc(t) ? "#FF6A1A" : "transparent"}` }}>
@@ -474,12 +492,13 @@ function DiaCarrera({ serie, v }: { serie: Map<number, Pronostico & { n: number 
                     <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--texto2)" }}>{fase(t)}</span>
                     <Icono tipo={iconoTiempo(p, noche)} size={48} />
                     <b className="condensada" style={{ fontSize: 24 }}>{num(p.t2m)}<small className="unidad">°C</small></b>
-                    <span style={{ alignSelf: "stretch", ...estiloWA(n), fontWeight: 700, fontSize: 14, padding: "4px 6px", borderRadius: 4 }}>WBGT {num(p.wbgt_est, 1)} °C</span>
+                    <span style={{ alignSelf: "stretch", ...estiloCalor(escala.variable, n), fontWeight: 700, fontSize: 14, padding: "4px 6px", borderRadius: 4 }}>WBGT {num(p.wbgt_est, 1)} °C</span>
                     <span style={{ fontSize: 14, fontWeight: 600 }}>
                       <span style={{ display: "inline-block", transform: `rotate(${(p.dir_viento ?? 0) + 180}deg)` }}>↑</span> {num(p.viento10)}/{num(p.rafaga10)}
                     </span>
                     <span className="chico"><Humedad texto={`${num(p.hr)} %`} size={16} /></span>
                     <UvDato uv={p.uv} compacto />
+                    {st != null && <span className="chico" title={`Sensación térmica por viento: riesgo ${riesgoWct(st).toLowerCase()} (informativo)`}>ST {num(st)} °C</span>}
                     <span className="chico">{num(p.precip, 1)} mm/h</span>
                   </div>
                 );
@@ -488,13 +507,13 @@ function DiaCarrera({ serie, v }: { serie: Map<number, Pronostico & { n: number 
           </div>
         )}
         <div className="leyenda-wbgt">
-          {["< 21 °C", "21–25 °C", "25–28 °C", "28–30 °C", "> 30 °C"].map((r, i) => (
-            <div key={r} style={estiloWA(i)}>
-              <b>{NOMBRE_WA[i]}</b> <span>{r}</span>
+          {escala.rangos.map((r, i) => (
+            <div key={r} style={estiloCalor(escala.variable, i)}>
+              <b>{escala.niveles[i]}</b> <span>{r}</span>
             </div>
           ))}
         </div>
-        <span className="chico">Escala y colores WBGT: World Athletics (2020), Tabla 1; «Riesgo bajo» corresponde a «Almost Safe» · viento medio / ráfaga en km/h a 10 m · gota con %: humedad relativa · {FUENTE_UV}</span>
+        <span className="chico">Escala y colores WBGT: {escala.variable === "wbgt" ? "World Athletics (2020), Tabla 1; «Riesgo bajo» corresponde a «Almost Safe»" : escala.variable === "wbgt_wt" ? "World Triathlon, regla 10.3 (banderas)" : "UCI, Parte 2, Anexo C (zonas)"}{conWct ? " · ST: sensación térmica por viento, informativa (sin umbral de decisión)" : ""} · viento medio / ráfaga en km/h a 10 m · gota con %: humedad relativa · {FUENTE_UV}</span>
       </div>
     </section>
   );

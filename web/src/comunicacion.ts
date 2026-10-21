@@ -3,6 +3,7 @@
 // Solo se arman cuando hay un aviso preventivo para el día de carrera: estrés térmico (escala World Athletics),
 // tormenta, lluvia, o una alerta del SMN vigente durante la ventana del corredor.
 import type { AlertaSMN, Evento, Nivel } from "./datos";
+import { confDisciplina, participantes } from "./disciplinas";
 
 export type Comunicado = {
   motivos: string[];
@@ -41,6 +42,34 @@ function calor(n: number): Bloque | null {
       corto: "Las condiciones de calor previstas son peligrosas. La organización está evaluando cambios en la carrera.",
       medio: "Las condiciones de calor previstas son peligrosas. La organización está evaluando cambios en la carrera: seguí los canales oficiales.",
       largo: "Las condiciones de calor previstas para el día de la carrera son peligrosas. La organización está evaluando cambios de horario, de recorrido o la suspensión de la prueba, y te los vamos a comunicar por este medio y por nuestros canales oficiales. Te pedimos que estés atento a las novedades.",
+    },
+  ][n];
+  return b ? { clave: "calor", emoji: "☀️", titulo: "Calor", ...b } : null;
+}
+
+/** Calor para disciplinas distintas de running: textos neutros (competir, no correr) */
+function calorGeneral(n: number, quien: string, agua: boolean): Bloque | null {
+  const b = [
+    null,
+    {
+      corto: "Se prevé calor moderado: hidratate desde el día anterior, usá protector solar y ajustá el esfuerzo.",
+      medio: "Se prevé calor moderado. Hidratate desde el día anterior, usá protector solar y ajustá el esfuerzo a las condiciones: no es un día para buscar marcas.",
+      largo: `Para el día del evento se prevé calor moderado. Te recomendamos hidratarte desde el día anterior, usar protector solar y ajustar el esfuerzo a las condiciones. Si sentís mareo, confusión o escalofríos, detenete y pedí asistencia al personal de la organización.`,
+    },
+    {
+      corto: "Se esperan condiciones de calor elevadas: bajá el esfuerzo, hidratate en cada puesto y enfriate cuando puedas.",
+      medio: `Se esperan condiciones de calor elevadas. Bajá el esfuerzo desde la largada, hidratate en cada puesto y enfriate cuando puedas. Si estuviste enfermo o dormiste mal, no compitas.`,
+      largo: `Para el día del evento se esperan condiciones de calor elevadas. Bajá el esfuerzo desde la largada, hidratate en cada puesto y enfriate cuando puedas.${agua ? " Al salir del agua, tomate unos segundos antes de exigirte." : ""} Si en los días previos estuviste enfermo, con fiebre o dormiste mal, te pedimos que no compitas. Prestá especial atención al tramo final. Si ves a otros ${quien} con dificultades, avisá al personal más cercano.`,
+    },
+    {
+      corto: "Se prevé calor extremo: la organización puede acortar la distancia o cambiar el horario. Seguí los canales oficiales.",
+      medio: "Se prevé calor extremo. La organización puede acortar la distancia o cambiar el horario. Si no entrenaste con calor, considerá no largar; si largás, hacelo sin objetivo de tiempo.",
+      largo: `Para el día del evento se prevé calor extremo. La organización puede acortar la distancia o modificar el horario, y lo va a informar por este medio. Si no entrenaste con calor en las últimas semanas, considerá no largar. Si largás, hacelo sin objetivo de tiempo, hidratate y enfriate en todos los puestos, y ante cualquier síntoma (mareo, confusión, náuseas, escalofríos) detenete y pedí asistencia.`,
+    },
+    {
+      corto: "Las condiciones de calor previstas son peligrosas. La organización está evaluando cambios en el evento.",
+      medio: "Las condiciones de calor previstas son peligrosas. La organización está evaluando cambios en el evento: seguí los canales oficiales.",
+      largo: "Las condiciones de calor previstas para el día del evento son peligrosas. La organización está evaluando cambios de horario, de distancia o la suspensión de la prueba, y te los vamos a comunicar por este medio y por nuestros canales oficiales.",
     },
   ][n];
   return b ? { clave: "calor", emoji: "☀️", titulo: "Calor", ...b } : null;
@@ -88,38 +117,44 @@ export function armarComunicado(ev: Evento, nivelesCarrera: Nivel[], alertas: Al
     const h = a.hasta ? new Date(a.hasta).getTime() : Infinity;
     return d <= ventana[1].getTime() && h >= ventana[0].getTime();
   });
-  const bloques = [...enVentana.map(smn), tormenta(max("tormenta")), calor(max("wbgt")), lluvia(max("lluvia"))].filter((b): b is Bloque => !!b);
+  const conf = confDisciplina(ev.disciplina);
+  const running = conf === confDisciplina("running");
+  const quien = participantes(ev.disciplina);
+  // Severidad del texto según la escala: World Triathlon azul ≈ moderado; UCI verde (riesgo bajo) no genera texto
+  const nCalor = conf.calor === "wbgt_uci" ? Math.max(0, max("wbgt_uci") - 1) : max(conf.calor);
+  const bloqueCalor = running ? calor(nCalor) : calorGeneral(nCalor, quien, conf.agua);
+  const bloques = [...enVentana.map(smn), tormenta(max("tormenta")), bloqueCalor, lluvia(max("lluvia"))].filter((b): b is Bloque => !!b);
   if (!bloques.length) return null;
 
-  const usados = nivelesCarrera.filter((n) => n.nivel > 0 && ["wbgt", "tormenta", "lluvia"].includes(n.variable));
+  const usados = nivelesCarrera.filter((n) => n.nivel > 0 && [conf.calor, "tormenta", "lluvia"].includes(n.variable));
   const confirmar = usados.length > 0 && usados.every((n) => n.confianza === "baja");
   const dia = fecha(ev.largada);
   const hl = hora(ev.largada);
 
   const redes = [
-    `${ev.nombre} · Aviso para corredores`,
+    `${ev.nombre} · Aviso para ${quien}`,
     `${dia.charAt(0).toUpperCase() + dia.slice(1)} · largada ${hl} h`,
     "",
     ...bloques.map((b) => `${b.emoji} ${b.corto}`),
     "",
-    "Ante cualquier síntoma durante la carrera, detenete y pedí asistencia al personal. Seguí nuestras cuentas para novedades.",
+    `Ante cualquier síntoma durante ${running ? "la carrera" : "la prueba"}, detenete y pedí asistencia al personal. Seguí nuestras cuentas para novedades.`,
   ].join("\n");
 
   const whatsapp = [
-    `*${ev.nombre} · Aviso para corredores*`,
+    `*${ev.nombre} · Aviso para ${quien}*`,
     `_${dia} · largada ${hl} h_`,
     "",
     ...bloques.flatMap((b) => [`${b.emoji} *${b.titulo}:* ${b.medio}`, ""]),
-    "Ante cualquier síntoma durante la carrera, detenete y pedí asistencia al personal de la organización.",
+    `Ante cualquier síntoma durante ${running ? "la carrera" : "la prueba"}, detenete y pedí asistencia al personal de la organización.`,
   ].join("\n");
 
   const cuerpo = [
     "Hola,",
     "",
-    `Te escribimos para compartir las condiciones previstas para ${ev.nombre}, el ${dia} con largada a las ${hl} h, y algunas recomendaciones para que corras de forma segura.`,
+    `Te escribimos para compartir las condiciones previstas para ${ev.nombre}, el ${dia} con largada a las ${hl} h, y algunas recomendaciones para que ${running ? "corras" : "compitas"} de forma segura.`,
     "",
     ...bloques.flatMap((b) => [`${b.titulo}`, b.largo, ""]),
-    "Ante cualquier síntoma durante la carrera, detenete y pedí asistencia al personal de la organización. Si ves a otro corredor con dificultades, avisá al puesto más cercano.",
+    `Ante cualquier síntoma durante ${running ? "la carrera" : "la prueba"}, detenete y pedí asistencia al personal de la organización. Si ves a ${running ? "otro corredor" : "otro participante"} con dificultades, avisá al puesto más cercano.`,
     "",
     "Si las condiciones cambian, te lo vamos a informar por este medio y por nuestros canales oficiales.",
     "",
@@ -133,6 +168,6 @@ export function armarComunicado(ev: Evento, nivelesCarrera: Nivel[], alertas: Al
     confirmar,
     redes,
     whatsapp,
-    mail: { asunto: `${ev.nombre} · Recomendaciones para el día de la carrera`, cuerpo },
+    mail: { asunto: `${ev.nombre} · Recomendaciones para el día ${running ? "de la carrera" : "del evento"}`, cuerpo },
   };
 }

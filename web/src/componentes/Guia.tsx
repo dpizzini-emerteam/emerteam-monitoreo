@@ -8,6 +8,7 @@ import {
   COLOR_NIVEL, estiloNivel, estiloWA, NOMBRE_FASE, NOMBRE_VARIABLE, NOMBRE_WA, nombreNivel, recomendacion, REGLAS, TIPO_FUENTE,
 } from "../reglas";
 import { Icono, type TipoIcono } from "./Icono";
+import { DISCIPLINAS, ESCALAS, confDisciplina, estiloCalor, nombreDisciplina } from "../disciplinas";
 
 const coma = (x: number, d = 0) => num(x, d);
 const KM_MI = 1 / 1.609344; // detector configurado en millas
@@ -20,6 +21,7 @@ const SECCIONES: { id: string; titulo: string; icono: TipoIcono }[] = [
   { id: "g-tormenta", titulo: "Tormenta eléctrica", icono: "tormenta" },
   { id: "g-lluvia", titulo: "Lluvia y suelo", icono: "lluvia" },
   { id: "g-smn", titulo: "Alertas del SMN", icono: "rayo" },
+  { id: "g-disciplinas", titulo: "Otras disciplinas", icono: "gota" },
   { id: "g-decisiones", titulo: "Decisiones", icono: "corredor" },
   { id: "g-fuentes", titulo: "Fuentes", icono: "gota" },
   { id: "g-glosario", titulo: "Glosario", icono: "nube" },
@@ -319,6 +321,87 @@ export function Guia({ ctx }: { ctx: Contexto }) {
         </Tecnico>
       </Seccion>
 
+      <Seccion id="g-disciplinas" titulo="Otras disciplinas" icono="gota" organizador={
+        <p>Cada evento tiene una disciplina. Cambia <b>la escala de calor</b> (la de su federación internacional) y suma <b>el agua</b> en triatlón y aguas abiertas. Viento, tormenta, lluvia, estructuras y personal siguen los mismos criterios para todas. Lo que no tiene norma publicada <b>se muestra pero no genera niveles ni avisos</b> hasta que EMERTEAM fije su criterio.</p>
+      }>
+        <EnEsteEvento ctx={ctx} variables={["wbgt_wt", "wbgt_uci"]} />
+        <div className="desplaza">
+          <table className="tabla guia-tabla">
+            <thead><tr><th>Disciplina</th><th>Escala de calor</th><th>Agua</th><th>Sensación térmica por viento</th></tr></thead>
+            <tbody>
+              {DISCIPLINAS.map((d) => {
+                const c = confDisciplina(d);
+                return <tr key={d}><td><b>{nombreDisciplina(d)}</b></td><td>{ESCALAS[c.calor].autor}</td><td>{c.agua ? "Temperatura y calidad, medidas en terreno" : "—"}</td><td>{c.wct ? "Informativa" : "—"}</td></tr>;
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Calor · triatlón (World Triathlon) y ciclismo (UCI)</h3>
+        <div className="guia-dos">
+          {(["wbgt_wt", "wbgt_uci"] as const).map((v) => (
+            <div key={v}>
+              <div className="desplaza">
+                <table className="tabla guia-tabla">
+                  <thead><tr><th>{ESCALAS[v].autor}</th><th>WBGT</th><th>Medida</th></tr></thead>
+                  <tbody>
+                    {ESCALAS[v].niveles.map((nombre, i) => (
+                      <tr key={nombre}><td><span className="badge" style={estiloCalor(v, i)}>{nombre}</span></td><td style={{ whiteSpace: "nowrap" }}>{ESCALAS[v].rangos[i]}</td><td>{recomendacion(v, i, "carrera") ?? "Sin medidas adicionales."}</td></tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <Fuente regla={v === "wbgt_wt" ? "wt_wbgt" : "uci_wbgt"} />
+            </div>
+          ))}
+        </div>
+        <p className="chico">Triatlón: bandera roja y negra según World Triathlon; azul y naranja con medidas de EMERTEAM. Ciclismo: medidas del Anexo C de la UCI. «Por encima de 28 °C» se toma desde 28,0 °C por prudencia.</p>
+
+        <h3>Agua · triatlón (World Triathlon)</h3>
+        <div className="desplaza">
+          <table className="tabla guia-tabla">
+            <thead><tr><th>Agua</th><th>750 m</th><th>1000 m</th><th>1500 m</th><th>1900 a 3000 m</th><th>3800 a 4000 m</th></tr></thead>
+            <tbody>
+              {U.agua_wt.franjas.map((f, i) => {
+                const hasta = i === 0 ? null : U.agua_wt.franjas[i - 1].desde;
+                const rango = i === 0 ? `≥ ${coma(f.desde, 1)} °C` : f.desde < 0 ? `< ${coma(hasta!, 1)} °C` : `${coma(f.desde, 1)} a ${coma(hasta! - 0.1, 1)} °C`;
+                return <tr key={i}><td style={{ whiteSpace: "nowrap" }}><b>{rango}</b></td>{(f.valores as (number | string | null)[]).map((x, j) => <td key={j}>{x === null ? <span className="badge" style={estiloNivel(4)}>Se cancela</span> : x === "orig" ? "Original" : `${x} m`}</td>)}</tr>;
+              })}
+            </tbody>
+          </table>
+        </div>
+        <p>Neopreno obligatorio con agua de {coma(U.agua_wt.neopreno_obligatorio_hasta, 1)} °C o menos. Para grupos de edad, prohibido desde {coma(U.agua_wt.neopreno_prohibido_grupos_edad.hasta_1500, 1)} °C (natación de hasta 1500 m) o {coma(U.agua_wt.neopreno_prohibido_grupos_edad.mas_de_1500, 1)} °C (más de 1500 m y 60 años o más). Con agua de 22 °C o menos y aire de 15 °C o menos se usa la <b>temperatura ajustada por aire frío</b> (regla 4.4(b)); con aire de 5 °C se cancela la natación. Medición: {U.agua_wt.medicion}</p>
+
+        <h3>Agua · aguas abiertas (World Aquatics)</h3>
+        <p>La temperatura del agua tiene que estar entre <b>{coma(U.agua_wa.minima)} y {coma(U.agua_wa.maxima)} °C</b>. Fuera de ese rango no se larga; en carrera se repite la medición a los 30 minutos y se detiene si persiste. Neopreno obligatorio con menos de {coma(U.agua_wa.neopreno_obligatorio_bajo)} °C. Medición: {U.agua_wa.medicion}</p>
+
+        <h3>Calidad del agua (World Aquatics OWS 10.1)</h3>
+        <div className="desplaza">
+          <table className="tabla guia-tabla">
+            <thead><tr><th>Agua</th><th>Excelente</th><th>Buena</th><th>Inaceptable</th></tr></thead>
+            <tbody>
+              {(["mar", "continental"] as const).map((t) => {
+                const l = U.calidad_agua[t];
+                return <tr key={t}><td><b>{t === "mar" ? "Mar" : "Río, lago o laguna"}</b></td><td>enterococos &lt; {l.excelente.enterococos} · E. coli &lt; {l.excelente.ecoli}</td><td>&lt; {l.buena.enterococos} · &lt; {l.buena.ecoli}</td><td>&gt; {l.buena.enterococos} · &gt; {l.buena.ecoli}</td></tr>;
+              })}
+            </tbody>
+          </table>
+        </div>
+        <p className="chico">UFC por 100 ml; muestras en 3 puntos, decide el peor resultado. Cianobacterias: más de {coma(U.calidad_agua.cianobacterias_max)} células/ml es inaceptable. World Triathlon exige al menos calidad «buena».</p>
+
+        <h3>Sin umbral publicado: se muestra, no genera niveles</h3>
+        <ul>
+          <li><b>Sensación térmica por viento</b> (ciclismo, montaña y el segmento de bici del triatlón): se calcula con temperatura de hasta 10 °C y viento desde 4,8 km/h. Riesgo moderado desde −10 °C, alto desde −28 °C (Environment and Climate Change Canada).</li>
+          <li><b>Viento y ráfagas sobre ciclistas, lluvia en bajadas y curvas, visibilidad, oleaje y corriente:</b> ninguna federación fija valores; se vigilan en terreno.</li>
+          <li><b>Rayos sobre el agua:</b> la evacuación desde el agua lleva más tiempo. La guía de la NATA (Walsh et al., 2013) indica tener a todos fuera del agua antes de que la tormenta llegue a unos 9 km.</li>
+          <li><b>Carreras de montaña:</b> el pronóstico corresponde al punto de largada; la temperatura baja unos 6,5 °C por cada 1000 m de altura y el viento en filos es mayor.</li>
+        </ul>
+        <Tecnico>
+          <p>La temperatura del agua no tiene pronóstico confiable en ríos, lagos y lagunas: se mide en terreno con el protocolo de la federación y la web aplica la regla a la última medición. Para el ajuste por aire frío se usa la temperatura del aire cargada en la misma medición, redondeando agua y aire hacia abajo (fila y columna más frías de la tabla).</p>
+          <p>En triatlón, la natación es zona crítica junto con el último cuarto: concentra entre el 67 y el 71 % de las muertes, mayormente de causa cardíaca en hombres de edad media (USA Triathlon, 2012; Harris et al., 2017).</p>
+        </Tecnico>
+      </Seccion>
+
       <Seccion id="g-decisiones" titulo="Decisiones y responsabilidades" icono="corredor" organizador={
         <p>EMERTEAM <b>recomienda</b>, con el fundamento y la fuente de cada criterio. La <b>decisión final corresponde al organizador</b>. Las decisiones se escalonan: cuanto antes se toma una medida menor, menos probable es tener que tomar una mayor el día del evento.</p>
       }>
@@ -347,13 +430,17 @@ export function Guia({ ctx }: { ctx: Contexto }) {
             <tbody>
               {Object.entries(REGLAS).map(([k, v]) => (
                 <tr key={k}>
-                  <td>{{ wa2020_wbgt: "Calor · corredores", srt30_2023_tgbh: "Calor · personal", emt_viento_A: "Viento · ultralivianas", emt_viento_B: "Viento · superficies de vela", emt_viento_C: "Viento · estructuras ingenieriles", emt_tormenta_cape: "Tormenta", emt_lluvia_intensidad: "Lluvia intensa", emt_suelo_saturado: "Suelo saturado" }[k] ?? k}</td>
+                  <td>{{ wa2020_wbgt: "Calor · corredores", srt30_2023_tgbh: "Calor · personal", emt_viento_A: "Viento · ultralivianas", emt_viento_B: "Viento · superficies de vela", emt_viento_C: "Viento · estructuras ingenieriles", emt_tormenta_cape: "Tormenta", emt_lluvia_intensidad: "Lluvia intensa", emt_suelo_saturado: "Suelo saturado", wt_wbgt: "Calor · triatletas", uci_wbgt: "Calor · ciclistas" }[k] ?? k}</td>
                   <td style={{ whiteSpace: "nowrap" }}>{TIPO_FUENTE[v.tipo]}</td>
                   <td>{v.fuente}</td>
                 </tr>
               ))}
               <tr><td>Rayos · distancias</td><td>{TIPO_FUENTE.GI}</td><td>National Weather Service (NOAA). Lightning Safety Toolkit for Outdoor Venues.</td></tr>
               <tr><td>WBGT estimado</td><td>{TIPO_FUENTE.CC}</td><td>Liljegren, J. C., Carhart, R. A., Lawday, P., Tschopp, S. y Sharp, R. (2008). Modeling the wet bulb globe temperature using standard meteorological measurements. Journal of Occupational and Environmental Hygiene, 5(10), 645-655.</td></tr>
+              <tr><td>Agua · triatlón</td><td>{TIPO_FUENTE.GI}</td><td>World Triathlon. Competition Rules 2026, reglas 4.2, 4.4(a), 4.4(b) y 4.4(e).</td></tr>
+              <tr><td>Agua · aguas abiertas</td><td>{TIPO_FUENTE.GI}</td><td>World Aquatics. Open Water Swimming Rules (2025), OWS 7.2, 9.1.6.3, 10.1 y 11.4.7.</td></tr>
+              <tr><td>Agua fría, base experimental</td><td>{TIPO_FUENTE.CC}</td><td>Saycell, J., Lomax, M., Massey, H. y Tipton, M. (2018). Scientific rationale for changing lower water temperature limits for triathlon racing to 12 °C with wetsuits and 16 °C without wetsuits. British Journal of Sports Medicine, 52(11), 702-708.</td></tr>
+              <tr><td>Sensación térmica por viento</td><td>{TIPO_FUENTE.GI}</td><td>Environment and Climate Change Canada; National Weather Service (2001). Wind Chill Temperature Index. Informativo, sin umbral de decisión.</td></tr>
               <tr><td>Alertas</td><td>Fuente oficial</td><td>Servicio Meteorológico Nacional. Sistema de Alerta Temprana (feed CAP).</td></tr>
             </tbody>
           </table>

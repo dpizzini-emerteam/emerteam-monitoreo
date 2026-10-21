@@ -2,10 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useOutletContext, useParams } from "react-router-dom";
 import type { Ctx } from "../main";
 import { Barra } from "../componentes/Barra";
-import { fmtDia, fmtFechaHora, fmtHora, nivelWBGT, num, supabase, type AlertaSMN, type Evento, type Medicion, type Pronostico, type Rayo, type Uv } from "../datos";
+import { fmtDia, fmtFechaHora, fmtHora, num, supabase, type AlertaSMN, type Evento, type Medicion, type Pronostico, type Rayo, type Uv } from "../datos";
 import { armarInforme, type FaseInforme, type FilaHistorial, type Informe as TInforme, type Pico, type RecoInforme } from "../informe";
-import { estiloVariable, NOMBRE_VARIABLE, NOMBRE_WA, nombreNivel } from "../reglas";
+import { estiloVariable, NOMBRE_VARIABLE, nombreNivel } from "../reglas";
 import { categoriaUv } from "../serie";
+import { escalaCalor, participantes } from "../disciplinas";
 
 type Registro = {
   evento_id: string; estado: "borrador" | "aprobado"; notas_corredores: string | null; notas_trabajadores: string | null;
@@ -24,14 +25,15 @@ function resumen(inf: TInforme): string[] {
   const out: string[] = [];
   const w = c.wbgtMed ?? c.wbgtEst;
   if (w) {
-    const n = nivelWBGT(w.valor) ?? 0;
-    out.push(`Durante la exposición de los corredores (${fmtHora(inf.ventanas.exposicion[0])} a ${fmtHora(inf.ventanas.exposicion[1])}) el WBGT máximo fue de ${num(w.valor, 1)} °C, ${c.wbgtMed ? `medido en ${c.wbgtMed.sector}` : "estimado por los modelos"} a las ${fmtHora(w.hora)}: nivel «${NOMBRE_WA[n]}» de la escala de World Athletics (2020).`);
+    const e = escalaCalor(inf.evento.disciplina);
+    const n = e.nivel(w.valor) ?? 0;
+    out.push(`Durante la exposición de los ${participantes(inf.evento.disciplina)} (${fmtHora(inf.ventanas.exposicion[0])} a ${fmtHora(inf.ventanas.exposicion[1])}) el WBGT máximo fue de ${num(w.valor, 1)} °C, ${c.wbgtMed ? `medido en ${c.wbgtMed.sector}` : "estimado por los modelos"} a las ${fmtHora(w.hora)}: nivel «${e.niveles[n]}» de la escala de ${e.autor}.`);
   }
   const r = c.rafagaMed ?? c.rafagaEst;
   if (r) out.push(`La ráfaga máxima fue de ${num(r.valor)} km/h${c.rafagaMed ? ` (medida en ${c.rafagaMed.sector})` : " (estimada a 10 m)"} y la lluvia acumulada en esa ventana, de ${num(c.lluviaMm, 1)} mm.`);
   out.push(c.rayos.cantidad
     ? `El satélite GOES-19 registró ${c.rayos.cantidad} rayos a menos de 24 km durante la exposición; el más cercano, a ${num(c.rayos.minKm, 0)} km a las ${fmtHora(c.rayos.hora ?? inf.ventanas.exposicion[0])}.`
-    : "No se registraron rayos a menos de 24 km durante la exposición de los corredores.");
+    : `No se registraron rayos a menos de 24 km durante la exposición de los ${participantes(inf.evento.disciplina)}.`);
   out.push(inf.alertas.length
     ? `${inf.alertas.length === 1 ? "Rigió una alerta" : `Rigieron ${inf.alertas.length} alertas`} del SMN para la zona del evento entre el armado y el desarme.`
     : "No hubo alertas del SMN para la zona del evento entre el armado y el desarme.");
@@ -83,7 +85,7 @@ function Documento({ inf, reg }: { inf: TInforme; reg: Registro | null }) {
         {resumen(inf).map((o, i) => <p key={i}>{o}</p>)}
       </div>
 
-      <h2 className="inf-banda">Corredores</h2>
+      <h2 className="inf-banda" style={{ textTransform: "capitalize" }}>{participantes(inf.evento.disciplina)}</h2>
       <table className="inf-tabla">
         <tbody>
           <tr><th>Exposición del corredor</th><td>{fmtHora(inf.ventanas.exposicion[0])} a {fmtHora(inf.ventanas.exposicion[1])} · último cuarto {fmtHora(inf.ventanas.ultimoCuarto[0])} a {fmtHora(inf.ventanas.ultimoCuarto[1])}</td></tr>

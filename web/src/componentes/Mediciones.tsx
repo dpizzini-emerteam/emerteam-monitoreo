@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { analizarDetector, fmtFechaHora, fmtHora, kmPorTrueno, nivelRayoMedido, nivelWBGT, num, supabase, type Medicion } from "../datos";
-import { estiloNivel, estiloWA, NOMBRE_WA } from "../reglas";
+import { analizarDetector, fmtFechaHora, fmtHora, kmPorTrueno, nivelRayoMedido, num, supabase, type Medicion } from "../datos";
+import { estiloNivel } from "../reglas";
+import { confDisciplina, escalaCalor, estiloCalor } from "../disciplinas";
 
 const SECTORES = ["Largada", "Llegada", "Puesto médico", "Último cuarto", "Recorrido"];
 // Rangos de cargas anteriores (antes se elegía un tramo; ahora se carga la lectura del detector)
@@ -15,6 +16,7 @@ type Form = {
   sector: string; tomada_en: string; wbgt: string; temp: string; hr: string; viento_medio: string; rafaga: string;
   altura_viento_m: string; detector: "" | "distancia" | "escuchando" | "na"; rayo_dist: string; unidad: "km" | "mi";
   rayo_conteo: string; trueno: boolean; relampago_trueno_s: string;
+  agua_temp: string; enterococos: string; ecoli: string; cianobacterias: string;
 };
 const unidadGuardada = (): "km" | "mi" => { try { return localStorage.getItem("mon_detector_unidad") === "mi" ? "mi" : "km"; } catch { return "km"; } };
 
@@ -22,11 +24,16 @@ const localAhora = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice
 const vacio = (): Form => ({
   sector: "Llegada", tomada_en: localAhora(), wbgt: "", temp: "", hr: "", viento_medio: "", rafaga: "",
   altura_viento_m: "2", detector: "", rayo_dist: "", unidad: unidadGuardada(), rayo_conteo: "", trueno: false, relampago_trueno_s: "",
+  agua_temp: "", enterococos: "", ecoli: "", cianobacterias: "",
 });
 const n = (x: string) => (x.trim() === "" ? null : Number(x.replace(",", ".")));
 
 /** Mediciones en terreno: el WBGT medido reemplaza al estimado. Cargan solo integrantes de EMERTEAM. */
-export function Mediciones({ eventoId, puedeCargar, miEmail }: { eventoId: string; puedeCargar: boolean; miEmail: string }) {
+export function Mediciones({ eventoId, puedeCargar, miEmail, disciplina, onGuardada }: {
+  eventoId: string; puedeCargar: boolean; miEmail: string; disciplina?: string; onGuardada?: () => void;
+}) {
+  const escala = escalaCalor(disciplina);
+  const conAgua = confDisciplina(disciplina).agua;
   const [lista, setLista] = useState<Medicion[]>([]);
   const [f, setF] = useState<Form>(vacio);
   const [foto, setFoto] = useState<File | null>(null);
@@ -68,7 +75,9 @@ export function Mediciones({ eventoId, puedeCargar, miEmail }: { eventoId: strin
   async function guardar(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    const valores = [f.wbgt, f.temp, f.hr, f.viento_medio, f.rafaga, f.relampago_trueno_s, f.rayo_conteo];
+    const valores = [f.wbgt, f.temp, f.hr, f.viento_medio, f.rafaga, f.relampago_trueno_s, f.rayo_conteo, f.agua_temp, f.enterococos, f.ecoli, f.cianobacterias];
+    const ag = n(f.agua_temp);
+    if (ag != null && (ag < -2 || ag > 40)) return setError("La temperatura del agua tiene que estar entre −2 y 40 °C.");
     if (valores.every((v) => v.trim() === "") && !f.detector && !f.trueno) return setError("Cargá al menos un valor medido.");
     const dist = n(f.rayo_dist);
     if (f.detector === "distancia" && (dist == null || dist <= 0 || dist > (f.unidad === "mi" ? 25 : 40)))
@@ -92,10 +101,11 @@ export function Mediciones({ eventoId, puedeCargar, miEmail }: { eventoId: strin
       wbgt: w, temp: n(f.temp), hr: n(f.hr), viento_medio: n(f.viento_medio), rafaga: n(f.rafaga), altura_viento_m: n(f.altura_viento_m),
       rayo_km, rayo_rango, rayo_conteo: n(f.rayo_conteo), rayo_detector: f.detector ? "AcuRite" : null,
       trueno: f.trueno, relampago_trueno_s: n(f.relampago_trueno_s),
+      agua_temp: ag, enterococos: n(f.enterococos), ecoli: n(f.ecoli), cianobacterias: n(f.cianobacterias),
       foto_path,
     });
     if (ei) { setEstado(""); return setError(ei.message); }
-    setF(vacio()); setFoto(null); setEstado("ok");
+    setF(vacio()); setFoto(null); setEstado("ok"); onGuardada?.();
     setTimeout(() => setEstado(""), 3000);
     void cargar();
   }
@@ -116,7 +126,8 @@ export function Mediciones({ eventoId, puedeCargar, miEmail }: { eventoId: strin
           {ultimaWbgt ? (
             <>
               <div className="condensada" style={{ fontSize: 38, fontWeight: 800, lineHeight: 1.1 }}>{num(ultimaWbgt.wbgt, 1)} °C</div>
-              <span className="badge" style={estiloWA(nivelWBGT(ultimaWbgt.wbgt) ?? 0)}>{NOMBRE_WA[nivelWBGT(ultimaWbgt.wbgt) ?? 0]}</span>
+              <span className="badge" style={estiloCalor(escala.variable, escala.nivel(ultimaWbgt.wbgt) ?? 0)}>{escala.niveles[escala.nivel(ultimaWbgt.wbgt) ?? 0]}</span>
+              <span className="chico" style={{ marginLeft: 6 }}>escala {escala.autor}</span>
               <div className="chico" style={{ marginTop: 6 }}>{ultimaWbgt.sector} · {fmtFechaHora(ultimaWbgt.tomada_en)}</div>
             </>
           ) : <p className="chico">Todavía no hay mediciones de WBGT.</p>}
@@ -155,7 +166,8 @@ export function Mediciones({ eventoId, puedeCargar, miEmail }: { eventoId: strin
             <label>Sector<select value={f.sector} onChange={set("sector")}>{SECTORES.map((s) => <option key={s}>{s}</option>)}</select></label>
             <label>Fecha y hora<input type="datetime-local" required value={f.tomada_en} onChange={set("tomada_en")} /></label>
             <label>WBGT (°C)<input inputMode="decimal" value={f.wbgt} onChange={set("wbgt")} placeholder="ej. 23,4" /></label>
-            <label>Temperatura (°C)<input inputMode="decimal" value={f.temp} onChange={set("temp")} /></label>
+            <label>Temperatura del aire (°C)<input inputMode="decimal" value={f.temp} onChange={set("temp")} /></label>
+            {conAgua && <label>Temperatura del agua (°C)<input inputMode="decimal" value={f.agua_temp} onChange={set("agua_temp")} placeholder="según protocolo" /></label>}
             <label>Humedad (%)<input inputMode="decimal" value={f.hr} onChange={set("hr")} /></label>
             <label>Viento medio (km/h)<input inputMode="decimal" value={f.viento_medio} onChange={set("viento_medio")} /></label>
             <label>Ráfaga (km/h)<input inputMode="decimal" value={f.rafaga} onChange={set("rafaga")} /></label>
@@ -176,6 +188,13 @@ export function Mediciones({ eventoId, puedeCargar, miEmail }: { eventoId: strin
             )}
             <label>Contador del detector (COUNT)<input inputMode="numeric" value={f.rayo_conteo} onChange={set("rayo_conteo")} placeholder="total acumulado" /></label>
             <label>Relámpago-trueno (segundos, respaldo)<input inputMode="decimal" value={f.relampago_trueno_s} onChange={set("relampago_trueno_s")} placeholder="si el detector falla" /></label>
+            {conAgua && (
+              <>
+                <label>Enterococos (UFC/100 ml)<input inputMode="decimal" value={f.enterococos} onChange={set("enterococos")} placeholder="laboratorio" /></label>
+                <label>E. coli (UFC/100 ml)<input inputMode="decimal" value={f.ecoli} onChange={set("ecoli")} placeholder="laboratorio" /></label>
+                <label>Cianobacterias (cél/ml)<input inputMode="decimal" value={f.cianobacterias} onChange={set("cianobacterias")} placeholder="si hay floración" /></label>
+              </>
+            )}
             <label style={{ flexDirection: "row", alignItems: "center", gap: 8, alignSelf: "end", minHeight: 42 }}>
               <input type="checkbox" checked={f.trueno} onChange={set("trueno")} style={{ minHeight: 0, width: 20, height: 20 }} /> Se escucha trueno
             </label>
@@ -201,14 +220,14 @@ export function Mediciones({ eventoId, puedeCargar, miEmail }: { eventoId: strin
             </thead>
             <tbody>
               {lista.map((m) => {
-                const nw = nivelWBGT(m.wbgt);
+                const nw = escala.nivel(m.wbgt);
                 const nr = nivelRayoMedido(m);
                 return (
                   <tr key={m.id}>
                     <td style={{ whiteSpace: "nowrap" }}>{fmtFechaHora(m.tomada_en)}</td>
                     <td>{m.sector}<div className="chico">{m.operador.split("@")[0]}</div></td>
-                    <td>{nw != null ? <span className="badge" style={{ ...estiloWA(nw), fontSize: 13 }}>{num(m.wbgt, 1)} °C</span> : "—"}</td>
-                    <td>{num(m.temp, 1)} °C · {num(m.hr)} %</td>
+                    <td>{nw != null ? <span className="badge" style={{ ...estiloCalor(escala.variable, nw), fontSize: 13 }}>{num(m.wbgt, 1)} °C</span> : "—"}</td>
+                    <td>{num(m.temp, 1)} °C · {num(m.hr)} %{m.agua_temp != null && <div className="chico">agua {num(m.agua_temp, 1)} °C</div>}</td>
                     <td>{num(m.viento_medio)} / {num(m.rafaga)} km/h{m.altura_viento_m != null && <div className="chico">a {num(m.altura_viento_m, 1)} m</div>}</td>
                     <td>{nr != null ? <><span className="badge" style={{ ...estiloNivel(nr), fontSize: 13 }}>{NIVEL_RAYO[nr]}</span><div className="chico">{textoRayo(m)}</div></> : "—"}</td>
                     <td>{m.foto_path && fotos[m.foto_path] ? <a href={fotos[m.foto_path]} target="_blank" rel="noreferrer">Ver</a> : "—"}</td>

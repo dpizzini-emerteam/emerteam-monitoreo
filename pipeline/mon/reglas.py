@@ -21,6 +21,8 @@ REGLAS = {
     "emt_tormenta_cape": {"tipo": "CI", "fuente": "Criterio interno EMERTEAM: potencial convectivo (CAPE) con precipitación."},
     "emt_lluvia_intensidad": {"tipo": "CI", "fuente": "Criterio interno EMERTEAM: intensidad > 20 mm/h."},
     "emt_suelo_saturado": {"tipo": "CI", "fuente": "Criterio interno EMERTEAM: acumulado ≥ 30 mm en 72 h."},
+    "wt_wbgt": {"tipo": "GI", "fuente": "World Triathlon Competition Rules, regla 10.3 (banderas WBGT); James et al. (2025), Sports Med 55:1515-1526."},
+    "uci_wbgt": {"tipo": "GI", "fuente": "UCI Cycling Regulations, Parte 2, Anexo C: Protocolo de Alta Temperatura (2024)."},
 }
 
 # Escala World Athletics (2020): <21, 21–25, 25–28, 28–30, >30 °C
@@ -47,6 +49,36 @@ def nivel_wbgt_wa(wbgt):
     n = _escalon(float(wbgt), WA_CORTES, inclusivo=True)
     umbral = WA_CORTES[n - 1] if n > 0 else None
     return n, float(wbgt), umbral, "wa2020_wbgt"
+
+
+# World Triathlon: verde < 25,7 · azul 25,7–27,8 · naranja 27,9–30,0 · roja 30,1–32,2 · negra > 32,2 °C
+WT = U["wbgt_wt"]
+# UCI Anexo C: blanca < 15 · verde 15–17,9 · amarilla 18–22,9 · naranja 23–27,9 · roja ≥ 28 °C
+UCI_CORTES = [float(x) for x in U["wbgt_uci"]["cortes"]]
+
+
+def nivel_wbgt_wt(wbgt):
+    if wbgt is None:
+        return None, None, None, None
+    w = float(wbgt)
+    c = [float(x) for x in WT["cortes"]]
+    n = 4 if w > float(WT["negra_mayor_que"]) else _escalon(w, c, inclusivo=True)
+    umbral = float(WT["negra_mayor_que"]) if n == 4 else (c[n - 1] if n else None)
+    return n, w, umbral, "wt_wbgt"
+
+
+def nivel_wbgt_uci(wbgt):
+    if wbgt is None:
+        return None, None, None, None
+    w = float(wbgt)
+    n = _escalon(w, UCI_CORTES, inclusivo=True)
+    return n, w, (UCI_CORTES[n - 1] if n else None), "uci_wbgt"
+
+
+def calor_participantes(disciplina: str | None):
+    """Variable y función de la escala de calor de la disciplina (running y sin dato: World Athletics)."""
+    escala = (U.get("disciplinas", {}).get(disciplina or "running") or {}).get("calor", "wbgt")
+    return {"wbgt_wt": ("wbgt_wt", nivel_wbgt_wt), "wbgt_uci": ("wbgt_uci", nivel_wbgt_uci)}.get(escala, ("wbgt", nivel_wbgt_wa))
 
 
 def nivel_calor_personal(wbgt):

@@ -400,3 +400,5 @@ input, select, textarea, button { font-family: inherit; }
 .uv-dato.compacto .uv-escala i { width: 7px; height: 4px; }
 .tira-dia { position: relative; overflow: hidden; }
 .tira-nivel { position: absolute; top: 0; left: 0; right: 0; height: 5px; }
+
+.dia-st { padding: 10px 18px 0; font-size: 14px; }

@@ -7,6 +7,7 @@ import { Barra } from "../componentes/Barra";
 import { EliminarEvento } from "../componentes/EliminarEvento";
 import { supabase, type Evento, type Modalidad } from "../datos";
 import { buscarUbicacion, leerCoordenadas, type Resultado } from "../geocodificar";
+import { confDisciplina, DISCIPLINAS, nombreDisciplina, type Disciplina } from "../disciplinas";
 
 // Argentina no aplica horario de verano: UTC−03:00 fijo
 const OFFSET = "-03:00";
@@ -30,12 +31,16 @@ type Form = {
   demora_largada_min: string;
   portico: "estructural" | "inflable";
   estado: "activo" | "cerrado";
+  disciplina: Disciplina;
+  agua_tipo: "" | "mar" | "rio" | "lago" | "laguna";
+  natacion_m: string;
+  natacion_min: string;
 };
 
 const VACIO: Form = {
   nombre: "", largada: "", ubicacion: "", lat: "", lon: "", organizador_email: "",
   participantes: "", armado_dias: "3", cupo_equipo: "3", duracion_propia_min: "", demora_largada_min: "",
-  portico: "estructural", estado: "activo",
+  portico: "estructural", estado: "activo", disciplina: "running", agua_tipo: "", natacion_m: "", natacion_min: "",
 };
 
 export function EventoForm() {
@@ -64,7 +69,8 @@ export function EventoForm() {
         organizador_email: e.organizador_email, participantes: String(e.participantes), armado_dias: String(e.armado_dias), cupo_equipo: String(e.cupo_equipo ?? 3),
         duracion_propia_min: e.duracion_propia_min ? String(e.duracion_propia_min) : "",
         demora_largada_min: e.demora_largada_min != null ? String(e.demora_largada_min) : "",
-        portico: e.portico, estado: e.estado,
+        portico: e.portico, estado: e.estado, disciplina: e.disciplina ?? "running", agua_tipo: e.agua_tipo ?? "",
+        natacion_m: e.natacion_m ? String(e.natacion_m) : "", natacion_min: e.natacion_min ? String(e.natacion_min) : "",
       });
       setMods(e.mon_modalidades ?? []);
     });
@@ -113,6 +119,7 @@ export function EventoForm() {
   if (!editor) return <p className="contenedor" style={{ paddingTop: 26 }}>Solo los editores de EMERTEAM pueden cargar y editar eventos.</p>;
 
   const set = (k: keyof Form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
+  const conf = confDisciplina(f.disciplina);
 
   async function guardar(e: React.FormEvent) {
     e.preventDefault();
@@ -120,6 +127,11 @@ export function EventoForm() {
     const largada = new Date(`${f.largada}:00${OFFSET}`);
     if (!id && largada.getTime() < Date.now()) return setError("La fecha de largada ya pasó.");
     if (!mods.length || mods.some((m) => !m.nombre || !(m.distancia_km > 0))) return setError("Cargá al menos una modalidad con distancia.");
+    // La duración por distancia solo está calibrada para running: el resto de las disciplinas la carga
+    if (f.disciplina !== "running" && !f.duracion_propia_min) return setError("Cargá la duración estimada del evento: el cálculo por distancia solo vale para running.");
+    if (conf.agua && !f.agua_tipo) return setError("Indicá el tipo de agua (mar, río, lago o laguna).");
+    if (conf.agua && !f.natacion_m) return setError("Cargá la distancia de natación en metros: define la regla de temperatura del agua.");
+    if (f.disciplina === "triatlon" && !f.natacion_min) return setError("Cargá la duración estimada de la natación: es la zona crítica del triatlón.");
     let lat = parseFloat(f.lat), lon = parseFloat(f.lon);
     if (Number.isNaN(lat) || Number.isNaN(lon)) {
       // Sin coordenadas: se buscan con el lugar o con lo escrito en el buscador
@@ -138,6 +150,9 @@ export function EventoForm() {
       duracion_propia_min: f.duracion_propia_min ? parseInt(f.duracion_propia_min, 10) : null,
       demora_largada_min: f.demora_largada_min ? parseInt(f.demora_largada_min, 10) : null,
       portico: f.portico, estado: f.estado, actualizado_en: new Date().toISOString(),
+      disciplina: f.disciplina, agua_tipo: conf.agua ? f.agua_tipo || null : null,
+      natacion_m: conf.agua && f.natacion_m ? parseInt(f.natacion_m, 10) : null,
+      natacion_min: f.disciplina === "triatlon" && f.natacion_min ? parseInt(f.natacion_min, 10) : null,
       ...(id ? {} : { creado_por: session.user.email }),
     };
     const res = id
@@ -166,13 +181,27 @@ export function EventoForm() {
         <form onSubmit={guardar} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           <div className="tarjeta form">
             <label style={{ gridColumn: "1 / -1" }}>Nombre del evento<input required value={f.nombre} onChange={set("nombre")} /></label>
+            <label>Disciplina<select value={f.disciplina} onChange={set("disciplina")}>{DISCIPLINAS.map((d) => <option key={d} value={d}>{nombreDisciplina(d)}</option>)}</select></label>
+            {conf.agua && (
+              <>
+                <label>Tipo de agua<select required value={f.agua_tipo} onChange={set("agua_tipo")}>
+                  <option value="">Elegí…</option><option value="mar">Mar</option><option value="rio">Río</option><option value="lago">Lago</option><option value="laguna">Laguna</option>
+                </select></label>
+                <label>Distancia de natación (m)<input type="number" min={50} required value={f.natacion_m} onChange={set("natacion_m")} placeholder="ej. 1500" /></label>
+              </>
+            )}
+            {f.disciplina === "triatlon" && (
+              <label>Duración de la natación (min, primeros en salir hasta los últimos)<input type="number" min={1} required value={f.natacion_min} onChange={set("natacion_min")} placeholder="ej. 50" /></label>
+            )}
             <label>Fecha y hora de largada (hora argentina)<input type="datetime-local" required value={f.largada} onChange={set("largada")} /></label>
             <label>Participantes (total)<input type="number" min={0} required value={f.participantes} onChange={set("participantes")} /></label>
             <label>Correo del organizador<input type="email" required value={f.organizador_email} onChange={set("organizador_email")} /></label>
             <label>Días de armado<input type="number" min={1} max={10} required value={f.armado_dias} onChange={set("armado_dias")} /></label>
             <label>Cupo del equipo del organizador<input type="number" min={0} max={200} required value={f.cupo_equipo} onChange={set("cupo_equipo")} /></label>
             <label>Pórtico<select value={f.portico} onChange={set("portico")}><option value="estructural">Estructural</option><option value="inflable">Inflable</option></select></label>
-            <label>Duración propia (min, opcional)<input type="number" min={1} value={f.duracion_propia_min} onChange={set("duracion_propia_min")} placeholder="estimada por distancia" /></label>
+            {f.disciplina === "running"
+              ? <label>Duración propia (min, opcional)<input type="number" min={1} value={f.duracion_propia_min} onChange={set("duracion_propia_min")} placeholder="estimada por distancia" /></label>
+              : <label>Duración estimada del evento (min, hasta el último participante)<input type="number" min={1} required value={f.duracion_propia_min} onChange={set("duracion_propia_min")} /></label>}
             <label>Demora de largada (min, opcional)<input type="number" min={0} value={f.demora_largada_min} onChange={set("demora_largada_min")} placeholder="1 min cada 1.000" /></label>
             {id && <label>Estado<select value={f.estado} onChange={set("estado")}><option value="activo">Activo</option><option value="cerrado">Cerrado</option></select></label>}
           </div>
@@ -219,7 +248,7 @@ export function EventoForm() {
                 )
             )}
             <div className="form" style={{ margin: "12px 0" }}>
-              <label style={{ gridColumn: "span 2" }}>Lugar (como se muestra en la web)<input value={f.ubicacion} onChange={set("ubicacion")} placeholder="Se completa con la búsqueda" /></label>
+              <label style={{ gridColumn: "1 / -1" }}>Lugar (como se muestra en la web)<input value={f.ubicacion} onChange={set("ubicacion")} placeholder="Se completa con la búsqueda" /></label>
               <label>Latitud<input value={f.lat} onChange={set("lat")} inputMode="decimal" /></label>
               <label>Longitud<input value={f.lon} onChange={set("lon")} inputMode="decimal" /></label>
             </div>

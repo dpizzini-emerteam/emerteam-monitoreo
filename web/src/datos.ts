@@ -26,6 +26,10 @@ export type Evento = {
   demora_largada_min: number | null;
   portico: "estructural" | "inflable";
   estado: "activo" | "cerrado";
+  disciplina?: "running" | "triatlon" | "aguas_abiertas" | "ciclismo" | "montana";
+  agua_tipo?: "mar" | "rio" | "lago" | "laguna" | null;
+  natacion_m?: number | null;
+  natacion_min?: number | null;
   mon_modalidades?: Modalidad[];
 };
 
@@ -190,6 +194,10 @@ export type Medicion = {
   rayo_rango: string | null;
   rayo_conteo: number | null;
   rayo_km?: number | null;
+  agua_temp?: number | null;
+  enterococos?: number | null;
+  ecoli?: number | null;
+  cianobacterias?: number | null;
   rayo_tendencia: string | null;
   trueno: boolean | null;
   relampago_trueno_s: number | null;

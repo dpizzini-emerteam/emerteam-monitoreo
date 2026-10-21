@@ -7,6 +7,7 @@
   - No modificar tablas, políticas, triggers ni plantillas de correo existentes de SUITE. No crear triggers en auth.users.
   - Excepción aprobada por Diego (20/10/2026): las políticas de SUITE exigen `suite_priv.es_equipo()` (lista `suite_priv.equipo`), porque la autenticación es compartida con los organizadores de Monitoreo. Ver supabase/suite/.
 - Escala WBGT oficial: World Athletics (2020). Ningún otro umbral se rotula como World Athletics.
+- Disciplinas (aprobado por Diego 20/10/2026): running, triatlón, aguas abiertas, ciclismo y montaña. Calor con la escala de cada federación (triatlón: World Triathlon; ciclismo: UCI Anexo C; el resto: World Athletics 2020), rotulada con su autor. Lo que no tiene norma publicada (viento sobre ciclistas, oleaje, visibilidad, frío/WCT, rayos sobre el agua) se muestra sin generar niveles ni avisos hasta que EMERTEAM fije criterio.
 - Cada recomendación cita su fuente y su tipo (norma/legislación, guía internacional, consenso científico, especificación de fabricante, criterio interno EMERTEAM).
 - Costo mensual cero: no usar Open-Meteo gratuito (uso no comercial). Fuentes como conectores configurables.
 - Nombre del evento antes que cualquier código en archivos, correos y listados.

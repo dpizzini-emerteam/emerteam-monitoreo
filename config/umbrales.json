@@ -87,5 +87,382 @@
     "pares_min": 12,
     "ventana_h": 72,
     "vida_media_h": 36
+  },
+  "disciplinas": {
+    "_comentario": "Escala de calor y variables por disciplina. Lo que no tiene norma publicada se muestra sin generar nivel (decisión de Dirección, 20/10/2026).",
+    "running": {
+      "nombre": "Running / calle",
+      "participantes": "corredores",
+      "calor": "wbgt",
+      "agua": false,
+      "wct": false
+    },
+    "triatlon": {
+      "nombre": "Triatlón",
+      "participantes": "triatletas",
+      "calor": "wbgt_wt",
+      "agua": true,
+      "wct": true
+    },
+    "aguas_abiertas": {
+      "nombre": "Aguas abiertas",
+      "participantes": "nadadores",
+      "calor": "wbgt",
+      "agua": true,
+      "wct": false
+    },
+    "ciclismo": {
+      "nombre": "Ciclismo",
+      "participantes": "ciclistas",
+      "calor": "wbgt_uci",
+      "agua": false,
+      "wct": true
+    },
+    "montana": {
+      "nombre": "Carreras de montaña",
+      "participantes": "corredores",
+      "calor": "wbgt",
+      "agua": false,
+      "wct": true
+    }
+  },
+  "wbgt_wt": {
+    "cortes": [
+      25.7,
+      27.9,
+      30.1
+    ],
+    "negra_mayor_que": 32.2,
+    "regla": "wt_wbgt",
+    "_fuente": "World Triathlon Competition Rules, regla 10.3 (banderas WBGT), confirmadas en James et al. (2025), Sports Medicine 55:1515-1526"
+  },
+  "wbgt_uci": {
+    "cortes": [
+      15.0,
+      18.0,
+      23.0,
+      28.0
+    ],
+    "regla": "uci_wbgt",
+    "_fuente": "UCI Cycling Regulations Parte 2, Anexo C (Protocolo de Alta Temperatura, enmiendas 05.02.2024). 'Above 28 °C' se toma desde 28,0 °C por prudencia."
+  },
+  "agua_wt": {
+    "_fuente": "World Triathlon Competition Rules 2026, reglas 4.2, 4.4(a), 4.4(b) y 4.4(e)",
+    "distancias_m": [
+      750,
+      1000,
+      1500,
+      3000,
+      4000
+    ],
+    "_distancias": "Columnas de la regla 4.4(a): 750, 1000, 1500, 1900-3000 y 3800-4000 m (distancia original)",
+    "franjas": [
+      {
+        "desde": 32.0,
+        "valores": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "desde": 31.0,
+        "valores": [
+          750,
+          750,
+          750,
+          750,
+          750
+        ]
+      },
+      {
+        "desde": 15.0,
+        "valores": [
+          "orig",
+          "orig",
+          "orig",
+          "orig",
+          "orig"
+        ]
+      },
+      {
+        "desde": 14.0,
+        "valores": [
+          750,
+          1000,
+          1500,
+          "orig",
+          3000
+        ]
+      },
+      {
+        "desde": 13.0,
+        "valores": [
+          750,
+          1000,
+          1500,
+          1500,
+          1500
+        ]
+      },
+      {
+        "desde": 12.0,
+        "valores": [
+          750,
+          750,
+          750,
+          750,
+          750
+        ]
+      },
+      {
+        "desde": -99,
+        "valores": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    ],
+    "_franjas": "None = se cancela la natación; 'orig' = distancia original",
+    "neopreno_obligatorio_hasta": 15.9,
+    "neopreno_prohibido_grupos_edad": {
+      "hasta_1500": 22.0,
+      "mas_de_1500": 24.6,
+      "60_o_mas": 24.6
+    },
+    "neopreno_prohibido_elite": {
+      "hasta_1500": 20.0,
+      "mas_de_1500": 22.0
+    },
+    "ajuste_aire": {
+      "aplica_agua_hasta": 22,
+      "aplica_aire_hasta": 15,
+      "agua_c": [
+        22,
+        21,
+        20,
+        19,
+        18,
+        17,
+        16,
+        15,
+        14,
+        13
+      ],
+      "aire_c": [
+        15,
+        14,
+        13,
+        12,
+        11,
+        10,
+        9,
+        8,
+        7,
+        6,
+        5
+      ],
+      "valores": [
+        [
+          18.5,
+          18.0,
+          17.5,
+          17.0,
+          16.5,
+          16.0,
+          15.5,
+          15.0,
+          14.5,
+          14.0,
+          null
+        ],
+        [
+          18.0,
+          17.5,
+          17.0,
+          16.5,
+          16.0,
+          15.5,
+          15.0,
+          14.5,
+          14.0,
+          13.5,
+          null
+        ],
+        [
+          17.5,
+          17.0,
+          16.5,
+          16.0,
+          15.5,
+          15.0,
+          14.5,
+          14.0,
+          13.5,
+          13.0,
+          null
+        ],
+        [
+          17.0,
+          16.5,
+          16.0,
+          15.5,
+          15.0,
+          14.5,
+          14.0,
+          13.5,
+          13.0,
+          12.5,
+          null
+        ],
+        [
+          16.5,
+          16.0,
+          15.5,
+          15.0,
+          14.5,
+          14.0,
+          13.5,
+          13.0,
+          12.5,
+          12.0,
+          null
+        ],
+        [
+          16.0,
+          15.5,
+          15.0,
+          14.5,
+          14.0,
+          13.5,
+          13.0,
+          12.5,
+          12.0,
+          null,
+          null
+        ],
+        [
+          15.5,
+          15.0,
+          14.5,
+          14.0,
+          13.5,
+          13.0,
+          12.5,
+          12.0,
+          null,
+          null,
+          null
+        ],
+        [
+          15.0,
+          14.5,
+          14.0,
+          13.5,
+          13.0,
+          12.5,
+          12.0,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          14.0,
+          14.0,
+          13.5,
+          13.0,
+          12.5,
+          12.0,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          13.0,
+          13.0,
+          13.0,
+          12.5,
+          12.0,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      ]
+    },
+    "medicion": "1 h antes de la largada, en el medio del recorrido y en otros 2 puntos, a 60 cm de profundidad. Promedio ≤ 27 °C: vale la lectura más baja; > 27 °C: la más alta."
+  },
+  "agua_wa": {
+    "_fuente": "World Aquatics, Open Water Swimming Rules (vigente 25/06/2025), OWS 7.2, 9.1.6.3 y 11.4.7",
+    "minima": 16.0,
+    "maxima": 31.0,
+    "neopreno_obligatorio_bajo": 18.0,
+    "neopreno_peligrosas_hasta": 20.0,
+    "medicion": "2 h antes de la largada, en 3 puntos del recorrido, a 40 cm de profundidad; vale el promedio. En carrera, una lectura por hora."
+  },
+  "calidad_agua": {
+    "_fuente": "World Aquatics OWS 10.1 (UFC/100 ml); World Triathlon exige al menos 'buena' desde 27/02/2025",
+    "mar": {
+      "excelente": {
+        "enterococos": 100,
+        "ecoli": 250
+      },
+      "buena": {
+        "enterococos": 200,
+        "ecoli": 500
+      }
+    },
+    "continental": {
+      "excelente": {
+        "enterococos": 200,
+        "ecoli": 500
+      },
+      "buena": {
+        "enterococos": 400,
+        "ecoli": 1000
+      }
+    },
+    "cianobacterias_max": 100000
+  },
+  "wct": {
+    "_fuente": "Environment and Climate Change Canada / NWS (2001). Informativo: sin umbral de decisión (decisión de Dirección).",
+    "aplica_temp_hasta": 10.0,
+    "aplica_viento_desde": 4.8,
+    "riesgo": [
+      [
+        0,
+        "Bajo"
+      ],
+      [
+        -10,
+        "Moderado"
+      ],
+      [
+        -28,
+        "Alto"
+      ],
+      [
+        -40,
+        "Muy alto"
+      ],
+      [
+        -48,
+        "Severo"
+      ],
+      [
+        -55,
+        "Extremo"
+      ]
+    ]
   }
 }

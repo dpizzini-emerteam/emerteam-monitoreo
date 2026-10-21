@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
       const desde = new Date(Date.now() - 2 * 86400_000).toISOString();
       const { data: eventos, error } = await supabase
         .from("mon_eventos")
-        .select("id,nombre,largada,lat,lon,participantes,armado_dias,duracion_propia_min,demora_largada_min,portico,mon_modalidades(nombre,distancia_km,participantes,largada)")
+        .select("id,nombre,largada,lat,lon,participantes,armado_dias,duracion_propia_min,demora_largada_min,portico,disciplina,natacion_min,mon_modalidades(nombre,distancia_km,participantes,largada)")
         .eq("estado", "activo")
         .gte("largada", desde);
       if (error) throw error;

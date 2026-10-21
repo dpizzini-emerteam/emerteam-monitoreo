@@ -3,11 +3,12 @@ import { Link, useParams } from "react-router-dom";
 import { Icono, iconoTiempo } from "../componentes/Icono";
 import {
   analizarDetector,
-  COLOR_SMN, estadoRayosGLM, fmtFechaHora, fmtHora, kmPorTrueno, nivelRayoMedido, nivelWBGT, num, ordenarAlertas, supabase, tituloAlerta,
+  COLOR_SMN, estadoRayosGLM, fmtFechaHora, fmtHora, kmPorTrueno, nivelRayoMedido, num, ordenarAlertas, supabase, tituloAlerta,
   type AlertaSMN, type Evento, type Medicion, type Nivel, type Pronostico, type Uv, type Rayo,
 } from "../datos";
-import { ESTILO_SIN_DATOS, estiloNivel, estiloVariable, estiloWA, NOMBRE_CORTO, NOMBRE_FASE, NOMBRE_WA, nombreNivel, recomendacion } from "../reglas";
+import { ESTILO_SIN_DATOS, estiloNivel, estiloVariable, NOMBRE_CORTO, NOMBRE_FASE, nombreNivel, recomendacion } from "../reglas";
 import { Humedad, UvDato } from "../componentes/Uv";
+import { confDisciplina, escalaCalor, estiloCalor, evaluarAguaAbierta, evaluarAguaTriatlon, nombreDisciplina, riesgoWct, wct } from "../disciplinas";
 import { consenso } from "../serie";
 import { calcular } from "../ventanas";
 
@@ -88,7 +89,12 @@ export function Comando() {
   const medV = meds.find((m) => m.rafaga != null && t - new Date(m.tomada_en).getTime() < VIGENCIA_MEDICION);
   const medR = meds.find((m) => nivelRayoMedido(m) != null && t - new Date(m.tomada_en).getTime() < VIGENCIA_RAYO);
   const wbgt = medW?.wbgt ?? actualP?.wbgt_est ?? null;
-  const nW = nivelWBGT(wbgt);
+  const escala = escalaCalor(ev.disciplina);
+  const nW = escala.nivel(wbgt);
+  const conf = confDisciplina(ev.disciplina);
+  const medA = conf.agua ? meds.find((m) => m.agua_temp != null) : undefined;
+  const agua = medA ? (ev.disciplina === "triatlon" ? evaluarAguaTriatlon(Number(medA.agua_temp), medA.temp != null ? Number(medA.temp) : null, ev.natacion_m ?? null) : evaluarAguaAbierta(Number(medA.agua_temp))) : null;
+  const stAhora = conf.wct ? wct(actualP?.t2m, actualP?.viento10) : null;
   const rafaga = medV?.rafaga ?? actualP?.rafaga10 ?? null;
   const nivelesAhora = niveles.filter((n) => new Date(n.desde).getTime() <= t && new Date(n.hasta).getTime() > t);
   const tormentaPron = Math.max(0, ...nivelesAhora.filter((n) => n.variable === "tormenta").map((n) => n.nivel));
@@ -117,7 +123,7 @@ export function Comando() {
       <header className="cmd-cab">
         <div>
           <div className="cmd-evento">{ev.nombre}</div>
-          <div className="cmd-sub">{ev.ubicacion} · largada {fmtFechaHora(ev.largada)}</div>
+          <div className="cmd-sub">{ev.disciplina && ev.disciplina !== "running" ? `${nombreDisciplina(ev.disciplina)} · ` : ""}{ev.ubicacion} · largada {fmtFechaHora(ev.largada)}</div>
         </div>
         <div className="cmd-fase">
           <div>{fase}</div>
@@ -143,8 +149,8 @@ export function Comando() {
         <div className="cmd-celda">
           <div className="cmd-rot">WBGT {medW ? "medido" : "estimado"}</div>
           <div className="cmd-valor">{num(wbgt, 1)}<small>°C</small></div>
-          {nW == null ? <span className="badge cmd-badge" style={ESTILO_SIN_DATOS}>Sin dato</span> : <span className="badge cmd-badge" style={estiloWA(nW)}>{NOMBRE_WA[nW]}</span>}
-          <div className="cmd-nota">{medW ? `${medW.sector} · ${fmtHora(medW.tomada_en)}` : "Modelos · sin medición en la última hora"}</div>
+          {nW == null ? <span className="badge cmd-badge" style={ESTILO_SIN_DATOS}>Sin dato</span> : <span className="badge cmd-badge" style={estiloCalor(escala.variable, nW)}>{escala.niveles[nW]}</span>}
+          <div className="cmd-nota">{medW ? `${medW.sector} · ${fmtHora(medW.tomada_en)}` : "Modelos · sin medición en la última hora"} · escala {escala.autor}</div>
         </div>
         <div className="cmd-celda">
           <div className="cmd-rot">Ráfaga {medV ? "medida" : "estimada"}</div>
@@ -177,8 +183,22 @@ export function Comando() {
           </div>
           <div className="cmd-nota" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}><Humedad texto={`${num(medW?.hr ?? actualP?.hr)} %`} size={18} /> <span>lluvia {num(actualP?.precip, 1)} mm/h</span></div>
           <div style={{ marginTop: 8 }}><UvDato uv={actualP?.uv} /></div>
+          {stAhora != null && <div className="cmd-nota">Sensación térmica {num(stAhora)} °C · riesgo {riesgoWct(stAhora).toLowerCase()} (informativo)</div>}
         </div>
       </section>
+
+      {conf.agua && (
+        <section className="cmd-bloque">
+          <div className="cmd-rot">Agua</div>
+          {medA && agua ? (
+            <p style={{ margin: "6px 0 0", fontSize: 18 }}>
+              <span className="badge" style={estiloNivel(agua.estado === "ok" ? 0 : agua.estado === "reducir" ? 3 : 4)}>{agua.titulo}</span>{" "}
+              Agua {num(medA.agua_temp, 1)} °C · {medA.sector} · {fmtHora(medA.tomada_en)}
+              <span className="cmd-nota" style={{ display: "block" }}>{agua.detalle.join(" ")}</span>
+            </p>
+          ) : <p className="cmd-nada">Sin medición de la temperatura del agua.</p>}
+        </section>
+      )}
 
       <section className="cmd-bloque">
         <div className="cmd-rot">Acciones vigentes</div>
@@ -201,14 +221,14 @@ export function Comando() {
         <div className="cmd-rot">Próximas horas · pronóstico</div>
         <div className="cmd-horas">
           {horas.map(([h, p]) => {
-            const n = nivelWBGT(p.wbgt_est) ?? 0;
+            const n = escala.nivel(p.wbgt_est) ?? 0;
             const uc = h >= v.inicioUltimoCuarto.getTime() && h <= v.finCarrera.getTime() + 3600_000;
             return (
               <div key={h} className="cmd-hora" style={uc ? { outline: "3px solid var(--naranja)" } : undefined}>
                 <b>{fmtHora(p.valido)}</b>
                 <Icono tipo={iconoTiempo(p, (p.radiacion ?? 0) < 5)} size={44} />
                 <span>{num(p.t2m)} °C</span>
-                <span className="cmd-wbgt" style={estiloWA(n)}>WBGT {num(p.wbgt_est, 1)}</span>
+                <span className="cmd-wbgt" style={estiloCalor(escala.variable, n)}>WBGT {num(p.wbgt_est, 1)}</span>
                 <span className="cmd-chico">ráf. {num(p.rafaga10)}</span>
                 <span className="cmd-chico"><Humedad texto={`${num(p.hr)} %`} size={15} /></span>
                 <UvDato uv={p.uv} compacto />

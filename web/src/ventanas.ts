@@ -25,6 +25,8 @@ export type Ventanas = {
   desarme: [Date, Date];
   duracionMin: number;
   demoraMin: number;
+  /** Triatlón: segmento de natación (zona crítica junto con el último cuarto) */
+  natacion: [Date, Date] | null;
 };
 
 const min = (d: Date, m: number) => new Date(d.getTime() + m * 60_000);
@@ -58,5 +60,6 @@ export function calcular(ev: Evento): Ventanas {
     desarme: [fin, min(fin, W.desarme_min)],
     duracionMin: duracion,
     demoraMin: demora,
+    natacion: ev.disciplina === "triatlon" && ev.natacion_min ? [min(largada, demora), min(largada, demora + ev.natacion_min)] : null,
   };
 }

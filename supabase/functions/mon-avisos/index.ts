@@ -18,16 +18,20 @@ const WEB = Deno.env.get("MON_URL_WEB") ?? "https://riesgoambiental.emerteam.com
 const HORIZONTE_MS = 5 * 86400_000;
 
 const COLOR = ["#2FA34C", "#C79000", "#FF6A1A", "#FF3B30", "#7A1610"];
-const TEXTO = ["#111111", "#111111", "#111111", "#111111", "#FFFFFF"];
 const COLOR_WA = ["#FFFFFF", "#B8D484", "#FBBC43", "#E83F43", "#1D1D1B"];
+const COLOR_WT = ["#2FA34C", "#2F6FD6", "#FF6A1A", "#FF3B30", "#111111"]; // banderas World Triathlon
+const COLOR_UCI = ["#FFFFFF", "#2FA34C", "#F5C400", "#FF6A1A", "#FF3B30"]; // zonas UCI, Anexo C
 const COLOR_SMN: Record<string, string> = { amarillo: "#F5C400", naranja: "#FF6A1A", rojo: "#FF3B30" };
 const FASE: Record<string, string> = { armado: "Armado", carrera: "Carrera", personal: "Jornada del personal", desarme: "Desarme" };
 const VARIABLE: Record<string, string> = {
   wbgt: "Estrés térmico de corredores", calor_personal: "Estrés térmico del personal",
+  wbgt_wt: "Estrés térmico de triatletas (World Triathlon)", wbgt_uci: "Estrés térmico de ciclistas (UCI)",
   viento_A: "Viento · estructuras ultralivianas", viento_B: "Viento · superficies de vela", viento_C: "Viento · estructuras ingenieriles",
   tormenta: "Tormenta", lluvia: "Lluvia y suelo",
 };
 const WA = ["Riesgo bajo", "Precaución", "Advertencia", "Advertencia severa", "Peligro"];
+const WT = ["Bandera verde", "Bandera azul", "Bandera naranja", "Bandera roja", "Bandera negra"];
+const UCI = ["Zona blanca", "Zona verde", "Zona amarilla", "Zona naranja", "Zona roja"];
 const VIENTO = ["Bajo umbral", "Vigilancia", "Reforzar", "Retirar", "Despejar área"];
 const ELEMENTOS: Record<string, string> = {
   A: "gazebos plegables, fly banners y arco inflable",
@@ -37,6 +41,8 @@ const ELEMENTOS: Record<string, string> = {
 
 function nombreNivel(variable: string, n: number): string {
   if (variable === "wbgt") return WA[n];
+  if (variable === "wbgt_wt") return WT[n] ?? "—";
+  if (variable === "wbgt_uci") return UCI[n] ?? "—";
   if (variable.startsWith("viento_")) return variable === "viento_C" && n === 4 ? "Despejar / suspender" : VIENTO[n];
   if (variable === "calor_personal") return ["Bajo límite", "Excede carga pesada", "Excede carga moderada"][n] ?? "—";
   if (variable === "tormenta") return ["Sin señal", "Tormenta posible", "Tormenta probable"][n] ?? "—";
@@ -52,6 +58,20 @@ function recomendacion(variable: string, n: number, fase: string): string {
     "Advertir a los corredores que regulen el ritmo. Reforzar puntos de enfriamiento y la capacidad de inmersión en agua fría en la llegada. Vigilancia activa del último cuarto y del grupo de mayor riesgo.",
     "Evaluar cambio de horario, acortamiento o retiro voluntario de corredores no aclimatados. Máxima capacidad de enfriamiento en llegada y recorrido.",
     "Evaluar la suspensión o postergación de la carrera.",
+  ][n];
+  if (variable === "wbgt_wt") return [
+    "",
+    "Vigilar el calor: hidratación y enfriamiento en transiciones y puestos; aviso a los triatletas antes de la largada.",
+    "Reforzar enfriamiento e hidratación en la carrera a pie, vigilancia del último cuarto y del grupo de mayor riesgo; evaluar adelantar la largada.",
+    "Pasar la distancia estándar a sprint o reprogramar la prueba (World Triathlon). Evaluar adelantar la largada.",
+    "Reprogramar o cancelar la prueba (World Triathlon).",
+  ][n];
+  if (variable === "wbgt_uci") return [
+    "",
+    "Entrada en calor a la sombra con ventiladores, protector solar, ropa clara e hidratación normal.",
+    "Chalecos de hielo y toallas frías, plan de hidratación individual y hielo para los equipos.",
+    "Salida a la sombra, protección de oficiales y voluntarios, más motos de abastecimiento con bebida y hielo, y reglas de hidratación flexibles.",
+    "Cambiar los horarios de salida y llegada, neutralizar un tramo o cancelar.",
   ][n];
   if (variable.startsWith("viento_")) {
     const cat = variable.slice(-1);
@@ -114,9 +134,9 @@ function armarCorreo(ev: Evento, cambios: Cambio[]): { asunto: string; html: str
   const corredores = new Set<string>();
   for (const c of cambios) {
     if (c.tipo === "sube" || c.tipo === "normaliza") {
-      const wa = c.variable === "wbgt";
-      const fondo = wa ? COLOR_WA[c.ahora] : COLOR[c.ahora];
-      const color = c.ahora === 4 ? "#FFFFFF" : TEXTO[c.ahora];
+      const paleta = c.variable === "wbgt" ? COLOR_WA : c.variable === "wbgt_wt" ? COLOR_WT : c.variable === "wbgt_uci" ? COLOR_UCI : COLOR;
+      const fondo = paleta[c.ahora];
+      const color = ["#1D1D1B", "#111111", "#7A1610", "#2F6FD6"].includes(fondo) ? "#FFFFFF" : "#111111";
       const titulo = c.tipo === "sube"
         ? `${VARIABLE[c.variable] ?? c.variable} · ${FASE[c.fase] ?? c.fase}`
         : `${VARIABLE[c.variable] ?? c.variable} · ${FASE[c.fase] ?? c.fase} · vuelve a quedar bajo el umbral`;

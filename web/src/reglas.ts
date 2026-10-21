@@ -1,4 +1,5 @@
 // Biblioteca de recomendaciones y fuentes. Textos sujetos a validación única de EMERTEAM.
+import { esVariableCalor, estiloCalor, ESCALAS } from "./disciplinas";
 
 export type TipoFuente = "NT" | "GI" | "CC" | "EF" | "CI";
 
@@ -35,6 +36,14 @@ export const REGLAS: Record<string, { tipo: TipoFuente; fuente: string }> = {
   },
   emt_lluvia_intensidad: { tipo: "CI", fuente: "EMERTEAM. Intensidad de lluvia superior a 20 mm/h." },
   emt_suelo_saturado: { tipo: "CI", fuente: "EMERTEAM. Lluvia acumulada igual o superior a 30 mm en 72 h." },
+  wt_wbgt: {
+    tipo: "GI",
+    fuente: "World Triathlon. Competition Rules, regla 10.3 (banderas WBGT). James, C. et al. (2025). Sports Medicine, 55(6), 1515–1526.",
+  },
+  uci_wbgt: {
+    tipo: "GI",
+    fuente: "Union Cycliste Internationale. Cycling Regulations, Parte 2, Anexo C: Protocolo de Alta Temperatura (enmiendas del 05.02.2024).",
+  },
 };
 
 export const COLOR_NIVEL = ["#2FA34C", "#C79000", "#FF6A1A", "#FF3B30", "#7A1610"];
@@ -56,12 +65,14 @@ export const estiloWA = (n: number) => ({
   boxShadow: n === 0 ? "inset 0 0 0 1px #1D1D1B" : undefined,
 });
 /** Estilo de nivel según la variable: WBGT con colores World Athletics, el resto con el semáforo EMERTEAM */
-export const estiloVariable = (variable: string, n: number) => (variable === "wbgt" ? estiloWA(n) : estiloNivel(n));
+export const estiloVariable = (variable: string, n: number) => (esVariableCalor(variable) ? estiloCalor(variable, n) : estiloNivel(n));
 
 export const NOMBRE_WA = ["Riesgo bajo", "Precaución", "Advertencia", "Advertencia severa", "Peligro"];
 
 export const NOMBRE_VARIABLE: Record<string, string> = {
   wbgt: "Estrés térmico de corredores",
+  wbgt_wt: "Estrés térmico de triatletas (World Triathlon)",
+  wbgt_uci: "Estrés térmico de ciclistas (UCI)",
   calor_personal: "Estrés térmico del personal",
   viento_A: "Viento · estructuras ultralivianas",
   viento_B: "Viento · superficies de vela",
@@ -72,6 +83,8 @@ export const NOMBRE_VARIABLE: Record<string, string> = {
 
 export const NOMBRE_CORTO: Record<string, string> = {
   wbgt: "Calor · corredores",
+  wbgt_wt: "Calor · triatletas",
+  wbgt_uci: "Calor · ciclistas",
   calor_personal: "Calor · personal",
   viento_A: "Viento · ultralivianas",
   viento_B: "Viento · superficies de vela",
@@ -91,6 +104,7 @@ const NIVEL_VIENTO = ["Bajo umbral", "Vigilancia", "Reforzar", "Retirar", "Despe
 
 export function nombreNivel(variable: string, nivel: number): string {
   if (variable === "wbgt") return NOMBRE_WA[nivel];
+  if (variable === "wbgt_wt" || variable === "wbgt_uci") return ESCALAS[variable].niveles[nivel] ?? "—";
   if (variable.startsWith("viento_")) return variable === "viento_C" && nivel === 4 ? "Despejar / suspender" : NIVEL_VIENTO[nivel];
   if (variable === "calor_personal") return ["Bajo límite", "Excede carga pesada", "Excede carga moderada"][nivel] ?? "—";
   if (variable === "tormenta") return ["Sin señal", "Tormenta posible", "Tormenta probable"][nivel] ?? "—";
@@ -114,6 +128,26 @@ export function recomendacion(variable: string, nivel: number, fase: string): st
       "Advertir a los corredores que regulen el ritmo. Reforzar puntos de enfriamiento y la capacidad de inmersión en agua fría en la llegada. Vigilancia activa del último cuarto y del grupo de mayor riesgo.",
       "Evaluar cambio de horario, acortamiento o retiro voluntario de corredores no aclimatados. Máxima capacidad de enfriamiento en llegada y recorrido.",
       "Evaluar la suspensión o postergación de la carrera.",
+    ][nivel];
+  }
+  if (variable === "wbgt_wt") {
+    // Roja y negra: World Triathlon, regla 10.3. Azul y naranja: criterio EMERTEAM (adelantar la largada: James et al., 2025)
+    return [
+      "",
+      "Vigilar el calor: hidratación y enfriamiento en transiciones y puestos; aviso a los triatletas antes de la largada.",
+      "Reforzar enfriamiento e hidratación en la carrera a pie, vigilancia del último cuarto y del grupo de mayor riesgo; evaluar adelantar la largada.",
+      "Pasar la distancia estándar a sprint o reprogramar la prueba (World Triathlon). Evaluar adelantar la largada.",
+      "Reprogramar o cancelar la prueba (World Triathlon).",
+    ][nivel];
+  }
+  if (variable === "wbgt_uci") {
+    // Medidas del Anexo C de la UCI para cada zona
+    return [
+      "",
+      "Entrada en calor a la sombra con ventiladores, protector solar, ropa clara e hidratación normal.",
+      "Chalecos de hielo y toallas frías, plan de hidratación individual y hielo para los equipos.",
+      "Salida a la sombra, protección de oficiales y voluntarios, más motos de abastecimiento con bebida y hielo, y reglas de hidratación flexibles.",
+      "Cambiar los horarios de salida y llegada, neutralizar un tramo o cancelar.",
     ][nivel];
   }
   if (variable.startsWith("viento_")) {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { nombreDisciplina } from "../disciplinas";
 import { Link, useOutletContext } from "react-router-dom";
 import type { Ctx } from "../main";
 import { Barra } from "../componentes/Barra";
@@ -98,7 +99,7 @@ export function Eventos() {
                     <div style={{ borderLeft: `5px solid ${cub?.size ? COLOR_NIVEL[max] : "var(--borde-input)"}`, paddingLeft: 12 }}>
                       <div className="condensada" style={{ fontSize: 22, fontWeight: 800, textTransform: "uppercase", lineHeight: 1.1 }}>{e.nombre}</div>
                       <div className="chico">
-                        {e.ubicacion} · {fmtHora(e.largada)} · {(e.mon_modalidades ?? []).map((m) => m.nombre).join(", ")} · {e.participantes.toLocaleString("es-AR")} participantes
+                        {e.disciplina && e.disciplina !== "running" && <b>{nombreDisciplina(e.disciplina)} · </b>}{e.ubicacion} · {fmtHora(e.largada)} · {(e.mon_modalidades ?? []).map((m) => m.nombre).join(", ")} · {e.participantes.toLocaleString("es-AR")} participantes
                         {e.estado === "cerrado" && " · cerrado"}
                       </div>
                     </div>

@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from . import ventanas as vt
-from .reglas import nivel_calor_personal, nivel_lluvia, nivel_tormenta, nivel_viento, nivel_wbgt_wa
+from .reglas import calor_participantes, nivel_calor_personal, nivel_lluvia, nivel_tormenta, nivel_viento
 
 from .reglas import U
 
@@ -105,6 +105,7 @@ def _en(t: datetime, rango: tuple[datetime, datetime]) -> bool:
 def niveles_evento(ev: dict, pron: list[dict], ahora: datetime) -> list[dict]:
     serie = serie_consenso(pron)
     v = vt.calcular(ev)
+    var_calor, nivel_calor = calor_participantes(ev.get("disciplina"))
     crudos: list[tuple] = []  # (fase, variable, hora, nivel, valor, umbral, regla, confianza)
     acumulado: list[tuple[datetime, float]] = []
     for h in sorted(serie):
@@ -131,7 +132,7 @@ def niveles_evento(ev: dict, pron: list[dict], ahora: datetime) -> list[dict]:
         for fase in fases:
             evaluaciones = []
             if fase == "carrera":
-                evaluaciones.append(("wbgt", *nivel_wbgt_wa(fila.get("wbgt_est"))))
+                evaluaciones.append((var_calor, *nivel_calor(fila.get("wbgt_est"))))
             if fase in ("armado", "personal", "desarme"):
                 evaluaciones.append(("calor_personal", *nivel_calor_personal(fila.get("wbgt_est"))))
             for cat in ("A", "B", "C"):

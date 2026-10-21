@@ -19,7 +19,7 @@ export type FaseInforme = {
 export type Informe = {
   version: 1;
   generado_en: string;
-  evento: { nombre: string; largada: string; ubicacion: string; modalidades: string; participantes: number };
+  evento: { nombre: string; largada: string; ubicacion: string; modalidades: string; participantes: number; disciplina?: string };
   ventanas: { exposicion: [string, string]; carrera: [string, string]; ultimoCuarto: [string, string] };
   corredores: {
     wbgtEst: Pico; wbgtMed: Pico; temperaturaMax: Pico; humedadMedia: number | null; hrMin?: number | null; hrMax?: number | null; uvMax?: Pico; rafagaEst: Pico; rafagaMed: Pico; lluviaMm: number;
@@ -103,7 +103,7 @@ export function armarInforme(ev: Evento, pron: Pronostico[], hist: FilaHistorial
     version: 1,
     generado_en: new Date().toISOString(),
     evento: {
-      nombre: ev.nombre, largada: ev.largada, ubicacion: ev.ubicacion, participantes: ev.participantes,
+      nombre: ev.nombre, largada: ev.largada, ubicacion: ev.ubicacion, participantes: ev.participantes, disciplina: ev.disciplina ?? "running",
       modalidades: (ev.mon_modalidades ?? []).map((m) => m.nombre).join(", "),
     },
     ventanas: {
