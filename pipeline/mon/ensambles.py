@@ -256,19 +256,21 @@ def explorar(evento: dict | None, max_pasos: int) -> dict:
     if ce:
         pasos_ref = [0, 90, 93, 144, 150, 360]
         _, res = ecmwf_campos(ce, pasos_ref)
-        informe["ecmwf_parametros_por_paso"] = res
+        informe["ecmwf_parametros_por_paso"] = {"_nota": "[miembros, mínimo, máximo]", **{str(k): v for k, v in res.items() if k in (90, 93, 144, 150)}}
         idx = ecmwf_indice(ce, 120) or []
         tam = {}
         for x in idx:
             if x.get("levtype") == "sfc" and x.get("type") == "pf":
                 tam.setdefault(x["param"], []).append(int(x["_length"]))
-        informe["ecmwf_mb_por_campo"] = {k: round(statistics.mean(v) / 1e6, 2) for k, v in sorted(tam.items())}
+        informe["ecmwf_mb_por_campo"] = {k: round(statistics.mean(v) / 1e6, 2) for k, v in sorted(tam.items())
+                                         if k in ECMWF_PARAM or k.startswith("10fg")}
+        informe["ecmwf_tipos"] = sorted({(x.get("type"), x.get("stream")) for x in idx}, key=str)
 
     # GEFS
     cg = gefs_ultima(ahora)
     informe["gefs_corrida"] = cg.isoformat() if cg else None
     if cg:
-        for prod in ("pgrb2sp25", "pgrb2ap5", "pgrb2bp5"):
+        for prod in ("pgrb2sp25",):
             _, res = gefs_campos(cg, [3, 6, 120, 240, 246, 384], range(1, 2), prod)
             informe[f"gefs_{prod}"] = res
         idx = gefs_idx(gefs_url(cg, 1, 120, ".idx")) or []
