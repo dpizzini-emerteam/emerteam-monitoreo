@@ -76,7 +76,8 @@ export function Comando() {
   const fase = t < v.armado[1].getTime() ? "Armado"
     : t < v.largada.getTime() ? "Previa a la largada"
     : t < v.inicioUltimoCuarto.getTime() ? "Carrera en curso"
-    : t <= v.finCarrera.getTime() ? "Último cuarto"
+    : t <= v.finUltimoCuarto.getTime() ? "Último cuarto"
+    : t <= v.finCarrera.getTime() ? "Carrera · llegada de la cola"
     : t <= v.desarme[1].getTime() ? "Desarme" : "Finalizado";
   const min = Math.round((t - v.largada.getTime()) / 60_000);
   const reloj = min < 0 ? `Largada en ${Math.floor(-min / 60)} h ${-min % 60} min` : t <= v.finCarrera.getTime() ? `Carrera: ${Math.floor(min / 60)} h ${min % 60} min` : "";
@@ -223,7 +224,7 @@ export function Comando() {
         <div className="cmd-horas">
           {horas.map(([h, p]) => {
             const n = escala.nivel(p.wbgt_est) ?? 0;
-            const uc = h >= v.inicioUltimoCuarto.getTime() && h <= v.finCarrera.getTime() + 3600_000;
+            const uc = h < v.finUltimoCuarto.getTime() && h + 3600_000 > v.inicioUltimoCuarto.getTime();
             return (
               <div key={h} className="cmd-hora" style={uc ? { outline: "3px solid var(--naranja)" } : undefined}>
                 <b>{fmtHora(p.valido)}</b>

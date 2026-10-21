@@ -487,5 +487,29 @@
     },
     "por_variable": {},
     "_por_variable": "Valores propios por variable o ventana, con la misma forma: {\"wbgt|carrera\": {\"preparar\": {...}, \"activar\": {...}}}. El día de la carrera no se dispara: mandan el determinístico corregido y las mediciones."
+  },
+  "ultimo_cuarto_tiempos": {
+    "_fuente": "RunRepeat, 35 millones de resultados de más de 28.000 carreras (últimos 20 años): percentiles 10 y 90 del tiempo de llegada. Criterio interno EMERTEAM aprobado por Diego (21/10/2026).",
+    "_tipo": "CI",
+    "_regla": "Running sin duración propia: el último cuarto va desde que el 10 % más rápido entra al último 25 % del recorrido (0,75 × P10) hasta que llega el 90 % (P90), más la demora de largada, por modalidad. Debajo de 5 km y arriba de 42,195 km se escala en proporción a la distancia. Con duración propia o en otras disciplinas: último 25 % de la duración.",
+    "km": [
+      5,
+      10,
+      21.0975,
+      42.195
+    ],
+    "p10_min": [
+      25.33,
+      48.18,
+      107.17,
+      211.77
+    ],
+    "p90_min": [
+      50.07,
+      87.97,
+      179.3,
+      341.75
+    ],
+    "entrada": 0.75
   }
 }

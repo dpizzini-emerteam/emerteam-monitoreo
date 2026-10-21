@@ -310,7 +310,7 @@ function Curva({ horas, escala, v }: { horas: Hora[]; escala: ReturnType<typeof 
       <figcaption className="rotulo">WBGT hora por hora · mediana y banda P10–P90 del ensamble</figcaption>
       <div className="desplaza"><svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="WBGT del ensamble: mediana y banda del 10 al 90 por ciento, con los umbrales de la escala">
         {sombra(v.exposicion[0], v.exposicion[1], "var(--superficie2)")}
-        {sombra(v.inicioUltimoCuarto, v.finCarrera, "color-mix(in srgb, #FF6A1A 18%, transparent)")}
+        {sombra(v.inicioUltimoCuarto, v.finUltimoCuarto, "color-mix(in srgb, #FF6A1A 18%, transparent)")}
         {cortes.map((c, i) => c >= y0 && c <= y1 && (
           <g key={c}>
             <line x1={ml} x2={W - mr} y1={Y(c)} y2={Y(c)} stroke={escala.fondo[i + 1] === "#FFFFFF" ? "#7C7C7C" : escala.fondo[i + 1]} strokeWidth={2} strokeDasharray="6 4" />

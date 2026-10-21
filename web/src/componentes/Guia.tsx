@@ -139,7 +139,7 @@ export function Guia({ ctx }: { ctx: Contexto }) {
             <tbody>
               <tr><td><b>Armado</b></td><td>00 h del primer día de armado</td><td>{w.armado_hasta_antes_largada_min / 60} h antes de la largada</td><td>Viento sobre estructuras, calor del personal, tormenta y lluvia.</td></tr>
               <tr><td><b>Ventana de los participantes</b></td><td>{w.exposicion_antes_min} min antes de la largada</td><td>{w.exposicion_despues_min} min después del último participante estimado</td><td>Calor de los participantes, viento, tormenta y lluvia.</td></tr>
-              <tr><td><b>Último cuarto</b></td><td>Al {Math.round(w.ultimo_cuarto * 100)} % de la duración estimada</td><td>Llegada del último participante</td><td>Zona crítica: mayor carga térmica acumulada y más asistencias.</td></tr>
+              <tr><td><b>Último cuarto</b></td><td>Running: cuando el 10 % más rápido entra al último 25 % del recorrido. Otras disciplinas o duración propia: al {Math.round(w.ultimo_cuarto * 100)} % de la duración</td><td>Running: llegada del 90 % (los tiempos de llegada salen de 35 millones de resultados, RunRepeat). Otras: fin de la prueba</td><td>Zona crítica: mayor carga térmica acumulada y más asistencias. Criterio interno EMERTEAM.</td></tr>
               <tr><td><b>Jornada del personal</b></td><td>{w.personal_antes_min / 60} h antes de la largada</td><td>{w.personal_despues_min / 60} h después del último participante</td><td>Calor del personal y viento.</td></tr>
               <tr><td><b>Desarme</b></td><td>Llegada del último participante</td><td>{w.desarme_min / 60} h después</td><td>Viento sobre estructuras, calor del personal, tormenta y lluvia.</td></tr>
             </tbody>
@@ -472,7 +472,7 @@ export function Guia({ ctx }: { ctx: Contexto }) {
             ["Confianza", "Qué tan firme es el pronóstico, según el plazo y el acuerdo entre modelos."],
             ["Tendencia", "Pronóstico con confianza baja: anticipa una posibilidad que todavía puede cambiar."],
             ["Sesgo", "Error sistemático de un modelo en un lugar (por ejemplo, pronosticar siempre 2 °C de menos). Se corrige con observaciones."],
-            ["Último cuarto", `Tramo final de la carrera, desde el ${Math.round(U.ventanas.ultimo_cuarto * 100)} % de la duración estimada: concentra la mayor carga térmica y las asistencias.`]].map(([t, d]) => (
+            ["Último cuarto", "Último 25 % del recorrido. En running, la franja horaria va desde que el 10 % más rápido entra a ese tramo hasta que llega el 90 % del pelotón: concentra la mayor carga térmica y las asistencias."]].map(([t, d]) => (
             <div key={t}><dt>{t}</dt><dd>{d}</dd></div>
           ))}
         </dl>

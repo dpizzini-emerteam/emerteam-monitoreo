@@ -480,7 +480,7 @@ function DiaCarrera({ serie, v, ev }: { serie: Map<number, Pronostico & { n: num
   const toca = (t: number, a: number, b: number) => t < b && t + H > a;
   const enExp = (t: number) => toca(t, ini.getTime(), fin.getTime());
   const enNat = (t: number) => !!nat && toca(t, nat[0].getTime(), nat[1].getTime());
-  const enUc = (t: number) => toca(t, v.inicioUltimoCuarto.getTime(), v.finCarrera.getTime());
+  const enUc = (t: number) => toca(t, v.inicioUltimoCuarto.getTime(), v.finUltimoCuarto.getTime());
   const dentro = todas.filter(([t]) => enExp(t));
   const iDentro = dentro.length ? todas.findIndex(([t]) => t === dentro[0][0]) : -1;
   const antes = iDentro > 0 ? [todas[iDentro - 1]] : [];
@@ -508,7 +508,7 @@ function DiaCarrera({ serie, v, ev }: { serie: Map<number, Pronostico & { n: num
       criticas.push([h, k]);
     }
   };
-  marcar(v.inicioUltimoCuarto, v.finCarrera);
+  marcar(v.inicioUltimoCuarto, v.finUltimoCuarto);
   if (nat) marcar(nat[0], nat[1]);
   const horas = [...antes, ...dentro, ...despues, ...criticas].sort((a, b) => a[0] - b[0]) as [number, Fila][];
   const fase = (t: number): { txt: string; tipo: "fuera" | "exp" | "uc" } => {
@@ -642,11 +642,11 @@ function Gantt({ v, ev, puntos, enTarjetas, quien }: { v: ReturnType<typeof calc
       {v.natacion && fila("Natación", v.natacion[0], v.natacion[1], <div className="dc-g-barra uc" style={{ left: pos(horaDec(v.natacion[0])), width: ancho(v.natacion[0], v.natacion[1]) }} />, "uc")}
       {fila(ev.disciplina === "running" || !ev.disciplina ? "Carrera" : "Prueba", v.largada, v.finCarrera, <>
         <div className="dc-g-barra carrera" style={{ left: pos(horaDec(v.largada)), width: ancho(v.largada, v.finCarrera) }} />
-        <div className="dc-g-barra uc" style={{ left: pos(horaDec(v.inicioUltimoCuarto)), width: ancho(v.inicioUltimoCuarto, v.finCarrera), borderRadius: "0 5px 5px 0" }} />
+        <div className="dc-g-barra uc" style={{ left: pos(horaDec(v.inicioUltimoCuarto)), width: ancho(v.inicioUltimoCuarto, v.finUltimoCuarto), borderRadius: v.finUltimoCuarto.getTime() >= v.finCarrera.getTime() ? "0 5px 5px 0" : 0 }} />
       </>)}
-      {fila("Último cuarto", v.inicioUltimoCuarto, v.finCarrera, <>
-        <div className="dc-g-barra uc" style={{ left: pos(horaDec(v.inicioUltimoCuarto)), width: ancho(v.inicioUltimoCuarto, v.finCarrera) }} />
-        <span className="dc-g-zona" style={{ left: `calc(${pos(horaDec(v.finCarrera))} + 8px)` }}>Zona crítica</span>
+      {fila("Último cuarto", v.inicioUltimoCuarto, v.finUltimoCuarto, <>
+        <div className="dc-g-barra uc" style={{ left: pos(horaDec(v.inicioUltimoCuarto)), width: ancho(v.inicioUltimoCuarto, v.finUltimoCuarto) }} />
+        <span className="dc-g-zona" style={{ left: `calc(${pos(horaDec(v.finUltimoCuarto))} + 8px)` }}>Zona crítica</span>
       </>, "uc")}
       <div className="dc-g-lab"><b>Pronóstico</b><span>● horas detalladas</span></div>
       <div className="dc-g-carril pron" style={fondo}>

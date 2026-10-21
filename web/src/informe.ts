@@ -109,7 +109,7 @@ export function armarInforme(ev: Evento, pron: Pronostico[], hist: FilaHistorial
     ventanas: {
       exposicion: [e0.toISOString(), e1.toISOString()],
       carrera: [v.largada.toISOString(), v.finCarrera.toISOString()],
-      ultimoCuarto: [v.inicioUltimoCuarto.toISOString(), v.finCarrera.toISOString()],
+      ultimoCuarto: [v.inicioUltimoCuarto.toISOString(), v.finUltimoCuarto.toISOString()],
     },
     corredores: {
       wbgtEst: maximo(expo, (p) => p.wbgt_est, (p) => p.valido),

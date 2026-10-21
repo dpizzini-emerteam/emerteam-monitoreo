@@ -15,10 +15,28 @@ export function duracionEstimadaMin(km: number): number {
   return 0;
 }
 
+/** Minutos desde la largada de la modalidad en que el grueso ocupa el último 25 % del recorrido:
+ *  del 10 % más rápido entrando (0,75 × P10) a la llegada del 90 % (P90). Ver umbrales.json → ultimo_cuarto_tiempos */
+export function ultimoCuartoMin(km: number): [number, number] {
+  const t = U.ultimo_cuarto_tiempos;
+  const ks = t.km;
+  const interp = (serie: number[]) => {
+    if (km <= ks[0]) return (serie[0] * km) / ks[0];
+    if (km >= ks[ks.length - 1]) return (serie[serie.length - 1] * km) / ks[ks.length - 1];
+    for (let i = 0; i < ks.length - 1; i++) {
+      if (km >= ks[i] && km <= ks[i + 1]) return serie[i] + ((serie[i + 1] - serie[i]) * (km - ks[i])) / (ks[i + 1] - ks[i]);
+    }
+    return serie[serie.length - 1];
+  };
+  return [t.entrada * interp(t.p10_min), interp(t.p90_min)];
+}
+
 export type Ventanas = {
   largada: Date;
   finCarrera: Date;
   inicioUltimoCuarto: Date;
+  /** Fin del último cuarto: llegada del 90 % en running (la cola sigue hasta finCarrera) */
+  finUltimoCuarto: Date;
   exposicion: [Date, Date];
   personal: [Date, Date];
   armado: [Date, Date];
@@ -47,13 +65,27 @@ export function calcular(ev: Evento): Ventanas {
     }
     duracion = (fin.getTime() - largada.getTime()) / 60_000 - demora;
   }
+  // Último cuarto: en running sin duración propia, por percentiles de llegada de cada modalidad; si no, último 25 % de la duración
+  let ucIni = min(largada, demora + W.ultimo_cuarto * duracion);
+  let ucFin = fin;
+  if (!ev.duracion_propia_min && (ev.disciplina ?? "running") === "running") {
+    const mods = ev.mon_modalidades?.length ? ev.mon_modalidades : [{ distancia_km: 10, largada: null }];
+    const tramos = mods.map((m) => {
+      const ini = m.largada ? new Date(m.largada) : largada;
+      const [a, b] = ultimoCuartoMin(Number(m.distancia_km));
+      return [min(ini, demora + a), min(ini, demora + b)];
+    });
+    ucIni = new Date(Math.min(...tramos.map((x) => x[0].getTime())));
+    ucFin = new Date(Math.max(...tramos.map((x) => x[1].getTime())));
+  }
   // Inicio del día local de largada (UTC−03:00) menos los días de armado
   const local = new Date(largada.getTime() - 3 * 3600_000);
   const dia0 = new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate(), 3));
   return {
     largada,
     finCarrera: fin,
-    inicioUltimoCuarto: min(largada, demora + W.ultimo_cuarto * duracion),
+    inicioUltimoCuarto: ucIni,
+    finUltimoCuarto: ucFin,
     exposicion: [min(largada, -W.exposicion_antes_min), min(fin, W.exposicion_despues_min)],
     personal: [min(largada, -W.personal_antes_min), min(fin, W.personal_despues_min)],
     armado: [new Date(dia0.getTime() - (ev.armado_dias || 3) * 86400_000), min(largada, -W.armado_hasta_antes_largada_min)],

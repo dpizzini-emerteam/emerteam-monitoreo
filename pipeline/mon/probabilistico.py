@@ -15,6 +15,8 @@ Cada miembro pasa por la misma cadena que el pronóstico determinístico:
   en superficie; las probabilidades cercanas a 0 % y 100 % se leen con cautela).
 
 Limitaciones que se guardan con cada probabilidad (columna `aproximacion`):
+* último cuarto (running): del 10 % más rápido entrando al último 25 % del recorrido a la llegada del 90 %
+  (percentiles internacionales de RunRepeat; ver config/umbrales.json → ultimo_cuarto_tiempos);
 * lluvia: con paso de 3 h no hay intensidad horaria; se usa P(acumulado en 3 h ≥ 20 mm), que es cota
   superior de P(alguna hora ≥ 20 mm/h);
 * tormenta: CAPE con precipitación del intervalo (proxy); a más de 48 h se lee como tendencia;
@@ -99,17 +101,17 @@ def ventanas_evento(ev: dict, ahora: datetime) -> list[Ventana]:
     ]
     # Último cuarto de cada modalidad, con la duración estimada que usa la plataforma
     mods = ev.get("mon_modalidades") or []
-    if ev.get("duracion_propia_min") or not mods:
-        lista.append(Ventana("ultimo_cuarto", v.inicio_ultimo_cuarto, v.fin_carrera, {"calor"}))
+    if ev.get("duracion_propia_min") or not mods or (ev.get("disciplina") or "running") != "running":
+        lista.append(Ventana("ultimo_cuarto", v.inicio_ultimo_cuarto, v.fin_ultimo_cuarto, {"calor"}))
     else:
         demora = ev.get("demora_largada_min")
         if demora is None:
             demora = (ev.get("participantes") or 0) / 1000.0 * w["demora_cada_1000"]
         for m in mods:
             ini = datetime.fromisoformat(m["largada"]).astimezone(timezone.utc) if m.get("largada") else v.largada
-            dur = ventanas.duracion_estimada_min(float(m["distancia_km"]))
-            a = ini + timedelta(minutes=demora + w["ultimo_cuarto"] * dur)
-            b = ini + timedelta(minutes=demora + dur)
+            a_min, b_min = ventanas.ultimo_cuarto_min(float(m["distancia_km"]))
+            a = ini + timedelta(minutes=demora + a_min)
+            b = ini + timedelta(minutes=demora + b_min)
             lista.append(Ventana(f"ultimo_cuarto:{m.get('nombre') or m['distancia_km']}", a, b, {"calor"}))
     return [x for x in lista if x.fin > ahora]
 
