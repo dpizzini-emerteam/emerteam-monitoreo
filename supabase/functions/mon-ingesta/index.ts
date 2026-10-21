@@ -90,6 +90,21 @@ Deno.serve(async (req) => {
       }
       respuesta.ultimas_por_evento = porEvento;
 
+      // Ensambles: sesgo vigente por evento y fuente, y última corrida de ensamble ya guardada por evento
+      if (url.searchParams.get("incluir") === "ensambles" && eventos?.length) {
+        const ids = eventos.map((e) => e.id);
+        const { data: sesgos, error: es } = await supabase.from("mon_sesgos").select("*").in("evento_id", ids);
+        if (es) throw es;
+        respuesta.sesgos = sesgos;
+        const ultimas: Record<string, string> = {};
+        for (const id of ids) {
+          const { data } = await supabase.from("mon_ens_prob").select("corrida").eq("evento_id", id).eq("modelo", "mezcla")
+            .order("corrida", { ascending: false }).limit(1);
+          if (data?.[0]) ultimas[id] = data[0].corrida;
+        }
+        respuesta.ens_ultimas = ultimas;
+      }
+
       if (url.searchParams.get("incluir") === "pronosticos" && eventos?.length) {
         const ids = eventos.map((e) => e.id);
         const pron: unknown[] = [];
@@ -193,6 +208,23 @@ Deno.serve(async (req) => {
           total += filas.length;
         }
         return json({ ok: true, filas: total });
+      }
+
+      if (body.tipo === "ensambles") {
+        // Cada emisión se guarda sin borrar las anteriores; reprocesar la misma corrida la reemplaza
+        const probs = (body.prob ?? []) as Record<string, unknown>[];
+        const horas = (body.horas ?? []) as Record<string, unknown>[];
+        const modelos = new Set(["ecmwf", "gefs", "mezcla"]);
+        if (![...probs, ...horas].every((f) => modelos.has(String(f.modelo)))) return json({ error: "modelo desconocido" }, 400);
+        for (let i = 0; i < probs.length; i += 500) {
+          const { error } = await supabase.from("mon_ens_prob").upsert(probs.slice(i, i + 500), { onConflict: "evento_id,corrida,modelo,variable,nivel,ventana" });
+          if (error) throw error;
+        }
+        for (let i = 0; i < horas.length; i += 500) {
+          const { error } = await supabase.from("mon_ens_horas").upsert(horas.slice(i, i + 500), { onConflict: "evento_id,corrida,modelo,variable,valido" });
+          if (error) throw error;
+        }
+        return json({ ok: true, prob: probs.length, horas: horas.length });
       }
 
       if (body.tipo === "niveles") {

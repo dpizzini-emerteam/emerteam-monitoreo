@@ -1,25 +1,34 @@
-name: Ensambles (exploración)
+name: Ensambles (pronóstico probabilístico)
 
-# Etapa 1 del pronóstico probabilístico: verifica parámetros por miembro, peso de los campos y tiempos
-# de la descarga recortada de ECMWF ENS y NOAA GEFS. No escribe en la base.
+# Probabilidad de alcanzar cada nivel por evento y ventana con ECMWF ENS (CC BY 4.0) y NOAA GEFS.
+# Programación pendiente de definir: el repositorio es privado y los minutos de Actions tienen tope mensual.
 on:
   workflow_dispatch:
     inputs:
+      modo:
+        description: "procesar (guarda en la base) o explorar (solo índices y tiempos)"
+        type: choice
+        options: [procesar, explorar]
+        default: procesar
+      forzar:
+        description: "Reprocesar aunque la corrida ya esté guardada"
+        type: boolean
+        default: false
       evento:
-        description: "Id del evento (vacío: el próximo evento activo)"
+        description: "Explorar: id del evento (vacío: el próximo activo)"
         type: string
         default: ""
-      max_pasos:
-        description: "Máximo de pasos de 3 h a descargar en la prueba"
-        type: string
-        default: "6"
 
 permissions:
   contents: read
   id-token: write
 
+concurrency:
+  group: ensambles
+  cancel-in-progress: false
+
 jobs:
-  explorar:
+  ensambles:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     defaults:
@@ -33,11 +42,9 @@ jobs:
           cache: pip
           cache-dependency-path: pipeline/requirements.txt
       - run: pip install -r requirements.txt
+      - name: Procesar
+        if: inputs.modo != 'explorar'
+        run: python -m mon.probabilistico ${{ inputs.forzar && '--forzar' || '' }}
       - name: Explorar
-        run: python -m mon.ensambles --evento "${{ inputs.evento }}" --max-pasos "${{ inputs.max_pasos }}"
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: ensambles
-          path: /tmp/ensambles.json
-          if-no-files-found: ignore
+        if: inputs.modo == 'explorar'
+        run: python -m mon.ensambles --evento "${{ inputs.evento }}"

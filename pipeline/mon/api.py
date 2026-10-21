@@ -29,8 +29,8 @@ class Ingesta:
     def _h(self) -> dict:
         return {"x-mon-oidc": _token()}
 
-    def estado(self, incluir_pronosticos: bool = False) -> dict:
-        params = {"incluir": "pronosticos"} if incluir_pronosticos else {}
+    def estado(self, incluir_pronosticos: bool = False, incluir: str | None = None) -> dict:
+        params = {"incluir": "pronosticos"} if incluir_pronosticos else ({"incluir": incluir} if incluir else {})
         r = self.s.get(URL, params=params, headers=self._h(), timeout=60)
         r.raise_for_status()
         return r.json()
@@ -57,5 +57,10 @@ class Ingesta:
 
     def uv(self, por_evento: dict[str, list[dict]]) -> dict:
         r = self.s.post(URL, json={"tipo": "uv", "eventos": por_evento}, headers=self._h(), timeout=120)
+        r.raise_for_status()
+        return r.json()
+
+    def ensambles(self, prob: list[dict], horas: list[dict]) -> dict:
+        r = self.s.post(URL, json={"tipo": "ensambles", "prob": prob, "horas": horas}, headers=self._h(), timeout=180)
         r.raise_for_status()
         return r.json()

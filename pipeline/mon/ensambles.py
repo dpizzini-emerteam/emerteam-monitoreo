@@ -75,7 +75,7 @@ def ecmwf_ultima(ahora: datetime, paso_control: int = 144) -> datetime | None:
     return None
 
 
-ECMWF_PARAM = {"2t": "2t", "2d": "2d", "10u": "10u", "10v": "10v", "10fg": "10fg", "fg10": "10fg",
+ECMWF_PARAM = {"2t": "2t", "2d": "2d", "10u": "10u", "10v": "10v", "10fg": "10fg", "fg10": "10fg", "10fg3": "10fg",
                "tp": "tp", "ssrd": "ssrd", "sp": "sp", "mucape": "cape", "cape": "cape"}
 
 
@@ -95,7 +95,7 @@ def ecmwf_campos(corrida: datetime, pasos: list[int]) -> tuple[list[Campo], dict
             por_param.setdefault(x.get("param"), set()).add(miembro)
             if nombre:
                 campos.append(Campo("ecmwf", miembro, p, nombre, ecmwf_url(corrida, p, "grib2"),
-                                    int(x["_offset"]), int(x["_length"])))
+                                    int(x["_offset"]), int(x["_length"]), {"orig": x.get("param")}))
         interes = set(ECMWF_PARAM) | {"10fg3", "10fg6", "mx2t3", "cp"}
         resumen[p] = {k: (len(v), min(v), max(v)) for k, v in sorted(por_param.items()) if k in interes}
     return campos, resumen
