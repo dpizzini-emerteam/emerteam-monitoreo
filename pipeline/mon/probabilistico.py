@@ -198,8 +198,10 @@ def descargar(modelo: str, corrida: datetime, pedidos: dict[int, set], puntos: d
     campos = [c for c in campos if c.param in pedidos.get(c.paso, ()) or (c.param == "2r" and "2d" in pedidos.get(c.paso, ()))]
     valores = _extraer(campos, puntos, {})
     miembros = sorted({k[0] for k in valores})
-    log.info("%s %s: %d pasos, %d campos, %.0f MB, %d miembros, %.0f s", modelo, corrida.isoformat(), len(pasos),
-             len(campos), sum(c.largo for c in campos) / 1e6, len(miembros), time.time() - t0)
+    msg = "%s %s: %d pasos, %d campos, %.0f MB, %d miembros, %.0f s" % (modelo, corrida.isoformat(), len(pasos),
+                                                                      len(campos), sum(c.largo for c in campos) / 1e6, len(miembros), time.time() - t0)
+    log.info(msg)
+    print(f"::notice title=Ensambles {modelo}::{msg}", flush=True)
     return {"valores": valores, "miembros": miembros, "corrida": corrida}
 
 
@@ -548,8 +550,12 @@ def main() -> int:
         return 0
     try:
         prob, horas = procesar(eventos, estado.get("sesgos") or [], ahora, args.forzar, estado.get("ens_ultimas") or {})
-        if prob or horas:
-            log.info("ingesta: %s", api.ensambles(prob, horas))
+        # En tandas: un solo envío con todas las horas supera el tiempo de escritura de la función
+        for i in range(0, len(prob), 1500):
+            log.info("ingesta prob: %s", api.ensambles(prob[i:i + 1500], []))
+        for i in range(0, len(horas), 1500):
+            log.info("ingesta horas: %s", api.ensambles([], horas[i:i + 1500]))
+        print(f"::notice title=Ensambles filas::{len(prob)} probabilidades, {len(horas)} horas", flush=True)
     except Exception:  # noqa: BLE001
         log.exception("Fallo el pronóstico probabilístico")
         tb = " | ".join(traceback.format_exc().strip().splitlines()[-6:]).replace("%", "%25")
