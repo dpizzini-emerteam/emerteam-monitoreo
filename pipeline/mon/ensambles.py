@@ -96,7 +96,8 @@ def ecmwf_campos(corrida: datetime, pasos: list[int]) -> tuple[list[Campo], dict
             if nombre:
                 campos.append(Campo("ecmwf", miembro, p, nombre, ecmwf_url(corrida, p, "grib2"),
                                     int(x["_offset"]), int(x["_length"])))
-        resumen[p] = {k: len(v) for k, v in sorted(por_param.items())}
+        interes = set(ECMWF_PARAM) | {"10fg3", "10fg6", "mx2t3", "cp"}
+        resumen[p] = {k: (len(v), min(v), max(v)) for k, v in sorted(por_param.items()) if k in interes}
     return campos, resumen
 
 
@@ -154,7 +155,7 @@ def gefs_campos(corrida: datetime, pasos: list[int], miembros: range, prod: str 
                 continue
             for ini, var, nivel, tiempo, largo in idx:
                 clave = GEFS_PARAM.get((var, nivel))
-                if m == 1:
+                if m == 1 and (clave or var in ("TMP", "RH", "DPT", "GUST", "DSWRF", "APCP", "CAPE", "LAND", "PRES")):
                     resumen.setdefault(p, {}).setdefault("vars", set()).add(f"{var}:{nivel}:{tiempo}")
                 if clave and largo:
                     campos.append(Campo("gefs", m, p, clave, gefs_url(corrida, m, p, "", prod), ini, largo,
@@ -253,7 +254,7 @@ def explorar(evento: dict | None, max_pasos: int) -> dict:
     ce = ecmwf_ultima(ahora)
     informe["ecmwf_corrida"] = ce.isoformat() if ce else None
     if ce:
-        pasos_ref = [0, 24, 87, 90, 93, 96, 120, 144, 150, 240, 360]
+        pasos_ref = [0, 90, 93, 144, 150, 360]
         _, res = ecmwf_campos(ce, pasos_ref)
         informe["ecmwf_parametros_por_paso"] = res
         idx = ecmwf_indice(ce, 120) or []
@@ -268,7 +269,7 @@ def explorar(evento: dict | None, max_pasos: int) -> dict:
     informe["gefs_corrida"] = cg.isoformat() if cg else None
     if cg:
         for prod in ("pgrb2sp25", "pgrb2ap5", "pgrb2bp5"):
-            _, res = gefs_campos(cg, [3, 24, 96, 120, 240, 384], range(1, 2), prod)
+            _, res = gefs_campos(cg, [3, 6, 120, 240, 246, 384], range(1, 2), prod)
             informe[f"gefs_{prod}"] = res
         idx = gefs_idx(gefs_url(cg, 1, 120, ".idx")) or []
         informe["gefs_mb_por_campo_sp25"] = {f"{v}:{n}": round(l / 1e6, 2) for _, v, n, _, l in idx
