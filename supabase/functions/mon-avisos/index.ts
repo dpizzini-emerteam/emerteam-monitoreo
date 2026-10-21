@@ -106,6 +106,15 @@ function textoCorredores(variable: string, n: number): string {
   return "";
 }
 
+// Aguas abiertas: el WBGT del aire gobierna las fases en tierra y el dispositivo; en el agua manda la temperatura del agua
+const CALOR_AGUAS_ABIERTAS = [
+  "",
+  "Sombra e hidratación en el corral de largada; acortar la espera al sol con neopreno. Protección solar e hidratación del personal en botes y pontones. Medir el agua según el protocolo de World Aquatics.",
+  "Tina de inmersión en agua fría operativa en la salida del agua. Sillas, bebida y evaluación médica a la salida. Vigilar a los nadadores que se detienen o cambian de técnica.",
+  "Adelantar y escalonar la largada; balsas de descanso y más embarcaciones. En 10 km o más, abastecimiento cada 2,5 km o menos. En 5 km o más, no largar con agua por encima de 29,45 °C (referencia US Masters Swimming).",
+  "Evaluar acortar o postergar la prueba. Ante sospecha de golpe de calor, enfriar por inmersión en el lugar antes de trasladar y decidir con temperatura rectal. Rotar al personal embarcado.",
+];
+
 type Evento = { id: string; nombre: string; largada: string; organizador_email: string; disciplina?: string | null };
 
 // Vocabulario por disciplina: los textos se escriben para running y se adaptan (corredores → atletas, nadadores, ciclistas)
@@ -154,7 +163,9 @@ function armarCorreo(ev: Evento, cambios: Cambio[]): { asunto: string; html: str
       const titulo = c.tipo === "sube"
         ? `${nombreVar(c.variable)} · ${FASE[c.fase] ?? c.fase}`
         : `${nombreVar(c.variable)} · ${FASE[c.fase] ?? c.fase} · vuelve a quedar bajo el umbral`;
-      const reco = c.tipo === "sube" ? adaptar(recomendacion(c.variable, c.ahora, c.fase), ev.disciplina) : "Se levantan las medidas indicadas para esta variable. El monitoreo continúa.";
+      const reco = c.tipo !== "sube" ? "Se levantan las medidas indicadas para esta variable. El monitoreo continúa."
+        : c.variable === "wbgt" && ev.disciplina === "aguas_abiertas" ? CALOR_AGUAS_ABIERTAS[c.ahora]
+        : adaptar(recomendacion(c.variable, c.ahora, c.fase), ev.disciplina);
       partes.push(`<tr><td style="padding:14px 18px;border-left:5px solid ${c.tipo === "sube" ? (fondo === "#FFFFFF" ? "#1D1D1B" : fondo) : "#2FA34C"};background:#f7f6f4">
         <div style="margin-bottom:6px">${etiqueta(c.tipo === "sube" ? nombreNivel(c.variable, c.ahora) : "Bajo umbral", c.tipo === "sube" ? fondo : "#2FA34C", c.tipo === "sube" ? color : "#111111")}</div>
         <div style="font:700 16px Arial,sans-serif;color:#111">${esc(titulo)}</div>

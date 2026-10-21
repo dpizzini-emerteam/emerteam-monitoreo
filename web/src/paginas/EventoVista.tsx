@@ -19,7 +19,7 @@ import {
   COLOR_SMN, estadoRayosGLM, ordenarAlertas, tituloAlerta, diaLocal, fmtDia, fmtFechaHora, fmtHora, num, supabase,
   type AlertaSMN, type Evento, type Rayo, type Nivel, type Pronostico, type Sesgo, type Uv,
 } from "../datos";
-import { fijarDisciplina, estiloNivel, estiloVariable, NOMBRE_CORTO, NOMBRE_FASE, NOMBRE_VARIABLE, REGLAS, TIPO_FUENTE, nombreNivel, recomendacion } from "../reglas";
+import { fijarDisciplina, reglaDe, estiloNivel, estiloVariable, NOMBRE_CORTO, NOMBRE_FASE, NOMBRE_VARIABLE, TIPO_FUENTE, nombreNivel, recomendacion } from "../reglas";
 import { calcular } from "../ventanas";
 
 
@@ -551,7 +551,7 @@ function Recomendaciones({ lista: vig, vacio }: { lista: Nivel[]; vacio: string 
 }
 
 function TarjetaReco({ n }: { n: Nivel }) {
-  const r = REGLAS[n.regla];
+  const r = reglaDe(n.regla, n.variable);
   const texto = recomendacion(n.variable, n.nivel, n.fase);
   return (
     <article className="tarjeta" style={{ display: "flex", flexDirection: "column", gap: 8, borderLeft: `5px solid ${estiloVariable(n.variable, n.nivel).background}` }}>

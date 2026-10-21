@@ -357,6 +357,20 @@ export function Guia({ ctx }: { ctx: Contexto }) {
         </div>
         <p className="chico">Triatlón: bandera roja y negra según World Triathlon; azul y naranja con medidas de EMERTEAM. Ciclismo: medidas del Anexo C de la UCI. «Por encima de 28 °C» se toma desde 28,0 °C por prudencia.</p>
 
+        <h3>Calor · aguas abiertas</h3>
+        <p>Durante el nado <b>manda la temperatura del agua</b>: en el agua el sudor no evapora y, cuando el agua se acerca a la temperatura de la piel, el nadador acumula calor. El WBGT del aire (escala World Athletics) se usa para las fases en tierra (espera, salida del agua) y para el personal embarcado.</p>
+        <div className="desplaza">
+          <table className="tabla guia-tabla">
+            <thead><tr><th>WBGT</th><th>Medida para aguas abiertas</th></tr></thead>
+            <tbody>
+              {[1, 2, 3, 4].map((i) => (
+                <tr key={i}><td><span className="badge" style={estiloCalor("wbgt", i)}>{ESCALAS.wbgt.niveles[i]}</span> <span className="chico">{ESCALAS.wbgt.rangos[i]}</span></td><td>{recomendacion("wbgt", i, "carrera", "aguas_abiertas")}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <Fuente regla="aa_calor" />
+
         <h3>Agua · triatlón (World Triathlon)</h3>
         <div className="desplaza">
           <table className="tabla guia-tabla">
@@ -430,7 +444,7 @@ export function Guia({ ctx }: { ctx: Contexto }) {
             <tbody>
               {Object.entries(REGLAS).map(([k, v]) => (
                 <tr key={k}>
-                  <td>{{ wa2020_wbgt: "Calor · participantes (World Athletics)", srt30_2023_tgbh: "Calor · personal", emt_viento_A: "Viento · ultralivianas", emt_viento_B: "Viento · superficies de vela", emt_viento_C: "Viento · estructuras ingenieriles", emt_tormenta_cape: "Tormenta", emt_lluvia_intensidad: "Lluvia intensa", emt_suelo_saturado: "Suelo saturado", wt_wbgt: "Calor · atletas de triatlón", uci_wbgt: "Calor · ciclistas" }[k] ?? k}</td>
+                  <td>{{ wa2020_wbgt: "Calor · participantes (World Athletics)", srt30_2023_tgbh: "Calor · personal", emt_viento_A: "Viento · ultralivianas", emt_viento_B: "Viento · superficies de vela", emt_viento_C: "Viento · estructuras ingenieriles", emt_tormenta_cape: "Tormenta", emt_lluvia_intensidad: "Lluvia intensa", emt_suelo_saturado: "Suelo saturado", wt_wbgt: "Calor · atletas de triatlón", aa_calor: "Calor · nadadores (medidas)", uci_wbgt: "Calor · ciclistas" }[k] ?? k}</td>
                   <td style={{ whiteSpace: "nowrap" }}>{TIPO_FUENTE[v.tipo]}</td>
                   <td>{v.fuente}</td>
                 </tr>

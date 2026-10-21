@@ -4,6 +4,11 @@ import { adaptar, esVariableCalor, estiloCalor, ESCALAS } from "./disciplinas";
 // Disciplina del evento que se está mirando: adapta «corredores» a atletas, nadadores o ciclistas en nombres y recomendaciones
 let disciplinaActual: string | null | undefined = null;
 export function fijarDisciplina(d: string | null | undefined) { disciplinaActual = d; }
+/** Regla que respalda la recomendación mostrada (aguas abiertas tiene medidas propias para el calor) */
+export function reglaDe(regla: string, variable: string, d: string | null | undefined = disciplinaActual) {
+  if (variable === "wbgt" && d === "aguas_abiertas") return REGLAS.aa_calor;
+  return REGLAS[regla];
+}
 
 export type TipoFuente = "NT" | "GI" | "CC" | "EF" | "CI";
 
@@ -43,6 +48,10 @@ export const REGLAS: Record<string, { tipo: TipoFuente; fuente: string }> = {
   wt_wbgt: {
     tipo: "GI",
     fuente: "World Triathlon. Competition Rules, regla 10.3 (banderas WBGT). James, C. et al. (2025). Sports Medicine, 55(6), 1515–1526.",
+  },
+  aa_calor: {
+    tipo: "CC",
+    fuente: "Escala: World Athletics (2020), tabla 1, aplicada a las fases en tierra (durante el nado manda la temperatura del agua: Macaluso et al., 2013; Tipton y Bradford, 2014). Medidas: World Aquatics, Open Water Swimming Manual (2024); Roberts, W. O. et al. (2023), ACSM Expert Consensus Statement on Exertional Heat Illness, Current Sports Medicine Reports, 22(4), 134–149; informe Otago para FINA (2013); IRONMAN SwimSmart (2013); US Masters Swimming, Rule Book 2026, art. 302.2.2A y 302.2.6C. Espera con neopreno y rotación del personal embarcado: criterio interno EMERTEAM.",
   },
   uci_wbgt: {
     tipo: "GI",
@@ -130,7 +139,17 @@ const ELEMENTOS: Record<string, string> = {
 };
 
 /** Texto de recomendación por variable, nivel y fase. null = sin recomendación (nivel 0). */
+/** Aguas abiertas: el WBGT del aire gobierna las fases en tierra y el dispositivo; en el agua manda la temperatura del agua */
+const CALOR_AGUAS_ABIERTAS = [
+  "",
+  "Sombra e hidratación en el corral de largada; acortar la espera al sol con neopreno. Protección solar e hidratación del personal en botes y pontones. Medir el agua según el protocolo de World Aquatics.",
+  "Tina de inmersión en agua fría operativa en la salida del agua. Sillas, bebida y evaluación médica a la salida. Vigilar a los nadadores que se detienen o cambian de técnica.",
+  "Adelantar y escalonar la largada; balsas de descanso y más embarcaciones. En 10 km o más, abastecimiento cada 2,5 km o menos. En 5 km o más, no largar con agua por encima de 29,45 °C (referencia US Masters Swimming).",
+  "Evaluar acortar o postergar la prueba. Ante sospecha de golpe de calor, enfriar por inmersión en el lugar antes de trasladar y decidir con temperatura rectal. Rotar al personal embarcado.",
+];
+
 export function recomendacion(variable: string, nivel: number, fase: string, d: string | null | undefined = disciplinaActual): string | null {
+  if (variable === "wbgt" && d === "aguas_abiertas" && nivel > 0) return CALOR_AGUAS_ABIERTAS[nivel] ?? null;
   const t = recomendacionBase(variable, nivel, fase);
   return t == null ? null : adaptar(t, d);
 }
