@@ -168,19 +168,22 @@ def gefs_campos(corrida: datetime, pasos: list[int], miembros: range, prod: str 
 
 # ---------------------------------------------------------------- descarga y punto
 
-def bajar_valor(c: Campo, lat: float, lon: float, cache: dict) -> float | None:
-    """Descarga un campo por rango de bytes y devuelve el valor en el punto de grilla más cercano."""
+def bajar_bytes(c: Campo) -> bytes | None:
+    """Descarga un campo por rango de bytes (en hilos: solo red, sin eccodes)."""
     for intento in range(3):
         try:
             r = S.get(c.url, headers={"Range": f"bytes={c.inicio}-{c.inicio + c.largo - 1}"}, timeout=120)
             if r.status_code in (200, 206) and r.content[:4] == b"GRIB":
-                break
+                return r.content
         except requests.RequestException:
             pass
         time.sleep(2 * (intento + 1))
-    else:
-        return None
-    gid = eccodes.codes_new_from_message(r.content)
+    return None
+
+
+def valor_punto(c: Campo, datos: bytes, lat: float, lon: float, cache: dict) -> float | None:
+    """Valor en el punto de grilla más cercano (eccodes no es seguro entre hilos: se llama desde el hilo principal)."""
+    gid = eccodes.codes_new_from_message(datos)
     try:
         clave = (c.modelo, eccodes.codes_get(gid, "numberOfDataPoints"))
         if clave not in cache:
@@ -201,8 +204,8 @@ def bajar(campos: list[Campo], lat: float, lon: float) -> tuple[dict, float, int
     t0 = time.time()
     valores: dict = {}
     with ThreadPoolExecutor(HILOS) as ex:
-        for c, v in zip(campos, ex.map(lambda c: bajar_valor(c, lat, lon, cache), campos)):
-            valores[(c.miembro, c.paso, c.param)] = v
+        for c, datos in zip(campos, ex.map(bajar_bytes, campos)):
+            valores[(c.miembro, c.paso, c.param)] = None if datos is None else valor_punto(c, datos, lat, lon, cache)
     return valores, time.time() - t0, sum(c.largo for c in campos)
 
 
