@@ -129,6 +129,8 @@ export function EventoForm() {
     if (!mods.length || mods.some((m) => !m.nombre || !(m.distancia_km > 0))) return setError("Cargá al menos una modalidad con distancia.");
     // La duración por distancia solo está calibrada para running: el resto de las disciplinas la carga
     if (f.disciplina !== "running" && !f.duracion_propia_min) return setError("Cargá la duración estimada del evento: el cálculo por distancia solo vale para running.");
+    if (f.duracion_propia_min && parseInt(f.duracion_propia_min, 10) < 15)
+      return setError(`Una duración de ${f.duracion_propia_min} min es demasiado corta y deja sin sentido la ventana de carrera y el último cuarto. Revisala${f.disciplina === "running" ? " o dejala vacía para estimarla por distancia" : ""}.`);
     if (conf.agua && !f.agua_tipo) return setError("Indicá el tipo de agua (mar, río, lago o laguna).");
     if (conf.agua && !f.natacion_m) return setError("Cargá la distancia de natación en metros: define la regla de temperatura del agua.");
     if (f.disciplina === "triatlon" && !f.natacion_min) return setError("Cargá la duración estimada de la natación: es la zona crítica del triatlón.");
@@ -200,8 +202,8 @@ export function EventoForm() {
             <label>Cupo del equipo del organizador<input type="number" min={0} max={200} required value={f.cupo_equipo} onChange={set("cupo_equipo")} /></label>
             <label>Pórtico<select value={f.portico} onChange={set("portico")}><option value="estructural">Estructural</option><option value="inflable">Inflable</option></select></label>
             {f.disciplina === "running"
-              ? <label>Duración propia (min, opcional)<input type="number" min={1} value={f.duracion_propia_min} onChange={set("duracion_propia_min")} placeholder="estimada por distancia" /></label>
-              : <label>Duración estimada del evento (min, hasta el último participante)<input type="number" min={1} required value={f.duracion_propia_min} onChange={set("duracion_propia_min")} /></label>}
+              ? <label>Duración propia (min, opcional)<input type="number" value={f.duracion_propia_min} onChange={set("duracion_propia_min")} placeholder="estimada por distancia" min={15} /></label>
+              : <label>Duración estimada del evento (min, hasta el último participante)<input type="number" min={15} required value={f.duracion_propia_min} onChange={set("duracion_propia_min")} /></label>}
             <label>Demora de largada (min, opcional)<input type="number" min={0} value={f.demora_largada_min} onChange={set("demora_largada_min")} placeholder="1 min cada 1.000" /></label>
             {id && <label>Estado<select value={f.estado} onChange={set("estado")}><option value="activo">Activo</option><option value="cerrado">Cerrado</option></select></label>}
           </div>
