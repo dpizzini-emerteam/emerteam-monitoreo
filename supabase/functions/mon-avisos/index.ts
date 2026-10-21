@@ -232,7 +232,7 @@ function adaptar(texto: string, d?: string | null): string {
   return texto.replace(/\bcorredores\b/g, pl).replace(/\bCorredores\b/g, cap(pl)).replace(/\bcorredor\b/g, sg).replace(/\bCorredor\b/g, cap(sg));
 }
 type Nivel = { evento_id: string; fase: string; variable: string; desde: string; hasta: string; nivel: number; confianza: string | null };
-type Alerta = { id: string; evento_id: string; fenomeno: string; color: string; desde: string | null; hasta: string | null; estado: string; tipo: string; descripcion?: string | null };
+type Alerta = { id: string; evento_id: string; fenomeno: string; color: string; desde: string | null; hasta: string | null; estado: string; tipo: string; descripcion?: string | null; instruccion?: string | null };
 type Estado = { niveles: Record<string, number>; smn: string[]; glm: number; ens?: Record<string, string> };
 type EnsProb = { evento_id: string; corrida: string; variable: string; nivel: number; ventana: string; ventana_hasta: string; umbral: number | null; prob: number; miembros: number };
 type Cambio =
@@ -299,6 +299,62 @@ function recomendacionSMN(a: Alerta & { descripcion?: string | null }, fs: strin
   return out;
 }
 
+// Réplica de web/src/alertasSmn.ts (frases del SMN sobre salir o estar al aire libre y decisión sugerida por fase,
+// criterio interno EMERTEAM según el color del SMN): cambiar los dos juntos.
+type FaseEvento = "armado" | "carrera" | "desarme";
+
+const AIRE_LIBRE = /sal[íi]r?(?=[\s.,;]|$)|salgas|aire libre|refugio|construcciones cerradas|actividad f[ií]sica|expongas al sol|autoridades/i;
+const POR_COLOR: Record<string, string[]> = {
+  amarillo: ["Evitá salir."],
+  naranja: ["Salí solo si es necesario."],
+  rojo: ["Salí solo si es imprescindible.", "Seguí las instrucciones de las autoridades locales."],
+};
+const CALOR_SMN = ["Reducí la actividad física.", "No te expongas al sol en exceso, ni en horas centrales del día (entre las 10 y las 16 horas)."];
+
+const esCalor = (f: string) => /calor|temperatura/i.test(f) && !/fr[ií]o/i.test(f);
+const esFrio = (f: string) => /fr[ií]o/i.test(f);
+
+/** Frases oficiales del SMN que se refieren a salir o a estar al aire libre */
+function recomendacionSmnAireLibre(a: { color: string; fenomeno: string; instruccion?: string | null }): string[] {
+  const items = (a.instruccion ?? "").split(/\s*\d+\s*-\s*/).map((x) => x.trim()).filter(Boolean)
+    .map((x) => (/[.!]$/.test(x) ? x : `${x}.`));
+  const sel = items.filter((x) => AIRE_LIBRE.test(x));
+  if (sel.length) return sel;
+  if (esCalor(a.fenomeno)) return CALOR_SMN;
+  if (esFrio(a.fenomeno)) return [];
+  return POR_COLOR[a.color] ?? [];
+}
+
+/** Decisión sugerida por fase (criterio interno EMERTEAM) */
+function decisionEvento(a: { color: string; fenomeno: string }, fases: FaseEvento[]): { fase: string; texto: string }[] {
+  const out: { fase: string; texto: string }[] = [];
+  const montaje = fases.filter((f) => f !== "carrera");
+  const nombreMontaje = montaje.map((f) => (f === "armado" ? "Armado" : "Desarme")).join(" y ");
+  if (esFrio(a.fenomeno)) return out;
+  if (esCalor(a.fenomeno)) {
+    if (fases.includes("carrera")) out.push({ fase: "Día de carrera", texto: "Si la carrera transcurre entre las 10 y las 16 h, evaluar adelantar la largada para terminar antes de las 10 h. Aplicar las medidas del nivel de estrés térmico que indica la web." });
+    if (montaje.length) out.push({ fase: nombreMontaje, texto: "Programar el trabajo físico fuera de la franja de 10 a 16 h, con pausas, sombra e hidratación." });
+    return out;
+  }
+  if (fases.includes("carrera")) {
+    out.push({
+      fase: "Día de carrera",
+      texto: a.color === "rojo" ? "Suspender la carrera y seguir las instrucciones de las autoridades locales."
+        : a.color === "naranja" ? "No realizar la carrera dentro de la vigencia de la alerta: postergar o suspender."
+        : "Evaluar reprogramar la largada fuera de la vigencia de la alerta. Si se mantiene: protocolo activo, refugios identificados y plan de evacuación de corrales y llegada.",
+    });
+  }
+  if (montaje.length) {
+    out.push({
+      fase: nombreMontaje,
+      texto: a.color === "rojo" ? "Suspender las tareas al aire libre durante la vigencia de la alerta y seguir las instrucciones de las autoridades locales."
+        : a.color === "naranja" ? "Suspender las tareas al aire libre durante la vigencia de la alerta."
+        : "No trabajar al aire libre mientras dure el fenómeno.",
+    });
+  }
+  return out;
+}
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 }
@@ -342,17 +398,26 @@ function armarCorreo(ev: Evento, cambios: Cambio[]): { asunto: string; html: str
       const afecta = fs.length ? `Afecta: ${listaY(fs.map((f) => NOMBRE_FASE[f]))}.${fs.includes("carrera") ? "" : " No afecta el día de carrera."}` : "";
       if (c.tipo === "smn_nueva") {
         const recos = recomendacionSMN(a, fs, ev);
+        const smnPob = recomendacionSmnAireLibre(a);
+        const decision = decisionEvento(a, fs);
         partes.push(`<tr><td style="padding:14px 18px;background:${fondo};border-left:5px solid #111">
         <div style="font:800 17px Arial,sans-serif;color:#111;text-transform:uppercase">${esc(titulo)}</div>
         <div style="font:14px Arial,sans-serif;color:#111;margin-top:6px">${esc(vig)}</div>
         ${afecta ? `<div style="font:700 14px Arial,sans-serif;color:#111;margin-top:4px">${esc(afecta)}</div>` : ""}</td></tr>
+        ${smnPob.length ? `<tr><td style="padding:12px 18px 4px"><div style="font:800 12px Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#7C7C7C">El SMN recomienda a la población</div>
+        <div style="font:700 15px/1.5 Arial,sans-serif;color:#111;margin-top:4px">${esc(smnPob.join(" "))}</div></td></tr>` : ""}
+        ${decision.length ? `<tr><td style="padding:12px 18px 4px"><div style="border-left:5px solid #FF6A1A;background:#fff4ec;padding:10px 14px">
+        <div style="font:800 12px Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#111">Decisión sugerida para el evento · criterio EMERTEAM</div>
+        ${decision.map((d) => `<div style="font:14px/1.5 Arial,sans-serif;color:#222;margin-top:6px"><b>${esc(d.fase)}:</b> ${esc(d.texto)}</div>`).join("")}</div></td></tr>` : ""}
         ${a.descripcion ? `<tr><td style="padding:12px 18px 4px"><div style="font:800 12px Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#7C7C7C">Qué anuncia el SMN</div>
         <div style="font:14px/1.5 Arial,sans-serif;color:#222;margin-top:4px;font-style:italic">«${esc(a.descripcion)}»</div></td></tr>` : ""}
-        ${recos.length ? `<tr><td style="padding:12px 18px 4px"><div style="font:800 12px Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#7C7C7C">Recomendación EMERTEAM</div>
+        ${recos.length ? `<tr><td style="padding:12px 18px 4px"><div style="font:800 12px Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#7C7C7C">Medidas operativas EMERTEAM</div>
         ${recos.map((r) => `<div style="font:14px/1.5 Arial,sans-serif;color:#222;margin-top:6px"><b>${esc(r.titulo)}:</b> ${esc(r.texto)}</div>`).join("")}</td></tr>` : ""}
         <tr><td style="padding:8px 18px 0"><div style="font:12px Arial,sans-serif;color:#666">La alerta oficial del SMN tiene prioridad sobre el pronóstico.</div></td></tr><tr><td style="height:14px"></td></tr>`);
-        lineas.push([titulo, vig, afecta, a.descripcion ? `Qué anuncia el SMN: «${a.descripcion}»` : "",
-          recos.length ? `Recomendación EMERTEAM:\n${recos.map((r) => `- ${r.titulo}: ${r.texto}`).join("\n")}` : "",
+        lineas.push([titulo, vig, afecta, smnPob.length ? `El SMN recomienda a la población: ${smnPob.join(" ")}` : "",
+          decision.length ? `Decisión sugerida para el evento (criterio EMERTEAM):\n${decision.map((d) => `- ${d.fase}: ${d.texto}`).join("\n")}` : "",
+          a.descripcion ? `Qué anuncia el SMN: «${a.descripcion}»` : "",
+          recos.length ? `Medidas operativas EMERTEAM:\n${recos.map((r) => `- ${r.titulo}: ${r.texto}`).join("\n")}` : "",
           "La alerta oficial del SMN tiene prioridad sobre el pronóstico."].filter(Boolean).join("\n"));
       } else {
         partes.push(`<tr><td style="padding:14px 18px;background:#f7f6f4;border-left:5px solid #111">
@@ -433,7 +498,7 @@ Deno.serve(async (req) => {
   const [{ data: nivs }, { data: alts }, { data: rays }, { data: estados }, { data: accesos }, { data: equipo }, { data: cred }] = await Promise.all([
     supabase.from("mon_niveles").select("evento_id,fase,variable,desde,hasta,nivel,confianza").in("evento_id", ids)
       .gt("hasta", new Date(ahora).toISOString()).lte("desde", new Date(ahora + HORIZONTE_MS).toISOString()).limit(20000),
-    supabase.from("mon_alertas_smn").select("id,evento_id,fenomeno,color,desde,hasta,estado,tipo,descripcion").in("evento_id", ids),
+    supabase.from("mon_alertas_smn").select("id,evento_id,fenomeno,color,desde,hasta,estado,tipo,descripcion,instruccion").in("evento_id", ids),
     supabase.from("mon_rayos").select("evento_id,distancia_km,ocurrido_en").in("evento_id", ids).gte("ocurrido_en", new Date(ahora - 30 * 60_000).toISOString()).limit(5000),
     supabase.from("mon_estado").select("clave,valor").in("clave", ids.map((i) => `avisos:${i}`)),
     supabase.from("mon_accesos").select("evento_id,email").in("evento_id", ids).eq("recibe_alertas", true),

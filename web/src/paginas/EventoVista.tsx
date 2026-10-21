@@ -13,6 +13,7 @@ import { Resumen } from "../componentes/Resumen";
 import { Mediciones } from "../componentes/Mediciones";
 import { AguaPanel } from "../componentes/Agua";
 import { Probabilistico } from "../componentes/Probabilistico";
+import { decisionEvento, recomendacionSmnAireLibre, type FaseEvento } from "../alertasSmn";
 import { categoriaUv, consenso, FUENTE_UV, NOMBRE_FUENTE, pesosFuentes, PRIORIDAD, UV_CATEGORIAS, uvMaxPorDia } from "../serie";
 import { UvDato } from "../componentes/Uv";
 import { confDisciplina, escalaCalor, estiloCalor, nombreDisciplina, participantes, riesgoWct, wct } from "../disciplinas";
@@ -208,6 +209,18 @@ export function EventoVista() {
               </div>
               {a.zona && <div style={{ fontSize: 13, opacity: 0.85 }} title={a.zona}>{a.zona.length > 140 ? a.zona.slice(0, 140) + "…" : a.zona}</div>}
               {a.descripcion && <div style={{ fontSize: 14, marginTop: 6, fontStyle: "italic" }}>«{a.descripcion}» <span style={{ fontStyle: "normal", opacity: 0.8 }}>(SMN)</span></div>}
+              {(() => {
+                const fs = fasesDeAlerta(a, v).map((n) => (n === "Armado" ? "armado" : n === "Desarme" ? "desarme" : "carrera") as FaseEvento);
+                const smn = recomendacionSmnAireLibre(a);
+                const dec = decisionEvento(a, fs);
+                return (smn.length > 0 || dec.length > 0) && (
+                  <div style={{ marginTop: 8, fontSize: 14, background: "rgba(255,255,255,.55)", borderRadius: 6, padding: "8px 12px" }}>
+                    {smn.length > 0 && <div><b>El SMN recomienda a la población:</b> {smn.join(" ")}</div>}
+                    {dec.map((d) => <div key={d.fase} style={{ marginTop: 4 }}><b>{d.fase}:</b> {d.texto}</div>)}
+                    {dec.length > 0 && <div style={{ fontSize: 12, opacity: 0.8, marginTop: 4 }}>Decisión sugerida: criterio interno EMERTEAM según el color del SMN. La decisión final corresponde al organizador.</div>}
+                  </div>
+                );
+              })()}
             </div>
             <button className="boton negro" onClick={() => (sonido.habilitado ? sonido.setActivo(!sonido.activo) : sonido.setHabilitado(true))}>
               {sonido.habilitado && sonido.activo ? "Silenciar alerta" : "Activar sonido"}
