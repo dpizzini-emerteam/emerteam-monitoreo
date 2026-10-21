@@ -506,3 +506,33 @@ input, select, textarea, button { font-family: inherit; }
 .pr-disparo b { font-family: "Barlow Condensed"; font-weight: 800; font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; }
 .dc-estimado { margin: -2px 14px 8px; font-size: 12px; font-weight: 700; color: var(--texto2); }
 .dc-h.uc .dc-estimado { color: #FF6A1A; }
+
+/* ---------- Resumen de probabilidades para el organizador ---------- */
+.pr-sub { margin: -4px 0 12px; color: var(--texto2); font-size: 15px; }
+.pr-res { background: var(--superficie); border: 1px solid var(--borde); border-radius: 12px; overflow: hidden; }
+.pr-res-fila { display: grid; grid-template-columns: 44px 1fr auto; gap: 14px; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--borde); }
+.pr-res-ic { width: 44px; height: 44px; border-radius: 10px; background: var(--superficie2); display: grid; place-items: center; }
+.pr-res-tit { font-family: "Barlow Condensed"; font-weight: 800; font-size: 18px; letter-spacing: 0.03em; text-transform: uppercase; }
+.pr-res-txt { font-size: 15px; margin-top: 2px; line-height: 1.4; }
+.pr-res-der { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; min-width: 190px; }
+.pr-res-ver { font-family: "Barlow Condensed"; font-weight: 800; font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; padding: 5px 12px; border-radius: 999px; white-space: nowrap; }
+.pr-res-ver.c0 { background: #eaf6ee; color: #1d6b33; }
+.pr-res-ver.c1 { background: #fff3cf; color: #7a5a00; }
+.pr-res-ver.c2 { background: #ffe2d1; color: #9a3a00; }
+.pr-res-ver.c3 { background: #ffd9d6; color: #9b1c14; }
+.pr-res-med { display: flex; gap: 3px; }
+.pr-res-med i { width: 30px; height: 7px; border-radius: 4px; background: var(--borde); }
+.pr-res-ten { font-size: 13px; color: var(--texto2); }
+.pr-res-pie { padding: 12px 20px; font-size: 13px; color: var(--texto2); background: var(--superficie2); }
+.pr-res-disp { display: flex; gap: 10px; align-items: baseline; margin: 0 0 12px; padding: 12px 16px; border-radius: 10px; background: var(--superficie); border: 1px solid var(--borde); border-left: 6px solid #C79000; line-height: 1.45; }
+.pr-res-disp.activar { border-left-color: #FF3B30; }
+.pr-res-disp b { font-family: "Barlow Condensed"; font-weight: 800; font-size: 16px; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; }
+.pr-detalle { margin-top: 12px; }
+.pr-detalle > summary { cursor: pointer; font-weight: 700; padding: 10px 2px; }
+@media (max-width: 640px) {
+  .pr-res-fila { grid-template-columns: 36px 1fr; padding: 14px; }
+  .pr-res-ic { width: 36px; height: 36px; }
+  .pr-res-der { grid-column: 1 / -1; align-items: flex-start; min-width: 0; }
+}
+.pr-res-disp .pr-res-disp-t { font-family: inherit; font-size: inherit; letter-spacing: 0; text-transform: none; white-space: normal; }
+@media (max-width: 640px) { .pr-res-disp { flex-direction: column; gap: 4px; } }

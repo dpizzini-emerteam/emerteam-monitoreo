@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { diaLocal, fmtHora, num, supabase, type Evento } from "../datos";
 import { escalaCalor, estiloCalor } from "../disciplinas";
-import { nombreNivel, NOMBRE_VARIABLE } from "../reglas";
+import { ELEMENTOS, nombreNivel, NOMBRE_VARIABLE, recomendacion } from "../reglas";
+import { Icono, type TipoIcono } from "./Icono";
 import type { Ventanas } from "../ventanas";
 import U from "../../../config/umbrales.json";
 
@@ -100,6 +101,92 @@ function Celda({ p, color }: { p: number; color: string }) {
   );
 }
 
+
+// ---------- Resumen para el organizador: palabras en lugar de tablas ----------
+const PALABRA = ["Muy poco probable", "Poco probable", "Posible", "Probable"];
+const COLOR_CAT = ["#2FA34C", "#C79000", "#FF6A1A", "#FF3B30"];
+const ACCION_VIENTO = ["", "vigilar", "reforzar", "retirar", "despejar el área alrededor de"];
+const deDiez = (p: number) => (p < 0.1 ? "menos de 1 en 10" : `${Math.min(10, Math.round(p * 10))} de 10`);
+
+type Linea = { clave: string; icono: TipoIcono; titulo: string; texto: React.ReactNode; p: number; tendencia: number | null; variable: string; nivel: number };
+
+/** Nivel a mostrar: el más alto con 30 % o más; si no, el más alto con 10 % o más; si no, el primero */
+function elegir(filas: Prob[]): Prob | undefined {
+  const orden = [...filas].sort((a, b) => b.nivel - a.nivel);
+  return orden.find((f) => f.prob >= 0.3) ?? orden.find((f) => f.prob >= 0.1) ?? [...filas].sort((a, b) => a.nivel - b.nivel)[0];
+}
+
+function lineas(actuales: Prob[], previas: Prob[], ventana: string, conCalor: boolean, varCalor: string, nivelesCalor: string[], lejos: boolean): Linea[] {
+  const en = (variable: string) => actuales.filter((f) => f.ventana === ventana && f.variable === variable);
+  const tend = (f?: Prob) => {
+    if (!f) return null;
+    const a = previas.find((x) => x.ventana === f.ventana && x.variable === f.variable && x.nivel === f.nivel);
+    return a ? f.prob - a.prob : null;
+  };
+  const salida: Linea[] = [];
+  if (conCalor) {
+    const f = elegir(en(varCalor));
+    if (f) salida.push({
+      clave: "calor", icono: "termometro", titulo: "Calor durante la carrera", p: f.prob, tendencia: tend(f), variable: varCalor, nivel: f.nivel,
+      texto: f.prob < 0.1
+        ? <>Sin señales de calor que obligue a medidas especiales. WBGT más probable: {num(f.p10, 0)} a {num(f.p90, 0)} °C.</>
+        : <>{PALABRA[cat(f.prob)]} que el calor llegue a <b>{nivelesCalor[f.nivel].toLowerCase()}</b> (WBGT {num(f.umbral, 0)} °C). WBGT más probable: {num(f.p10, 0)} a {num(f.p90, 0)} °C.</>,
+    });
+  }
+  const vientos = (["A", "B", "C"] as const).flatMap((c) => en(`viento_${c}`));
+  if (vientos.length) {
+    const fuertes = [...vientos].sort((a, b) => b.nivel - a.nivel || a.variable.localeCompare(b.variable));
+    const f = fuertes.find((x) => x.prob >= 0.3) ?? fuertes.find((x) => x.prob >= 0.1) ?? vientos.find((x) => x.variable === "viento_A" && x.nivel === 1) ?? vientos[0];
+    const el = ELEMENTOS[f.variable.slice(-1)];
+    salida.push({
+      clave: "viento", icono: "viento", titulo: "Viento sobre estructuras", p: f.prob, tendencia: tend(f), variable: f.variable, nivel: f.nivel,
+      texto: f.prob < 0.1
+        ? <>Sin señales de viento que afecte las estructuras. Ráfagas más probables: {num(f.p10)} a {num(f.p90)} km/h.</>
+        : <>{PALABRA[cat(f.prob)]} que haya que <b>{ACCION_VIENTO[f.nivel]}</b> {el}. Ráfagas más probables: {num(f.p10)} a {num(f.p90)} km/h.</>,
+    });
+  }
+  const t = elegir(en("tormenta"));
+  if (t) salida.push({
+    clave: "tormenta", icono: "tormenta", titulo: "Tormenta eléctrica", p: t.prob, tendencia: tend(t), variable: "tormenta", nivel: t.nivel,
+    texto: <>{t.prob < 0.1 ? "Sin señales de tormenta." : <>{PALABRA[cat(t.prob)]} que haya condiciones de tormenta{t.nivel === 2 ? " fuerte" : ""}.</>}{lejos ? " Es una tendencia: se confirma cerca de la fecha." : ""}</>,
+  });
+  const ll = en("lluvia")[0];
+  if (ll) salida.push({
+    clave: "lluvia", icono: "lluvia", titulo: "Lluvia intensa", p: ll.prob, tendencia: tend(ll), variable: "lluvia", nivel: 2,
+    texto: ll.prob < 0.1 ? <>Sin señales de lluvia fuerte.</> : <>{PALABRA[cat(ll.prob)]} que llueva fuerte (20 mm o más en 3 horas).</>,
+  });
+  return salida;
+}
+
+function Resumen({ ls }: { ls: Linea[] }) {
+  return (
+    <div className="pr-res">
+      {ls.map((l) => {
+        const c = cat(l.p);
+        return (
+          <div key={l.clave} className="pr-res-fila">
+            <div className="pr-res-ic"><Icono tipo={l.icono} size={30} /></div>
+            <div>
+              <div className="pr-res-tit">{l.titulo}</div>
+              <div className="pr-res-txt">{l.texto}</div>
+            </div>
+            <div className="pr-res-der">
+              <span className={`pr-res-ver c${c}`}>{PALABRA[c]}{l.p >= 0.1 ? ` · ${deDiez(l.p)}` : ""}</span>
+              <span className="pr-res-med" aria-hidden>{[0, 1, 2, 3].map((k) => <i key={k} style={k <= c ? { background: COLOR_CAT[k] } : undefined} />)}</span>
+              {l.tendencia != null && <span className="pr-res-ten">{l.tendencia >= 0.1 ? "↑ subió desde la actualización anterior" : l.tendencia <= -0.1 ? "↓ bajó desde la actualización anterior" : "= estable"}</span>}
+            </div>
+          </div>
+        );
+      })}
+      <div className="pr-res-pie">Muy poco probable: menos de 1 en 10 · Poco probable: 1 a 3 en 10 · Posible: 3 a 6 en 10 · Probable: más de 6 en 10</div>
+    </div>
+  );
+}
+
+function cat(p: number): number {
+  return p < 0.1 ? 0 : p < 0.3 ? 1 : p < 0.6 ? 2 : 3;
+}
+
 /**
  * Pronóstico probabilístico por umbral (ensambles ECMWF ENS y NOAA GEFS).
  * fase = carrera: curva de calor con banda P10–P90 y tablas de calor, viento, tormenta y lluvia.
@@ -134,8 +221,8 @@ export function Probabilistico({ ev, v, fase, quien }: { ev: Evento; v: Ventanas
   if (!ultima) {
     return (
       <section className="seccion pr">
-        <h2>Probabilidad por umbral</h2>
-        <div className="tarjeta chico">Todavía no hay emisiones del ensamble para este evento. Aparecen cuando la ventana entra en el horizonte de 6 días.</div>
+        <h2>¿Qué tan probable es que se complique?</h2>
+        <div className="tarjeta chico">Las probabilidades aparecen cuando faltan 6 días o menos para esta fase.</div>
       </section>
     );
   }
@@ -149,9 +236,42 @@ export function Probabilistico({ ev, v, fase, quien }: { ev: Evento; v: Ventanas
   const aprox = [...new Set(actuales.filter((f) => ventanasFase.includes(f.ventana) && f.aproximacion).map((f) => f.aproximacion!))];
   const tormentaLejos = actuales.some((f) => ventanasFase.includes(f.ventana) && f.variable === "tormenta" && f.anticipacion_h > 48);
 
+  const c1 = [...new Set(filas.map((f) => f.corrida))].sort().reverse()[1];
+  const previas = filas.filter((f) => f.corrida === c1);
+  const ventanaRes = fase === "carrera" ? "carrera" : fase;
+  const ls = lineas(actuales, previas, ventanaRes, fase === "carrera", escala.variable, escala.niveles, tormentaLejos);
+  const dsRes = disparos(filas, ev.largada).filter((d) => fase === "carrera" ? (d.ventana === "carrera" || d.ventana.startsWith("ultimo_cuarto")) : d.ventana === fase);
+  const diasRes = diasA(ultima, ev.largada);
+  const faseTxt = fase === "carrera" ? "Para el día de carrera" : fase === "armado" ? "Para el armado" : "Para el desarme";
+  const actualizado = new Intl.DateTimeFormat("es-AR", { timeZone: "America/Argentina/Buenos_Aires", weekday: "short", day: "2-digit", month: "2-digit" }).format(new Date(ultima));
+
   return (
     <section className="seccion pr" aria-labelledby={`pr-${fase}`}>
-      <h2 id={`pr-${fase}`}>Probabilidad por umbral</h2>
+      <h2 id={`pr-${fase}`}>¿Qué tan probable es que se complique?</h2>
+      <p className="pr-sub">{faseTxt} · actualizado {actualizado}{diasRes > 0 ? ` · faltan ${diasRes} ${diasRes === 1 ? "día" : "días"}` : ""}. Cuanto más cerca de la fecha, más firme.</p>
+      {(() => {
+        // Un aviso por tipo de riesgo: el más exigente (Activar sobre Preparar, nivel más alto)
+        const familia = (v: string) => (v.startsWith("viento_") ? "viento" : v.startsWith("wbgt") ? "calor" : v);
+        const mejor = new Map<string, Disparo>();
+        for (const d of dsRes) {
+          const k = familia(d.variable);
+          const r = (x: Disparo) => (x.accion === "activar" ? 10 : 0) + x.nivel + x.prob / 10;
+          if (!mejor.has(k) || r(d) > r(mejor.get(k)!)) mejor.set(k, d);
+        }
+        const titulo: Record<string, string> = { calor: "Calor", viento: "Viento", tormenta: "Tormenta", lluvia: "Lluvia intensa" };
+        return [...mejor.entries()].map(([k, d]) => {
+          const reco = recomendacion(d.variable, d.nivel, d.ventana.startsWith("ultimo_cuarto") ? "carrera" : d.ventana);
+          return (
+            <div key={`r${k}`} className={`pr-res-disp ${d.accion}`}>
+              <b>{d.accion === "activar" ? "Activar" : "Preparar"}</b>
+              <span><b className="pr-res-disp-t">{titulo[k]} · {nombreNivel(d.variable, d.nivel)} · {deDiez(d.prob)}.</b> {d.accion === "activar" ? "Poner en marcha:" : "Dejar listo, sin ejecutar todavía:"} {reco}</span>
+            </div>
+          );
+        });
+      })()}
+      <Resumen ls={ls} />
+      <details className="pr-detalle">
+        <summary>Ver detalle técnico</summary>
       <div className="tarjeta pr-cuerpo">
         <p className="chico pr-meta">
           Emisión {etiquetaD(ultima, ev.largada)} · {Object.entries(corridas).map(([m, c]) => `${m === "ecmwf" ? "ECMWF ENS" : "NOAA GEFS"} ${corridaTxt(c)}`).join(" · ")} · calculado sobre {muestra?.miembros} escenarios de ECMWF y NOAA (cada modelo pesa la mitad).
@@ -213,6 +333,7 @@ export function Probabilistico({ ev, v, fase, quien }: { ev: Evento; v: Ventanas
           <p>Fuentes: ECMWF Ensemble open data (CC BY 4.0) y NOAA GEFS 0,25° (dominio público). Probabilidades calculadas por EMERTEAM; NOAA y ECMWF no avalan este servicio.</p>
         </div>
       </div>
+      </details>
     </section>
   );
 }

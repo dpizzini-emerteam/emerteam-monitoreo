@@ -132,7 +132,7 @@ export function nombreNivel(variable: string, nivel: number): string {
   return String(nivel);
 }
 
-const ELEMENTOS: Record<string, string> = {
+export const ELEMENTOS: Record<string, string> = {
   A: "gazebos plegables, fly banners y arco inflable",
   B: "lonas en vallas, banners en truss, cartelería y columnas de sonido",
   C: "pórtico de truss, carpas estructurales y pantalla LED",
