@@ -115,7 +115,45 @@ const CALOR_AGUAS_ABIERTAS = [
   "Evaluar acortar o postergar la prueba. Ante sospecha de golpe de calor, enfriar por inmersión en el lugar antes de trasladar y decidir con temperatura rectal. Rotar al personal embarcado.",
 ];
 
-type Evento = { id: string; nombre: string; largada: string; organizador_email: string; disciplina?: string | null };
+type Evento = {
+  id: string; nombre: string; largada: string; organizador_email: string; disciplina?: string | null;
+  armado_dias: number; participantes: number | null; duracion_propia_min: number | null; demora_largada_min: number | null;
+  mon_modalidades: { distancia_km: number; largada: string | null }[] | null;
+};
+
+// Réplica de pipeline/mon/ventanas.py y web/src/ventanas.ts (config/umbrales.json → ventanas):
+// del inicio del armado (00:00 del día de largada menos los días de armado) al fin del desarme (fin de carrera + 24 h)
+const ANCLAS: [number, number][] = [[0, 0], [3, 54], [5, 75], [10, 120], [21.0975, 180], [42.195, 360]];
+function duracionEstimadaMin(km: number): number {
+  if (km >= 42.195) return (360 * km) / 42.195;
+  for (let i = 0; i < ANCLAS.length - 1; i++) {
+    const [k0, d0] = ANCLAS[i], [k1, d1] = ANCLAS[i + 1];
+    if (km >= k0 && km <= k1) return d0 + ((d1 - d0) * (km - k0)) / (k1 - k0);
+  }
+  return 0;
+}
+function ventana(ev: Evento): [number, number] {
+  const largada = new Date(ev.largada).getTime();
+  const demora = ev.demora_largada_min ?? ((ev.participantes ?? 0) / 1000) * 1;
+  let fin = largada;
+  if (ev.duracion_propia_min) fin = largada + (demora + ev.duracion_propia_min) * 60_000;
+  else {
+    for (const m of ev.mon_modalidades?.length ? ev.mon_modalidades : [{ distancia_km: 10, largada: null }]) {
+      const ini = m.largada ? new Date(m.largada).getTime() : largada;
+      fin = Math.max(fin, ini + (demora + duracionEstimadaMin(Number(m.distancia_km))) * 60_000);
+    }
+  }
+  const local = new Date(largada - 3 * 3600_000);
+  const dia0 = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate(), 3);
+  return [dia0 - (ev.armado_dias || 3) * 86400_000, fin + 1440 * 60_000];
+}
+/** La alerta se superpone con el armado, la carrera o el desarme */
+function enFases(a: { desde: string | null; hasta: string | null }, ev: Evento, ahora: number): boolean {
+  const [v0, v1] = ventana(ev);
+  const t0 = a.desde ? new Date(a.desde).getTime() : ahora;
+  const t1 = a.hasta ? new Date(a.hasta).getTime() : Infinity;
+  return t1 >= v0 && t0 <= v1;
+}
 
 // Vocabulario por disciplina: los textos se escriben para running y se adaptan (corredores → atletas, nadadores, ciclistas)
 const PARTICIPANTES: Record<string, [string, string]> = {
@@ -224,7 +262,7 @@ Deno.serve(async (req) => {
   const ahora = Date.now();
   const prueba = new URL(req.url).searchParams.get("prueba") === "1"; // calcula sin enviar ni guardar estado
 
-  const { data: evs } = await supabase.from("mon_eventos").select("id,nombre,largada,organizador_email,disciplina")
+  const { data: evs } = await supabase.from("mon_eventos").select("id,nombre,largada,organizador_email,disciplina,armado_dias,participantes,duracion_propia_min,demora_largada_min,mon_modalidades(distancia_km,largada)")
     .eq("estado", "activo")
     .gte("largada", new Date(ahora - 2 * 86400_000).toISOString())
     .lte("largada", new Date(ahora + 16 * 86400_000).toISOString());
@@ -270,7 +308,8 @@ Deno.serve(async (req) => {
       const k = `${n.fase}|${n.variable}`;
       if ((niveles[k] ?? -1) < n.nivel) { niveles[k] = n.nivel; inicio[k] = n; }
     }
-    const vigentes = ((alts ?? []) as Alerta[]).filter((a) => a.evento_id === ev.id && a.estado !== "levantada" && (!a.hasta || new Date(a.hasta).getTime() > ahora));
+    // Solo las alertas que tocan alguna fase del evento (armado, carrera o desarme)
+    const vigentes = ((alts ?? []) as Alerta[]).filter((a) => a.evento_id === ev.id && a.estado !== "levantada" && (!a.hasta || new Date(a.hasta).getTime() > ahora) && enFases(a, ev, ahora));
     const rayosEv = ((rays ?? []) as { evento_id: string; distancia_km: number }[]).filter((r) => r.evento_id === ev.id);
     const km = rayosEv.length ? Math.min(...rayosEv.map((r) => Number(r.distancia_km))) : null;
     const glm = km == null ? 0 : km < 13 ? 4 : km < 19 ? 3 : km < 24 ? 2 : 1;
@@ -300,7 +339,8 @@ Deno.serve(async (req) => {
       for (const idPrev of previo.smn) {
         if (!actual.smn.includes(idPrev)) {
           const a = ((alts ?? []) as Alerta[]).find((x) => x.id === idPrev);
-          if (a) cambios.push({ tipo: "smn_levantada", alerta: a });
+          // Una alerta que deja de contar por quedar fuera de las fases no se informa como levantada
+          if (a && enFases(a, ev, ahora)) cambios.push({ tipo: "smn_levantada", alerta: a });
         }
       }
       if (glm >= 2 && glm > (previo.glm ?? 0) && km != null) cambios.push({ tipo: "rayos", nivel: glm, km });

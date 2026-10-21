@@ -20,7 +20,7 @@ import {
   type AlertaSMN, type Evento, type Rayo, type Nivel, type Pronostico, type Sesgo, type Uv,
 } from "../datos";
 import { fijarDisciplina, reglaDe, estiloNivel, estiloVariable, NOMBRE_CORTO, NOMBRE_FASE, NOMBRE_VARIABLE, TIPO_FUENTE, nombreNivel, recomendacion } from "../reglas";
-import { calcular } from "../ventanas";
+import { calcular, fasesDeAlerta } from "../ventanas";
 
 
 function useSonido() {
@@ -114,7 +114,10 @@ export function EventoVista() {
 
   // Aviso sonoro mientras haya alertas SMN vigentes
   const glm = estadoRayosGLM(rayos);
-  const hayAviso = alertas.length > 0 || glm.nivel >= 2;
+  const vAlertas = useMemo(() => (ev ? calcular(ev) : null), [ev]);
+  // Solo cuentan las alertas que tocan alguna fase del evento
+  const alertasEv = vAlertas ? alertas.filter((a) => fasesDeAlerta(a, vAlertas).length > 0) : [];
+  const hayAviso = alertasEv.length > 0 || glm.nivel >= 2;
   useEffect(() => {
     if (!hayAviso) return;
     sonido.sonar();
@@ -123,7 +126,7 @@ export function EventoVista() {
   }, [hayAviso, sonido.sonar]);
 
   fijarDisciplina(ev?.disciplina);
-  const v = useMemo(() => (ev ? calcular(ev) : null), [ev]);
+  const v = vAlertas;
   const serie = useMemo(() => consenso(pron, uv), [pron, uv]);
   const uvDia = useMemo(() => uvMaxPorDia(uv), [uv]);
   const ahora = Date.now();
@@ -152,7 +155,7 @@ export function EventoVista() {
   const nivelFase = (fases: string[]) => Math.max(0, ...vigentes.filter((n) => fases.includes(n.fase)).map((n) => n.nivel));
   const delaFase = (p: Pestana) => vigentes.filter((n) => FASES_DE[p].includes(n.fase));
   const nivelesFase = (p: Pestana) => nivelesEv.filter((n) => FASES_DE[p].includes(n.fase));
-  const comunicado = armarComunicado(ev, vigentes.filter((n) => n.fase === "carrera"), alertas, v.exposicion);
+  const comunicado = armarComunicado(ev, vigentes.filter((n) => n.fase === "carrera"), alertasEv, v.exposicion);
 
   const pestanas = (
     <nav className="pestanas" aria-label="Secciones del evento">
@@ -170,7 +173,7 @@ export function EventoVista() {
   return (
     <>
       <Barra titulo={ev.nombre} subtitulo={`${ev.disciplina && ev.disciplina !== "running" ? `${nombreDisciplina(ev.disciplina)} · ` : ""}${fmtFechaHora(ev.largada)} · ${cuenta}`} abajo={pestanas}>
-        {alertas.length > 0 && <a href="#alerta-smn" className="boton-osc alerta" style={{ background: COLOR_SMN[alertas[0].color], color: "#111", borderColor: "#fff", fontWeight: 800 }}>Alerta SMN</a>}
+        {alertasEv.length > 0 && <a href="#alerta-smn" className="boton-osc alerta" style={{ background: COLOR_SMN[alertasEv[0].color], color: "#111", borderColor: "#fff", fontWeight: 800 }}>Alerta SMN</a>}
         {admin && <Link className="boton-osc" to={`/evento/${ev.id}/dashboard`}>Dashboard</Link>}
         {(admin || informeAprobado) && <Link className="boton-osc" to={`/evento/${ev.id}/informe`}>Informe</Link>}
         {editor && <Link className="boton-osc" to={`/evento/${ev.id}/editar`}>Editar</Link>}
@@ -189,14 +192,14 @@ export function EventoVista() {
         </div>
       )}
 
-      {alertas.map((a, i) => (
+      {alertasEv.map((a, i) => (
         <section key={a.id} id={i === 0 ? "alerta-smn" : undefined} role="alert" className="alerta" style={{ background: COLOR_SMN[a.color], scrollMarginTop: 130 }}>
           <div className="contenedor" style={{ display: "flex", flexWrap: "wrap", gap: "14px 24px", alignItems: "center", padding: "16px 24px" }}>
             <div className="icono-pulso"><Icono tipo={iconoAlerta(a.fenomeno)} size={52} /></div>
             <div style={{ flex: "1 1 300px" }}>
               <div className="condensada" style={{ fontSize: 24, fontWeight: 800, textTransform: "uppercase" }}>{tituloAlerta(a)}</div>
               <div style={{ fontSize: 14, fontWeight: 600 }}>
-                Vigencia {a.desde ? fmtFechaHora(a.desde) : "desde ahora"} → {a.hasta ? fmtFechaHora(a.hasta) : "sin fin informado"}
+                Vigencia {a.desde ? fmtFechaHora(a.desde) : "desde ahora"} → {a.hasta ? fmtFechaHora(a.hasta) : "sin fin informado"} · Afecta: {fasesDeAlerta(a, v).join(", ")}
                 {" · "}<a href="https://www.smn.gob.ar/alertas" target="_blank" rel="noreferrer" style={{ color: "#111" }}>Ver en el SMN</a>
               </div>
               {a.zona && <div style={{ fontSize: 13, opacity: 0.85 }} title={a.zona}>{a.zona.length > 140 ? a.zona.slice(0, 140) + "…" : a.zona}</div>}
@@ -244,7 +247,7 @@ export function EventoVista() {
           <>
             <TiraDias serie={serie} uvDia={uvDia} niveles={niveles} desde={v.armado[0]} hasta={v.desarme[1]} largada={v.largada} eventoId={ev.id} />
             <Introduccion />
-            <Resumen vigentes={vigentes} alertas={alertas} eventoId={ev.id} />
+            <Resumen vigentes={vigentes} alertas={alertasEv} eventoId={ev.id} />
             {confDisciplina(ev.disciplina).agua && <AguaPanel ev={ev} />}
             {comunicado && (
               <section className="seccion tarjeta" style={{ borderLeft: "4px solid var(--naranja)", display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
@@ -276,7 +279,7 @@ export function EventoVista() {
             <Recomendaciones lista={delaFase("desarme")} vacio="Con el pronóstico actual no hay recomendaciones para el desarme." />
           </>
         )}
-        {actual === "guia" && <Guia ctx={{ niveles: vigentes, alertas }} />}
+        {actual === "guia" && <Guia ctx={{ niveles: vigentes, alertas: alertasEv }} />}
         {actual === "mediciones" && (
           <>
             {confDisciplina(ev.disciplina).agua && <AguaPanel ev={ev} refresco={refrescoAgua} />}

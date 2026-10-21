@@ -10,7 +10,7 @@ import { fijarDisciplina, ESTILO_SIN_DATOS, estiloNivel, estiloVariable, NOMBRE_
 import { Humedad, UvDato } from "../componentes/Uv";
 import { confDisciplina, escalaCalor, estiloCalor, evaluarAguaAbierta, evaluarAguaTriatlon, nombreDisciplina, riesgoWct, wct } from "../disciplinas";
 import { consenso } from "../serie";
-import { calcular } from "../ventanas";
+import { calcular, fasesDeAlerta } from "../ventanas";
 
 const NIVEL_RAYO = ["Sin actividad", "Vigilar", "Alerta", "Preparar / demorar", "Suspender"];
 const RANGO: Record<string, string> = { sin: "Sin actividad", ">24": "Rayos a más de 24 km", "19-24": "Rayos a 19–24 km", "13-19": "Rayos a 13–19 km", "<13": "Rayos a menos de 13 km" };
@@ -139,7 +139,7 @@ export function Comando() {
         </div>
       </header>
 
-      {alertas.map((a) => (
+      {alertas.filter((a) => fasesDeAlerta(a, v).length > 0).map((a) => (
         <div key={a.id} className="cmd-alerta alerta" style={{ background: COLOR_SMN[a.color] }} role="alert">
           <b>{tituloAlerta(a)}</b>
           <span>{a.desde ? fmtHora(a.desde) : "ahora"} → {a.hasta ? fmtFechaHora(a.hasta) : "sin fin informado"}</span>

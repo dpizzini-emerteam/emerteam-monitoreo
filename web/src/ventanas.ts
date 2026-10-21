@@ -63,3 +63,12 @@ export function calcular(ev: Evento): Ventanas {
     natacion: ev.disciplina === "triatlon" && ev.natacion_min ? [min(largada, demora), min(largada, demora + ev.natacion_min)] : null,
   };
 }
+
+/** Fases del evento con las que se superpone una alerta del SMN (vacío: no toca el evento) */
+export function fasesDeAlerta(a: { desde: string | null; hasta: string | null }, v: Ventanas): string[] {
+  const t0 = a.desde ? new Date(a.desde).getTime() : Date.now();
+  const t1 = a.hasta ? new Date(a.hasta).getTime() : Infinity;
+  const toca = ([d, h]: [Date, Date]) => t1 >= d.getTime() && t0 <= h.getTime();
+  return ([["Armado", v.armado], ["Día de carrera", [v.personal[0], v.personal[1]]], ["Desarme", v.desarme]] as [string, [Date, Date]][])
+    .filter(([, r]) => toca(r)).map(([n]) => n);
+}

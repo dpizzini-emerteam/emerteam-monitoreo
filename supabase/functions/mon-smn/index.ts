@@ -20,7 +20,11 @@ const COLOR: Record<string, string> = { Minor: "amarillo", Moderate: "amarillo",
 const parser = new XMLParser({ ignoreAttributes: true, removeNSPrefix: true, parseTagValue: false });
 const lista = <T>(x: T | T[] | undefined): T[] => (x === undefined ? [] : Array.isArray(x) ? x : [x]);
 
-type Evento = { id: string; nombre: string; largada: string; lat: number; lon: number; armado_dias: number };
+type Evento = {
+  id: string; nombre: string; largada: string; lat: number; lon: number; armado_dias: number;
+  participantes: number | null; duracion_propia_min: number | null; demora_largada_min: number | null;
+  mon_modalidades: { distancia_km: number; largada: string | null }[] | null;
+};
 type Fila = {
   id: string; evento_id: string; fenomeno: string; color: string; desde: string | null; hasta: string | null;
   emitida: string | null; estado: string; zona: string | null; tipo: string; severidad: string; fuente_url: string;
@@ -42,9 +46,31 @@ function dentro(lat: number, lon: number, poligono: string): boolean {
   return adentro;
 }
 
+// Réplica de pipeline/mon/ventanas.py y web/src/ventanas.ts (config/umbrales.json → ventanas):
+// del inicio del armado (00:00 del día de largada menos los días de armado) al fin del desarme (fin de carrera + 24 h)
+const ANCLAS: [number, number][] = [[0, 0], [3, 54], [5, 75], [10, 120], [21.0975, 180], [42.195, 360]];
+function duracionEstimadaMin(km: number): number {
+  if (km >= 42.195) return (360 * km) / 42.195;
+  for (let i = 0; i < ANCLAS.length - 1; i++) {
+    const [k0, d0] = ANCLAS[i], [k1, d1] = ANCLAS[i + 1];
+    if (km >= k0 && km <= k1) return d0 + ((d1 - d0) * (km - k0)) / (k1 - k0);
+  }
+  return 0;
+}
 function ventana(ev: Evento): [number, number] {
   const largada = new Date(ev.largada).getTime();
-  return [largada - ((ev.armado_dias || 3) + 1) * 86400_000, largada + 2 * 86400_000];
+  const demora = ev.demora_largada_min ?? ((ev.participantes ?? 0) / 1000) * 1;
+  let fin = largada;
+  if (ev.duracion_propia_min) fin = largada + (demora + ev.duracion_propia_min) * 60_000;
+  else {
+    for (const m of ev.mon_modalidades?.length ? ev.mon_modalidades : [{ distancia_km: 10, largada: null }]) {
+      const ini = m.largada ? new Date(m.largada).getTime() : largada;
+      fin = Math.max(fin, ini + (demora + duracionEstimadaMin(Number(m.distancia_km))) * 60_000);
+    }
+  }
+  const local = new Date(largada - 3 * 3600_000);
+  const dia0 = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate(), 3);
+  return [dia0 - (ev.armado_dias || 3) * 86400_000, fin + 1440 * 60_000];
 }
 
 async function hash(texto: string): Promise<string> {
@@ -98,7 +124,7 @@ Deno.serve(async (req) => {
 
   const { data: evs, error } = await supabase
     .from("mon_eventos")
-    .select("id,nombre,largada,lat,lon,armado_dias")
+    .select("id,nombre,largada,lat,lon,armado_dias,participantes,duracion_propia_min,demora_largada_min,mon_modalidades(distancia_km,largada)")
     .eq("estado", "activo")
     .gte("largada", new Date(ahora - 2 * 86400_000).toISOString())
     .lte("largada", new Date(ahora + 16 * 86400_000).toISOString());
