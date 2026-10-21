@@ -1,24 +1,8 @@
 {{ if contains .RedirectTo "riesgoambiental.emerteam.com.ar" }}
-<!doctype html>
-<html><body style="margin:0;background:#f2f1ef">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f2f1ef"><tr><td align="center" style="padding:20px 10px">
-<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff">
-  <tr><td style="background:#111111;padding:16px 22px;border-bottom:4px solid #FF6A1A">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-      <td style="width:160px;padding-right:16px;border-right:1px solid #3a3a3a;vertical-align:middle">
-        <img src="https://riesgoambiental.emerteam.com.ar/logo-correo.png" width="160" height="56" alt="EMERTEAM" style="display:block;width:160px;max-width:160px;height:auto;border:0;color:#FF6A1A;font:800 16px Arial,sans-serif"></td>
-      <td style="padding-left:16px;vertical-align:middle">
-        <div style="font:800 12px Arial,sans-serif;letter-spacing:.12em;color:#FF6A1A;text-transform:uppercase">Monitoreo ambiental</div>
-        <div style="font:800 21px Arial,sans-serif;color:#ffffff;text-transform:uppercase;margin-top:3px">Ingreso a la plataforma</div></td>
-    </tr></table></td></tr>
-  <tr><td style="padding:22px">
-    <p style="font:15px/1.5 Arial,sans-serif;color:#222;margin:0 0 18px">Recibimos un pedido de ingreso con esta dirección de correo. Tocá el botón para entrar al monitoreo de tus eventos.</p>
-    <a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#FF6A1A;color:#111111;font:700 15px Arial,sans-serif;text-decoration:none;padding:12px 20px;border-radius:6px">Ingresar</a>
-    <p style="font:13px/1.5 Arial,sans-serif;color:#555;margin:18px 0 0">El enlace vence a los pocos minutos y sirve una sola vez. Si pediste más de uno, usá el último que llegó.</p>
-    <p style="font:13px/1.5 Arial,sans-serif;color:#555;margin:8px 0 0">Si no pediste ingresar, ignorá este correo: sin el enlace nadie puede entrar con tu dirección.</p></td></tr>
-  <tr><td style="background:#111111;color:#cfcfcf;font:12px Arial,sans-serif;padding:10px 22px;border-top:3px solid #FF6A1A">EMERTEAM | Sports Risks &amp; Emergency Management</td></tr>
-</table></td></tr></table>
-</body></html>
+<h2>Ingreso a EMERTEAM Monitoreo</h2>
+<p>Recibimos un pedido de ingreso con esta dirección de correo. Tocá el botón para entrar.</p>
+<p><a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#FF6A1A;color:#111111;font-weight:bold;text-decoration:none;padding:12px 20px;border-radius:6px">Ingresar</a></p>
+<p>El enlace vence a los pocos minutos y sirve una sola vez. Si no pediste ingresar, ignorá este correo.</p>
 {{ else }}
 <!-- PEGAR ACÁ, SIN CAMBIOS, EL CUERPO ACTUAL DE LA PLANTILLA (lo que usa EMERTEAM SUITE) -->
 {{ end }}
