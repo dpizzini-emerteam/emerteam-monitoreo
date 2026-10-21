@@ -147,7 +147,7 @@ export function Guia({ ctx }: { ctx: Contexto }) {
         </div>
         <Tecnico>
           <p>Pronóstico: modelos ECMWF IFS (0,25°, cada 3 h hasta 6 días), NOAA GFS (0,25°, horario hasta 5 días y cada 3 h hasta 7 días) y WRF del SMN (4 km, horario hasta 72 h, temperatura y viento calibrados por el SMN; Fuente: Servicio Meteorológico Nacional), revisados cada hora. Se toma el punto de grilla de tierra más cercano al evento, cada modelo se corrige con las observaciones horarias de hasta dos estaciones del SMN y la serie de consenso es un promedio ponderado por el error que cada modelo tuvo en la zona en las últimas 72 h. Tormenta, precipitación y dirección del viento salen del modelo prioritario (ECMWF).</p>
-          <p>Ajuste local: si hay una estación del SMN a menos de {U.correccion.distancia_max_km} km con al menos {U.correccion.pares_min} horas comparables en las últimas {U.correccion.ventana_h} h, se corrige el sesgo de temperatura (por separado de día y de noche), punto de rocío y viento, y se recalcula el WBGT. El detalle está en «Equipo y fuentes».</p>
+          <p>Ajuste local: con hasta {U.correccion.estaciones} estaciones del SMN a menos de {U.correccion.distancia_max_km} km y al menos {U.correccion.pares_min} horas comparables en las últimas {U.correccion.ventana_h} h (observación de cada hora), se corrige el sesgo de temperatura (por separado de día y de noche), punto de rocío y viento, y se recalcula el WBGT. La corrección es completa hasta {U.correccion.distancia_plena_km} km y se atenúa hasta la mitad a {U.correccion.distancia_max_km} km (criterio interno EMERTEAM). El detalle está en «Equipo y fuentes».</p>
           <p>La duración se estima por distancia (5K ≈ 75 min, 10K ≈ 120 min, 21K ≈ 180 min, 42K ≈ 360 min para el último corredor; en las demás disciplinas se carga la duración estimada) más una demora de largada de {w.demora_cada_1000} min cada 1.000 participantes, salvo que el evento tenga una duración propia cargada.</p>
         </Tecnico>
       </Seccion>
@@ -299,25 +299,52 @@ export function Guia({ ctx }: { ctx: Contexto }) {
       </Seccion>
 
       <Seccion id="g-smn" titulo="Alertas del SMN" icono="alerta" organizador={
-        <p>Las alertas y avisos del <b>Servicio Meteorológico Nacional</b> son la información oficial y <b>tienen prioridad sobre el pronóstico de esta web</b>. Aparecen arriba de todo, con sonido, y generan un correo a quienes reciben alertas.</p>
+        <p>Las alertas y avisos del <b>Servicio Meteorológico Nacional</b> son la información oficial y <b>tienen prioridad sobre el pronóstico de esta web</b>. Aparecen arriba de todo, con sonido, y son lo único que genera un correo a quienes reciben alertas. Cada aviso indica a qué fase afecta, qué anuncia el SMN, qué le recomienda el SMN a la población y la <b>decisión sugerida para el evento</b> según el color.</p>
       }>
         {ctx && (ctx.alertas.length
           ? <p className="guia-ahora">En este evento: {ctx.alertas.length === 1 ? "hay una alerta vigente" : `hay ${ctx.alertas.length} alertas vigentes`} del SMN.</p>
           : <p className="guia-ahora ok">En este evento: sin alertas del SMN vigentes.</p>)}
+        <h4 style={{ margin: "14px 0 6px" }}>Los colores del SMN</h4>
+        <div className="desplaza">
+          <table className="tabla guia-tabla">
+            <thead><tr><th>Color</th><th>Qué significa según el SMN</th><th>Qué le recomienda el SMN a la población</th></tr></thead>
+            <tbody>
+              <tr><td><span className="badge" style={{ background: "#F5C400", color: "#111" }}>Amarillo</span><br /><b>Informate</b></td><td>Posibles fenómenos meteorológicos con capacidad de daño y riesgo de interrupción momentánea de actividades cotidianas.</td><td>«Evitá salir.» Con tormenta: «Si estás al aire libre, buscá refugio inmediato en un edificio, casa o vehículo cerrado.»</td></tr>
+              <tr><td><span className="badge" style={{ background: "#FF6A1A", color: "#111" }}>Naranja</span><br /><b>Preparate</b></td><td>Se esperan fenómenos meteorológicos peligrosos para la sociedad, la vida, los bienes y el ambiente.</td><td>«Seguí las instrucciones de las autoridades locales.» «Salí solo si es necesario.» Con tormenta: «Permanecé en construcciones cerradas como casas, escuelas, edificios públicos.»</td></tr>
+              <tr><td><span className="badge" style={{ background: "#FF3B30", color: "#111" }}>Rojo</span><br /><b>Seguí instrucciones oficiales</b></td><td>Se esperan fenómenos meteorológicos excepcionales con potencial de provocar emergencias o desastres.</td><td>«Seguí las instrucciones de las autoridades locales.» «Salí solo si es imprescindible.» Con viento: «No salgas y quedate en el interior de un lugar seguro.»</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p className="chico">Temperaturas extremas (calor), sin distinción de color: «Reducí la actividad física» y «No te expongas al sol en exceso, ni en horas centrales del día (entre las 10 y las 16 horas)». Advertencias por humo o ceniza volcánica: «Evitá actividades al aire libre».</p>
+        <p className="chico">Fuente: Servicio Meteorológico Nacional, Sistema de Alerta Temprana, módulo «Recomendaciones para alertas y advertencias». Son las mismas instrucciones que el SMN incluye en cada alerta; la web y el correo las muestran textuales.</p>
+
+        <h4 style={{ margin: "14px 0 6px" }}>Decisión sugerida para el evento</h4>
+        <div className="desplaza">
+          <table className="tabla guia-tabla">
+            <thead><tr><th>Color</th><th>Día de carrera</th><th>Armado y desarme</th></tr></thead>
+            <tbody>
+              <tr><td><span className="badge" style={{ background: "#F5C400", color: "#111" }}>Amarillo</span></td><td>Evaluar reprogramar la largada fuera de la vigencia de la alerta. Si se mantiene: protocolo activo, refugios identificados y plan de evacuación de corrales y llegada.</td><td>No trabajar al aire libre mientras dure el fenómeno.</td></tr>
+              <tr><td><span className="badge" style={{ background: "#FF6A1A", color: "#111" }}>Naranja</span></td><td>No realizar la carrera dentro de la vigencia de la alerta: postergar o suspender.</td><td>Suspender las tareas al aire libre durante la vigencia de la alerta.</td></tr>
+              <tr><td><span className="badge" style={{ background: "#FF3B30", color: "#111" }}>Rojo</span></td><td>Suspender la carrera y seguir las instrucciones de las autoridades locales.</td><td>Suspender las tareas al aire libre y seguir las instrucciones de las autoridades locales.</td></tr>
+              <tr><td><b>Calor</b> (cualquier color)</td><td>Si la carrera transcurre entre las 10 y las 16 h, evaluar adelantar la largada para terminar antes de las 10 h. Aplicar las medidas del nivel de estrés térmico.</td><td>Programar el trabajo físico fuera de la franja de 10 a 16 h, con pausas, sombra e hidratación.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p className="chico">Criterio interno EMERTEAM: traduce la recomendación del SMN a la población a una actividad masiva al aire libre. Frío, nieve y niebla se muestran sin decisión sugerida hasta que EMERTEAM fije criterio. Además se indican las medidas operativas de cada fenómeno (tormenta eléctrica, ráfagas sobre estructuras, lluvia) con los mismos criterios de las secciones anteriores. La decisión final corresponde al organizador.</p>
+
+        <h4 style={{ margin: "14px 0 6px" }}>Alertas y avisos a corto plazo</h4>
         <div className="desplaza">
           <table className="tabla guia-tabla">
             <thead><tr><th>Tipo</th><th>Qué es</th><th>Qué hacer</th></tr></thead>
             <tbody>
-              <tr><td><b>Alerta</b> amarilla, naranja o roja</td><td>Fenómenos previstos para las próximas horas o días en la zona, de severidad creciente según el color.</td><td>Revisar el plan para la franja de vigencia; con naranja o roja, evaluar con EMERTEAM la modificación o suspensión de la actividad expuesta.</td></tr>
+              <tr><td><b>Alerta</b> amarilla, naranja o roja</td><td>Fenómenos previstos para las próximas horas o días en la zona, de severidad creciente según el color.</td><td>Revisar el plan para la franja de vigencia y aplicar la decisión sugerida según el color y la fase que toca.</td></tr>
               <tr><td><b>Aviso a corto plazo</b></td><td>Fenómeno inminente o en curso, en general tormentas fuertes, para las próximas horas.</td><td>Activar el protocolo correspondiente de inmediato.</td></tr>
             </tbody>
           </table>
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "8px 0" }}>
-          {[["Amarilla", "#F5C400"], ["Naranja", "#FF6A1A"], ["Roja", "#FF3B30"]].map(([n, col]) => <span key={n} className="badge" style={{ background: col, color: "#111" }}>{n}</span>)}
-        </div>
         <Tecnico>
-          <p>La web lee el feed oficial del SMN en formato CAP cada 5 minutos y muestra solo las alertas cuyo polígono contiene el punto del evento y cuya vigencia coincide con el armado, la carrera o el desarme. Cuando el SMN deja de publicarla, figura como levantada.</p>
+          <p>La web lee el feed oficial del SMN en formato CAP cada 5 minutos y muestra solo las alertas cuyo polígono contiene el punto del evento y cuya vigencia coincide con el armado, la carrera o el desarme. Guarda textual la descripción y las instrucciones de cada alerta. Cuando el SMN deja de publicarla, figura como levantada y se avisa por correo.</p>
+          <p>El color se toma de la severidad del CAP (Minor y Moderate: amarillo; Severe: naranja; Extreme: rojo). Las advertencias por humo, polvo, ceniza o niebla todavía no se incorporan.</p>
         </Tecnico>
       </Seccion>
 
