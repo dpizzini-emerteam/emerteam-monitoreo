@@ -28,7 +28,19 @@ type Evento = {
 type Fila = {
   id: string; evento_id: string; fenomeno: string; color: string; desde: string | null; hasta: string | null;
   emitida: string | null; estado: string; zona: string | null; tipo: string; severidad: string; fuente_url: string;
+  descripcion: string | null; instruccion: string | null;
 };
+
+/** Texto del CAP con las entidades numéricas resueltas (&#xE1; → á) y espacios normalizados */
+function textoCap(x: unknown): string | null {
+  if (x == null) return null;
+  const t = String(x)
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(parseInt(d, 10)))
+    .replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ").trim();
+  return t ? t.slice(0, 3000) : null;
+}
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -189,6 +201,7 @@ Deno.serve(async (req) => {
               emitida: String(alerta.sent ?? "") || null, estado: "vigente",
               zona: String(area.areaDesc ?? "").trim().slice(0, 500) || null,
               tipo, severidad, fuente_url: d.u,
+              descripcion: textoCap(info.description), instruccion: textoCap(info.instruction),
             });
           }
         }
@@ -201,6 +214,10 @@ Deno.serve(async (req) => {
   if (nuevas.length) {
     const { error: e1 } = await supabase.from("mon_alertas_smn").upsert(nuevas, { onConflict: "id", ignoreDuplicates: true });
     if (e1) return json({ error: e1.message }, 500);
+    // Texto oficial en las ya registradas que no lo tenían
+    for (const n of nuevas.filter((x) => x.descripcion || x.instruccion)) {
+      await supabase.from("mon_alertas_smn").update({ descripcion: n.descripcion, instruccion: n.instruccion }).eq("id", n.id).is("descripcion", null);
+    }
     // Una alerta que se había dado por levantada y vuelve a figurar, vuelve a estar vigente
     await supabase.from("mon_alertas_smn").update({ estado: "vigente" }).in("id", nuevas.map((n) => n.id)).eq("estado", "levantada");
   }

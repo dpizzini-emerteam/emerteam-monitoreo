@@ -207,6 +207,7 @@ export function EventoVista() {
                 {" · "}<a href="https://www.smn.gob.ar/alertas" target="_blank" rel="noreferrer" style={{ color: "#111" }}>Ver en el SMN</a>
               </div>
               {a.zona && <div style={{ fontSize: 13, opacity: 0.85 }} title={a.zona}>{a.zona.length > 140 ? a.zona.slice(0, 140) + "…" : a.zona}</div>}
+              {a.descripcion && <div style={{ fontSize: 14, marginTop: 6, fontStyle: "italic" }}>«{a.descripcion}» <span style={{ fontStyle: "normal", opacity: 0.8 }}>(SMN)</span></div>}
             </div>
             <button className="boton negro" onClick={() => (sonido.habilitado ? sonido.setActivo(!sonido.activo) : sonido.setHabilitado(true))}>
               {sonido.habilitado && sonido.activo ? "Silenciar alerta" : "Activar sonido"}

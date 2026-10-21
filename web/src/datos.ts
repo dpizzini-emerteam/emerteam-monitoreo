@@ -123,6 +123,8 @@ export type AlertaSMN = {
   tipo: "alerta" | "aviso_corto_plazo";
   severidad: string | null;
   fuente_url: string | null;
+  descripcion?: string | null;
+  instruccion?: string | null;
 };
 
 const PESO_SMN: Record<string, number> = { rojo: 3, naranja: 2, amarillo: 1 };

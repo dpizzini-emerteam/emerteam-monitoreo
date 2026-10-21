@@ -132,7 +132,7 @@ function duracionEstimadaMin(km: number): number {
   }
   return 0;
 }
-function ventana(ev: Evento): [number, number] {
+function finCarrera(ev: Evento): number {
   const largada = new Date(ev.largada).getTime();
   const demora = ev.demora_largada_min ?? ((ev.participantes ?? 0) / 1000) * 1;
   let fin = largada;
@@ -143,10 +143,36 @@ function ventana(ev: Evento): [number, number] {
       fin = Math.max(fin, ini + (demora + duracionEstimadaMin(Number(m.distancia_km))) * 60_000);
     }
   }
+  return fin;
+}
+/** Fases operativas (réplica de config/umbrales.json → ventanas): armado hasta 4 h antes de la largada,
+ *  día de carrera = jornada del personal (4 h antes de la largada a 5 h después del fin), desarme 24 h */
+function fases(ev: Evento): Record<"armado" | "carrera" | "desarme", [number, number]> {
+  const largada = new Date(ev.largada).getTime();
+  const fin = finCarrera(ev);
   const local = new Date(largada - 3 * 3600_000);
   const dia0 = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate(), 3);
-  return [dia0 - (ev.armado_dias || 3) * 86400_000, fin + 1440 * 60_000];
+  return {
+    armado: [dia0 - (ev.armado_dias || 3) * 86400_000, largada - 240 * 60_000],
+    carrera: [largada - 240 * 60_000, fin + 300 * 60_000],
+    desarme: [fin, fin + 1440 * 60_000],
+  };
 }
+function ventana(ev: Evento): [number, number] {
+  const f = fases(ev);
+  return [f.armado[0], Math.max(f.carrera[1], f.desarme[1])];
+}
+/** Fases que toca una alerta, en orden */
+function fasesAfectadas(a: { desde: string | null; hasta: string | null }, ev: Evento, ahora: number): ("armado" | "carrera" | "desarme")[] {
+  const t0 = a.desde ? new Date(a.desde).getTime() : ahora;
+  const t1 = a.hasta ? new Date(a.hasta).getTime() : Infinity;
+  return (Object.entries(fases(ev)) as ["armado" | "carrera" | "desarme", [number, number]][])
+    .filter(([, [v0, v1]]) => t1 >= v0 && t0 <= v1).map(([k]) => k);
+}
+const NOMBRE_FASE = { armado: "armado", carrera: "día de carrera", desarme: "desarme" } as const;
+const FASE_ART = { armado: "el armado", carrera: "el día de carrera", desarme: "el desarme" } as const;
+const listaY = (xs: string[]) => xs.length <= 1 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} y ${xs.at(-1)}`;
+
 /** La alerta se superpone con el armado, la carrera o el desarme */
 function enFases(a: { desde: string | null; hasta: string | null }, ev: Evento, ahora: number): boolean {
   const [v0, v1] = ventana(ev);
@@ -206,7 +232,7 @@ function adaptar(texto: string, d?: string | null): string {
   return texto.replace(/\bcorredores\b/g, pl).replace(/\bCorredores\b/g, cap(pl)).replace(/\bcorredor\b/g, sg).replace(/\bCorredor\b/g, cap(sg));
 }
 type Nivel = { evento_id: string; fase: string; variable: string; desde: string; hasta: string; nivel: number; confianza: string | null };
-type Alerta = { id: string; evento_id: string; fenomeno: string; color: string; desde: string | null; hasta: string | null; estado: string; tipo: string };
+type Alerta = { id: string; evento_id: string; fenomeno: string; color: string; desde: string | null; hasta: string | null; estado: string; tipo: string; descripcion?: string | null };
 type Estado = { niveles: Record<string, number>; smn: string[]; glm: number; ens?: Record<string, string> };
 type EnsProb = { evento_id: string; corrida: string; variable: string; nivel: number; ventana: string; ventana_hasta: string; umbral: number | null; prob: number; miembros: number };
 type Cambio =
@@ -217,7 +243,61 @@ type Cambio =
 
 const fmt = (iso: string) => new Intl.DateTimeFormat("es-AR", { timeZone: "America/Argentina/Buenos_Aires", weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(iso));
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-const tituloAlerta = (a: Alerta) => `${a.tipo === "aviso_corto_plazo" ? "Aviso a corto plazo" : "Alerta"} ${a.color} del SMN · ${a.fenomeno.replace(/\s*\(aviso a corto plazo\)$/, "")}`;
+const COLOR_FEM: Record<string, string> = { amarillo: "amarilla", naranja: "naranja", rojo: "roja" };
+const fenomenoDe = (a: Alerta) => a.fenomeno.replace(/\s*\(aviso a corto plazo\)$/, "").toLowerCase();
+const tituloAlerta = (a: Alerta) => a.tipo === "aviso_corto_plazo"
+  ? `Aviso a corto plazo por ${fenomenoDe(a)}`
+  : `Alerta ${COLOR_FEM[a.color] ?? a.color} por ${fenomenoDe(a)}`;
+/** «jueves 22/10, 15:00 h»; un fin de vigencia a :59:59 se muestra en la hora siguiente */
+function fmtLargo(iso: string, fin = false): string {
+  let t = new Date(iso).getTime();
+  if (fin && new Date(iso).getUTCSeconds() === 59) t += 1000;
+  const p = Object.fromEntries(new Intl.DateTimeFormat("es-AR", { timeZone: "America/Argentina/Buenos_Aires", weekday: "long", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false })
+    .formatToParts(new Date(t)).map((x) => [x.type, x.value]));
+  return `${p.weekday} ${p.day}/${p.month}, ${p.hour}:${p.minute} h`;
+}
+const UMBRAL_VIENTO: Record<string, number[]> = { A: [25, 30, 38, 45], B: [35, 40, 45, 55], C: [35, 45, 55, 65] }; // config/umbrales.json → viento
+/** Recomendación EMERTEAM para una alerta del SMN según el fenómeno, su texto oficial y las fases que toca */
+function recomendacionSMN(a: Alerta & { descripcion?: string | null }, fs: string[], ev: Evento): { titulo: string; texto: string }[] {
+  const fen = fenomenoDe(a);
+  const desc = (a.descripcion ?? "").toLowerCase();
+  const out: { titulo: string; texto: string }[] = [];
+  const conCarrera = fs.includes("carrera");
+  const conMontaje = fs.includes("armado") || fs.includes("desarme");
+  if (/tormenta|el[ée]ctric/.test(fen) || /actividad el[ée]ctrica/.test(desc)) {
+    const montaje = fs.filter((f) => f !== "carrera").map((f) => NOMBRE_FASE[f as "armado" | "desarme"]);
+    if (conMontaje) out.push({ titulo: `Tormenta eléctrica (${listaY(montaje)})`, texto: recomendacion("tormenta", 1, "armado") });
+    if (conCarrera) out.push({ titulo: "Tormenta eléctrica (día de carrera)", texto: adaptar(recomendacion("tormenta", 1, "carrera"), ev.disciplina) });
+  }
+  const rafagas = [...desc.matchAll(/r[áa]fagas?[^.]*?(\d{2,3})\s*km\/h/g)].map((m) => Number(m[1]));
+  const raf = rafagas.length ? Math.max(...rafagas) : null;
+  if (raf != null) {
+    // Categorías de estructuras agrupadas por el nivel que alcanzan con la ráfaga máxima anunciada
+    const porNivel = new Map<number, string[]>();
+    for (const c of ["A", "B", "C"]) {
+      const n = UMBRAL_VIENTO[c].filter((u) => raf >= u).length;
+      if (n > 0) porNivel.set(n, [...(porNivel.get(n) ?? []), c]);
+    }
+    const frases = [...porNivel.entries()].sort((x, y) => y[0] - x[0]).map(([n, cs]) => {
+      const el = cs.map((c) => ELEMENTOS[c]).join("; ");
+      return [``, `Vigilar ${el}: verificar lastre y anclajes.`, `Reforzar ${el}: lastre adicional, retirar laterales y lonas no esenciales.`,
+        `Retirar ${el}${cs.includes("A") ? " (desinflar el arco)" : ""}; no montar mientras dure la alerta.`,
+        `Despejar el área alrededor de ${el} (radio de 1,5 veces su altura)${cs.includes("C") ? "; evaluar la suspensión de tareas" : ""}.`][n];
+    });
+    if (frases.length) out.push({ titulo: `Ráfagas de hasta ${raf} km/h`, texto: frases.join(" ") });
+  } else if (/viento/.test(fen)) {
+    out.push({ titulo: "Viento", texto: "Verificar lastre y anclajes de todas las estructuras y retirar las ultralivianas (gazebos, fly banners, arco inflable) mientras dure la alerta." });
+  }
+  if (/lluvia|tormenta|precipitaci/.test(fen) || /precipitaci|lluvia/.test(desc)) {
+    const intensa = /abundantes|intensa|cortos? per[ií]odos?/.test(desc);
+    const [tit, ...resto] = recomendacion("lluvia", intensa ? 2 : 1, "armado").split(": ");
+    out.push({ titulo: tit, texto: resto.join(": ").replace(/^./, (x) => x.toUpperCase()) });
+  }
+  if (/calor|temperatura/.test(fen) && conCarrera) {
+    out.push({ titulo: "Calor", texto: "Consultar el nivel de estrés térmico del evento en la web y aplicar las medidas de ese nivel." });
+  }
+  return out;
+}
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -256,12 +336,30 @@ function armarCorreo(ev: Evento, cambios: Cambio[]): { asunto: string; html: str
     } else if (c.tipo === "smn_nueva" || c.tipo === "smn_levantada") {
       const a = c.alerta;
       const fondo = COLOR_SMN[a.color] ?? "#F5C400";
-      const titulo = c.tipo === "smn_nueva" ? tituloAlerta(a) : `${tituloAlerta(a)} · levantada`;
-      const vig = `${a.desde ? fmt(a.desde) : "desde ahora"} a ${a.hasta ? fmt(a.hasta) : "sin fin informado"}`;
-      partes.push(`<tr><td style="padding:14px 18px;background:${c.tipo === "smn_nueva" ? fondo : "#f7f6f4"};border-left:5px solid #111">
+      const fs = fasesAfectadas(a, ev, Date.now());
+      const titulo = `${tituloAlerta(a)} · SMN${c.tipo === "smn_levantada" ? " · levantada" : ""}`;
+      const vig = `${a.desde ? fmtLargo(a.desde) : "desde ahora"} a ${a.hasta ? fmtLargo(a.hasta, true) : "sin fin informado"}`.replace(/^./, (x) => x.toUpperCase());
+      const afecta = fs.length ? `Afecta: ${listaY(fs.map((f) => NOMBRE_FASE[f]))}.${fs.includes("carrera") ? "" : " No afecta el día de carrera."}` : "";
+      if (c.tipo === "smn_nueva") {
+        const recos = recomendacionSMN(a, fs, ev);
+        partes.push(`<tr><td style="padding:14px 18px;background:${fondo};border-left:5px solid #111">
         <div style="font:800 17px Arial,sans-serif;color:#111;text-transform:uppercase">${esc(titulo)}</div>
-        <div style="font:13px Arial,sans-serif;color:#111;margin-top:4px">${c.tipo === "smn_nueva" ? `Vigencia: ${esc(vig)}. Tiene prioridad sobre el pronóstico.` : "El SMN dejó de incluir esta alerta para la zona del evento."}</div></td></tr><tr><td style="height:10px"></td></tr>`);
-      lineas.push(`${titulo}. ${c.tipo === "smn_nueva" ? `Vigencia: ${vig}.` : ""}`);
+        <div style="font:14px Arial,sans-serif;color:#111;margin-top:6px">${esc(vig)}</div>
+        ${afecta ? `<div style="font:700 14px Arial,sans-serif;color:#111;margin-top:4px">${esc(afecta)}</div>` : ""}</td></tr>
+        ${a.descripcion ? `<tr><td style="padding:12px 18px 4px"><div style="font:800 12px Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#7C7C7C">Qué anuncia el SMN</div>
+        <div style="font:14px/1.5 Arial,sans-serif;color:#222;margin-top:4px;font-style:italic">«${esc(a.descripcion)}»</div></td></tr>` : ""}
+        ${recos.length ? `<tr><td style="padding:12px 18px 4px"><div style="font:800 12px Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#7C7C7C">Recomendación EMERTEAM</div>
+        ${recos.map((r) => `<div style="font:14px/1.5 Arial,sans-serif;color:#222;margin-top:6px"><b>${esc(r.titulo)}:</b> ${esc(r.texto)}</div>`).join("")}</td></tr>` : ""}
+        <tr><td style="padding:8px 18px 0"><div style="font:12px Arial,sans-serif;color:#666">La alerta oficial del SMN tiene prioridad sobre el pronóstico.</div></td></tr><tr><td style="height:14px"></td></tr>`);
+        lineas.push([titulo, vig, afecta, a.descripcion ? `Qué anuncia el SMN: «${a.descripcion}»` : "",
+          recos.length ? `Recomendación EMERTEAM:\n${recos.map((r) => `- ${r.titulo}: ${r.texto}`).join("\n")}` : "",
+          "La alerta oficial del SMN tiene prioridad sobre el pronóstico."].filter(Boolean).join("\n"));
+      } else {
+        partes.push(`<tr><td style="padding:14px 18px;background:#f7f6f4;border-left:5px solid #111">
+        <div style="font:800 17px Arial,sans-serif;color:#111;text-transform:uppercase">${esc(titulo)}</div>
+        <div style="font:13px Arial,sans-serif;color:#111;margin-top:4px">El SMN dejó de incluir esta alerta para la zona del evento (vigencia original: ${esc(vig)}).</div></td></tr><tr><td style="height:10px"></td></tr>`);
+        lineas.push(`${titulo}. El SMN dejó de incluir esta alerta para la zona del evento.`);
+      }
     } else if (c.tipo === "ens") {
       const accion = c.accion === "activar" ? "Activar" : "Preparar";
       const color = c.accion === "activar" ? "#FF3B30" : "#C79000";
@@ -290,7 +388,8 @@ function armarCorreo(ev: Evento, cambios: Cambio[]): { asunto: string; html: str
     : primero.tipo === "normaliza" ? `${nombreVar(primero.variable)} vuelve a quedar bajo el umbral`
     : primero.tipo === "rayos" ? `Rayos a ${Math.round(primero.km)} km`
     : primero.tipo === "ens" ? `${primero.accion === "activar" ? "Activar" : "Preparar"} · ${nombreVar(primero.variable)} · ${nombreNivel(primero.variable, primero.nivel)}`
-    : `${tituloAlerta(primero.alerta)}${primero.tipo === "smn_levantada" ? " · levantada" : ""}`;
+    : primero.tipo === "smn_levantada" ? `${tituloAlerta(primero.alerta)} (SMN) · levantada`
+    : (() => { const fs = fasesAfectadas(primero.alerta, ev, Date.now()); return `${tituloAlerta(primero.alerta)} (SMN)${fs.length ? ` · afecta ${listaY(fs.map((f) => FASE_ART[f]))}` : ""}`; })();
   const asunto = `${ev.nombre} · ${resumen}`;
   const bloqueCorredores = corredores.size ? `<tr><td style="padding:14px 18px;border:1px dashed #7C7C7C">
       <div style="font:800 13px Arial,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#7C7C7C;margin-bottom:6px">Texto sugerido para comunicar a los corredores</div>
@@ -305,14 +404,14 @@ function armarCorreo(ev: Evento, cambios: Cambio[]): { asunto: string; html: str
         <td style="padding-left:16px;vertical-align:middle">
           <div style="font:800 12px Arial,sans-serif;letter-spacing:.12em;color:#FF6A1A;text-transform:uppercase">Monitoreo ambiental</div>
           <div style="font:800 21px Arial,sans-serif;color:#ffffff;text-transform:uppercase;margin-top:3px">${esc(ev.nombre)}</div>
-          <div style="font:13px Arial,sans-serif;color:#cfcfcf;margin-top:2px">Largada ${esc(fmt(ev.largada))}</div></td>
+          <div style="font:13px Arial,sans-serif;color:#cfcfcf;margin-top:2px">Largada ${esc(fmtLargo(ev.largada))}</div></td>
       </tr></table></td></tr>
     <tr><td style="padding:18px 22px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${partes.join("")}${bloqueCorredores}</table>
       <a href="${enlace}" style="display:inline-block;background:#FF6A1A;color:#111;font:700 15px Arial,sans-serif;text-decoration:none;padding:11px 18px;border-radius:6px;margin-top:6px">Ver el monitoreo del evento</a>
       <p style="font:12px/1.5 Arial,sans-serif;color:#666;margin:16px 0 0">EMERTEAM recomienda; la decisión final corresponde al organizador. Recibís este aviso porque tu correo está habilitado para el evento.</p></td></tr>
     <tr><td style="background:#111111;color:#cfcfcf;font:12px Arial,sans-serif;padding:10px 22px;border-top:3px solid #FF6A1A">EMERTEAM | Sports Risks &amp; Emergency Management</td></tr>
   </table></td></tr></table></body></html>`;
-  const texto = `${ev.nombre}\nLargada ${fmt(ev.largada)}\n\n${lineas.join("\n\n")}${corredores.size ? `\n\nTexto sugerido para los corredores:\n${[...corredores].join("\n")}` : ""}\n\nVer el monitoreo: ${enlace}\n\nEMERTEAM | Sports Risks & Emergency Management`;
+  const texto = `${ev.nombre}\nLargada ${fmtLargo(ev.largada)}\n\n${lineas.join("\n\n")}${corredores.size ? `\n\nTexto sugerido para los corredores:\n${[...corredores].join("\n")}` : ""}\n\nVer el monitoreo: ${enlace}\n\nEMERTEAM | Sports Risks & Emergency Management`;
   return { asunto, html, texto };
 }
 
@@ -334,7 +433,7 @@ Deno.serve(async (req) => {
   const [{ data: nivs }, { data: alts }, { data: rays }, { data: estados }, { data: accesos }, { data: equipo }, { data: cred }] = await Promise.all([
     supabase.from("mon_niveles").select("evento_id,fase,variable,desde,hasta,nivel,confianza").in("evento_id", ids)
       .gt("hasta", new Date(ahora).toISOString()).lte("desde", new Date(ahora + HORIZONTE_MS).toISOString()).limit(20000),
-    supabase.from("mon_alertas_smn").select("id,evento_id,fenomeno,color,desde,hasta,estado,tipo").in("evento_id", ids),
+    supabase.from("mon_alertas_smn").select("id,evento_id,fenomeno,color,desde,hasta,estado,tipo,descripcion").in("evento_id", ids),
     supabase.from("mon_rayos").select("evento_id,distancia_km,ocurrido_en").in("evento_id", ids).gte("ocurrido_en", new Date(ahora - 30 * 60_000).toISOString()).limit(5000),
     supabase.from("mon_estado").select("clave,valor").in("clave", ids.map((i) => `avisos:${i}`)),
     supabase.from("mon_accesos").select("evento_id,email").in("evento_id", ids).eq("recibe_alertas", true),
@@ -347,8 +446,11 @@ Deno.serve(async (req) => {
   // Envío de prueba: un correo de muestra (con acentos y asunto largo) solo a los editores de EMERTEAM, sin tocar el estado
   if (new URL(req.url).searchParams.get("envio_prueba") === "1") {
     if (!smtp?.usuario || !smtp?.clave) return json({ ok: false, error: "sin credencial" });
-    const ev = eventos[0];
-    const muestra: Cambio[] = new URL(req.url).searchParams.get("muestra") === "ens"
+    const tipoMuestra = new URL(req.url).searchParams.get("muestra");
+    const alertaMuestra = ((alts ?? []) as Alerta[]).find((a) => a.estado !== "levantada");
+    const ev = tipoMuestra === "smn" && alertaMuestra ? eventos.find((e) => e.id === alertaMuestra.evento_id) ?? eventos[0] : eventos[0];
+    const muestra: Cambio[] = tipoMuestra === "smn" && alertaMuestra ? [{ tipo: "smn_nueva", alerta: alertaMuestra }]
+      : tipoMuestra === "ens"
       ? [{ tipo: "ens", accion: "preparar", ventana: "carrera", variable: "wbgt", nivel: 1, prob: 0.42, umbral: 21, miembros: 81, corrida: new Date(ahora - 6 * 3600_000).toISOString(), dias: 3 }]
       : [{ tipo: "sube", fase: "desarme", variable: "calor_personal", antes: 0, ahora: 2, desde: new Date(ahora + 86400_000).toISOString(), confianza: "media" }];
     const correo = armarCorreo(ev, muestra);
