@@ -1,6 +1,8 @@
 // EMERTEAM Monitoreo Ambiental · observaciones horarias del SMN (datos abiertos)
 // Cada hora: actualiza (semanalmente) el listado de estaciones, elige las estaciones cercanas a cada evento
-// en monitoreo y guarda sus observaciones de los últimos 3 días en mon_observaciones.
+// en monitoreo y guarda sus observaciones en mon_observaciones. Dos archivos:
+// · tiepre (tiempo presente): último parte de cada estación, se renueva cada hora. Da pares casi en tiempo real.
+// · datohorario: el día completo, publicado al día siguiente. Es el registro oficial y reemplaza lo de tiepre.
 // Sirven para medir el error de los modelos en la zona del evento y corregirlo (ver pipeline/mon/correccion.py).
 // Lo dispara pg_cron con la clave de Vault (encabezado x-mon-cron).
 
@@ -14,7 +16,7 @@ const UA = { "user-agent": "EMERTEAM-Monitoreo/1.0 (info@emerteam.com.ar)" };
 const BASE = "https://ssl.smn.gob.ar/dpd";
 const RADIO_KM = 60;      // estaciones consideradas para cada evento
 const POR_EVENTO = 2;     // la más cercana y una de respaldo
-const DIAS = 3;           // días de observaciones que se releen en cada corrida
+const DIAS = 3;           // días de datohorario que se releen en cada corrida
 
 export type Estacion = { nombre: string; provincia: string; lat: number; lon: number; altura: number | null; nro: string };
 
@@ -60,6 +62,12 @@ async function estaciones(): Promise<Estacion[]> {
   return lista;
 }
 
+/** AAAAMMDD en hora oficial argentina */
+const fechaAR = (t: number) => {
+  const d = new Date(t - 3 * 3600_000);
+  return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, "0")}${String(d.getUTCDate()).padStart(2, "0")}`;
+};
+
 const num = (s: string) => {
   const t = s.trim();
   if (!t) return null;
@@ -83,6 +91,58 @@ function leerHorario(texto: string, buscadas: Set<string>) {
       estacion: nombre, valido: valido.toISOString(),
       temp: num(l.slice(14, 20)), hr: num(l.slice(20, 25)), presion: num(l.slice(25, 33)),
       dir_viento: dd != null && dd <= 360 ? Math.round(dd) : null, viento: num(l.slice(38, 43)),
+    });
+  }
+  return filas;
+}
+
+const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+const RUMBOS: Record<string, number> = {
+  NORTE: 0, NORNORESTE: 22.5, NORESTE: 45, ESTENORESTE: 67.5, ESTE: 90, ESTESUDESTE: 112.5, SUDESTE: 135, SUDSUDESTE: 157.5,
+  SUR: 180, SUDSUDOESTE: 202.5, SUDOESTE: 225, OESTESUDOESTE: 247.5, OESTE: 270, OESTENOROESTE: 292.5, NOROESTE: 315, NORNOROESTE: 337.5,
+};
+// Nombres de tiepre que no se resuelven con las reglas generales
+const ALIAS: Record<string, string> = {
+  "AEROPARQUE BUENOS AIRES": "AEROPARQUE AERO", "PILAR OBS.": "PILAR OBSERVATORIO", "JUJUY UNIVERSIDAD NACIONAL": "JUJUY U N",
+  "PCIA. ROQUE SAENZ PENA": "PRESIDENCIA ROQUE SAENZ PEÑA A", "ESC. AVIACION MILITAR": "ESCUELA DE AVIACION MILITAR AE",
+  "BASE CARLINI": "BASE CARLINI (EX JUBANY)", "SANTA ROSA DEL CONLARA": "SANTA ROSA DE CONLARA AERO",
+  "VILLA MARIA DEL RIO SECO": "VILLA DE MARIA DEL RIO SECO", "TERMAS DE RIO HONDO": "TERMAS DE RIO HONDO AERO",
+};
+export const normalizar = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/\s+/g, " ").trim();
+
+/** Nombre de tiepre → nombre del listado de estaciones (null si no hay correspondencia segura) */
+export function estacionDeTiepre(nombre: string, listado: Set<string>): string | null {
+  const n = normalizar(nombre);
+  if (ALIAS[n]) return ALIAS[n];
+  for (const c of [n, `${n} AERO`, `${n} OBSERVATORIO`]) if (listado.has(c)) return c;
+  return null;
+}
+
+/** tiepre: nombre;dd-mes-aaaa;HH:MM;cielo;visibilidad;temp;sensación;HR;viento;presión (hora oficial, UTC−3) */
+export function leerTiepre(texto: string, buscadas: Set<string>, listado: Set<string>, ahora: number) {
+  const filas: Record<string, unknown>[] = [];
+  for (const l of texto.split(/\r?\n/)) {
+    const c = l.split(";");
+    if (c.length < 10) continue;
+    const est = estacionDeTiepre(c[0], listado);
+    if (!est || !buscadas.has(est)) continue;
+    const f = /^(\d{1,2})-([a-z]+)-(\d{4})$/i.exec(c[1].trim());
+    const h = /^(\d{1,2}):(\d{2})$/.exec(c[2].trim());
+    if (!f || !h) continue;
+    const mes = MESES.indexOf(f[2].toLowerCase());
+    if (mes < 0) continue;
+    const valido = new Date(Date.UTC(+f[3], mes, +f[1], +h[1] + 3, +h[2]));
+    if (valido.getUTCMinutes() !== 0 || valido.getTime() > ahora + 3600_000 || ahora - valido.getTime() > 12 * 3600_000) continue;
+    const v = normalizar(c[8]);
+    let dir: number | null = null, vel: number | null = null;
+    if (v.startsWith("CALMA")) vel = 0;
+    else {
+      const m = /^([A-Z]+)\s+(\d+(?:\.\d+)?)$/.exec(v);
+      if (m) { vel = +m[2]; dir = RUMBOS[m[1]] ?? null; }
+    }
+    filas.push({
+      estacion: est, valido: valido.toISOString(), temp: num(c[5]), hr: num(c[7]),
+      presion: num(c[9].split("/")[0]), dir_viento: dir == null ? null : Math.round(dir), viento: vel, origen: "tiepre",
     });
   }
   return filas;
@@ -113,14 +173,32 @@ Deno.serve(async (req) => {
     }
     if (!buscadas.size) return json({ ok: true, eventos: evs.length, estaciones: 0, asignadas });
 
+    // Tiempo presente: no pisa lo ya guardado (el horario oficial manda)
+    const listado = new Set(lista.map((e) => e.nombre));
+    let tiepre = 0;
+    // Pasada la medianoche el archivo del día puede no existir todavía: se prueba el del día anterior
+    for (const t0 of [ahora, ahora - 86400_000]) {
+      const r = await fetch(`${BASE}/descarga_opendata.php?file=observaciones/tiepre${fechaAR(t0)}.txt`, { headers: UA });
+      const t = r.ok ? new TextDecoder("latin1").decode(new Uint8Array(await r.arrayBuffer())) : "";
+      if (t.length > 500) {
+        const leidas = leerTiepre(t, buscadas, listado, ahora);
+        if (leidas.length) {
+          const { error: e1 } = await supabase.from("mon_observaciones").upsert(leidas, { onConflict: "estacion,valido", ignoreDuplicates: true });
+          if (e1) throw e1;
+        }
+        tiepre = leidas.length;
+        break;
+      }
+    }
+
     let filas: Record<string, unknown>[] = [];
     const dias: string[] = [];
     for (let k = 0; k < DIAS; k++) {
       const d = new Date(ahora - 3 * 3600_000 - k * 86400_000);
       const n = `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, "0")}${String(d.getUTCDate()).padStart(2, "0")}`;
       const r = await fetch(`${BASE}/descarga_opendata.php?file=observaciones/datohorario${n}.txt`, { headers: UA });
-      const t = r.ok ? await r.text() : "";
-      const leidas = leerHorario(t, buscadas);
+      const t = r.ok ? new TextDecoder("latin1").decode(new Uint8Array(await r.arrayBuffer())) : "";
+      const leidas = leerHorario(t, buscadas).map((f) => ({ ...f, origen: "datohorario" }));
       dias.push(`${n}:${leidas.length}`);
       filas = filas.concat(leidas);
     }
@@ -129,7 +207,7 @@ Deno.serve(async (req) => {
       if (e2) throw e2;
     }
     await supabase.from("mon_observaciones").delete().lt("valido", new Date(ahora - 30 * 86400_000).toISOString());
-    return json({ ok: true, eventos: evs.length, estaciones: [...buscadas], asignadas, dias, filas: filas.length });
+    return json({ ok: true, eventos: evs.length, estaciones: [...buscadas], asignadas, tiepre, dias, filas: filas.length });
   } catch (e) {
     console.error(e);
     return json({ error: String((e as Error).message ?? e) }, 500);

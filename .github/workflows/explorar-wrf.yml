@@ -7,6 +7,10 @@ on:
         description: "AAAAMMDDHH (vacío: la última completa)"
         type: string
         default: ""
+      tipos:
+        description: "01H,10M,24H"
+        type: string
+        default: "01H"
 
 permissions:
   contents: read
@@ -24,4 +28,4 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install numpy==2.1.3 requests==2.32.3 h5py==3.12.1 fsspec==2024.10.0 aiohttp==3.11.7
-      - run: python -m mon.explorar_wrf "${{ inputs.corrida }}"
+      - run: python -m mon.explorar_wrf "${{ inputs.corrida }}" "${{ inputs.tipos }}"

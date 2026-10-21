@@ -37,7 +37,10 @@ def ultima() -> str:
 def main() -> None:
     c = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] else ultima()
     d = datetime.strptime(c, "%Y%m%d%H")
+    tipos = sys.argv[2].split(",") if len(sys.argv) > 2 and sys.argv[2] else ["01H", "10M", "24H"]
     for tipo, paso in (("01H", "024"), ("10M", "024"), ("24H", "001")):
+        if tipo not in tipos:
+            continue
         url = f"{BUCKET}/DATA/WRF/DET/{d:%Y/%m/%d/%H}/WRFDETAR_{tipo}_{d:%Y%m%d_%H}_{paso}.nc"
         t0 = time.time()
         fs = fsspec.filesystem("http")
