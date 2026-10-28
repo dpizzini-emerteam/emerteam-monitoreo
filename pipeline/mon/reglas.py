@@ -15,6 +15,7 @@ U = json.loads((Path(__file__).resolve().parents[2] / "config" / "umbrales.json"
 REGLAS = {
     "wa2020_wbgt": {"tipo": "GI", "fuente": "World Athletics (2020). Competition Medical Guidelines, 2.ª ed., tabla 1."},
     "srt30_2023_tgbh": {"tipo": "NT", "fuente": "Res. SRT 30/2023 (valor límite de acción, no aclimatados)."},
+    "emt_wbgt_viento_min": {"tipo": "CI", "fuente": "Criterio interno EMERTEAM: piso de viento de 1,3 m/s a 10 m (~1 m/s a 2 m) en el WBGT estimado; base: Kjellstrom et al., ClimateCHIP (1 m/s por movimiento de las personas en actividad)."},
     "emt_viento_A": {"tipo": "CI", "fuente": "Criterio interno EMERTEAM; retiro con base en HSE/HSENI (inflables, Beaufort 5)."},
     "emt_viento_B": {"tipo": "CI", "fuente": "Criterio interno EMERTEAM, con base en ANSI E1.21 (elementos retirables)."},
     "emt_viento_C": {"tipo": "CI", "fuente": "Criterio interno EMERTEAM."},

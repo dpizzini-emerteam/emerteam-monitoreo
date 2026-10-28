@@ -30,6 +30,11 @@ export const REGLAS: Record<string, { tipo: TipoFuente; fuente: string }> = {
     tipo: "NT",
     fuente: "Resolución SRT 30/2023. Estrés térmico. Valor límite de acción para trabajadores no aclimatados.",
   },
+  emt_wbgt_viento_min: {
+    tipo: "CI",
+    fuente:
+      "EMERTEAM. Piso de viento de 1,3 m/s a 10 m (alrededor de 1 m/s a la altura de las personas) para el WBGT estimado. Base: Kjellstrom, T., Lemke, B. y colaboradores, ClimateCHIP, Index calculation (1 m/s por el movimiento de brazos y piernas de las personas en actividad); Liljegren et al. (2008); KNMI aplica un piso de 0,62 m/s (thermofeel, ECMWF).",
+  },
   emt_viento_A: {
     tipo: "CI",
     fuente: "EMERTEAM. Escala de viento por categoría de estructura. Retiro con base en HSE/HSENI (inflables, Beaufort 5).",

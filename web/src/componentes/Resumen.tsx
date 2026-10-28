@@ -10,9 +10,13 @@ const BLOQUES = [
 
 const ESTADO = ["Sin acciones previstas", "Vigilar", "Actuar", "Retirar", "Suspender / despejar"];
 
-type Item = { variable: string; fase: string; nivel: number; desde: string; hasta: string; confianza: Nivel["confianza"] };
+type Franja = { desde: string; hasta: string; confianza: Nivel["confianza"] };
+type Item = { variable: string; fase: string; nivel: number; desde: string; franjas: Franja[]; confianza: Nivel["confianza"] };
 
-/** Agrupa por variable: nivel máximo y la franja en que se da ese nivel */
+const peor = (a: Nivel["confianza"], b: Nivel["confianza"]): Nivel["confianza"] =>
+  a === "baja" || b === "baja" ? "baja" : a === "media" || b === "media" ? "media" : "alta";
+
+/** Agrupa por variable: nivel máximo y cada franja en que se da ese nivel (solo se unen tramos contiguos) */
 function items(niveles: Nivel[]): Item[] {
   const porVar = new Map<string, Nivel[]>();
   for (const n of niveles) if (n.nivel > 0) porVar.set(n.variable, [...(porVar.get(n.variable) ?? []), n]);
@@ -20,8 +24,16 @@ function items(niveles: Nivel[]): Item[] {
   for (const [variable, ns] of porVar) {
     const max = Math.max(...ns.map((n) => n.nivel));
     const top = ns.filter((n) => n.nivel === max).sort((a, b) => a.desde.localeCompare(b.desde));
-    const conf = top.some((n) => n.confianza === "baja") ? "baja" : top.some((n) => n.confianza === "media") ? "media" : "alta";
-    out.push({ variable, fase: top[0].fase, nivel: max, desde: top[0].desde, hasta: top[top.length - 1].hasta, confianza: conf });
+    const franjas: Franja[] = [];
+    for (const n of top) {
+      const u = franjas[franjas.length - 1];
+      if (u && Date.parse(n.desde) <= Date.parse(u.hasta)) {
+        if (n.hasta > u.hasta) u.hasta = n.hasta;
+        u.confianza = peor(u.confianza, n.confianza);
+      } else franjas.push({ desde: n.desde, hasta: n.hasta, confianza: n.confianza });
+    }
+    const conf = franjas.reduce<Nivel["confianza"]>((c, f) => peor(c, f.confianza), "alta");
+    out.push({ variable, fase: top[0].fase, nivel: max, desde: franjas[0].desde, franjas, confianza: conf });
   }
   return out.sort((a, b) => b.nivel - a.nivel || a.desde.localeCompare(b.desde));
 }
@@ -31,6 +43,14 @@ function franja(desde: string, hasta: string): string {
     ? `${fmtDia(desde)} · ${fmtHora(desde)} a ${fmtHora(hasta)} h`
     : `${fmtFechaHora(desde)} → ${fmtFechaHora(hasta)}`;
 }
+
+/** Texto de las franjas para el párrafo principal: la primera y cuántas más hay */
+function franjasTexto(fs: Franja[]): string {
+  const f = franja(fs[0].desde, fs[0].hasta);
+  return fs.length === 1 ? f : `${f}, y ${fs.length - 1} ${fs.length === 2 ? "franja más" : "franjas más"}`;
+}
+
+const MAX_FRANJAS = 3;
 
 /** Primera oración de la recomendación: la acción principal */
 function accion(it: Item): string {
@@ -61,7 +81,7 @@ export function Resumen({ vigentes, alertas, eventoId }: { vigentes: Nivel[]; al
           <p className="resumen-principal">El resumen se completa con la primera actualización de los modelos para este evento.</p>
         ) : principal ? (
           <p className="resumen-principal" style={{ borderColor: estiloVariable(principal.variable, principal.nivel).background }}>
-            <b>Lo principal · {principal.bloque}:</b> {NOMBRE_CORTO[principal.variable]} — {nombreNivel(principal.variable, principal.nivel)} ({franja(principal.desde, principal.hasta)}). {accion(principal)}
+            <b>Lo principal · {principal.bloque}:</b> {NOMBRE_CORTO[principal.variable]} — {nombreNivel(principal.variable, principal.nivel)} ({franjasTexto(principal.franjas)}). {accion(principal)}
             {principal.confianza === "baja" && " Es una tendencia: se confirma o descarta con las próximas actualizaciones."}
           </p>
         ) : (
@@ -89,8 +109,10 @@ export function Resumen({ vigentes, alertas, eventoId }: { vigentes: Nivel[]; al
                       <span className="punto" style={{ background: estiloVariable(it.variable, it.nivel).background }} aria-hidden />
                       <span>
                         <b>{NOMBRE_CORTO[it.variable]}</b> · {nombreNivel(it.variable, it.nivel)}
-                        <br />
-                        <span className="chico">{franja(it.desde, it.hasta)}{it.confianza === "baja" ? " · tendencia" : ""}</span>
+                        {it.franjas.slice(0, MAX_FRANJAS).map((f) => (
+                          <span key={f.desde} className="chico" style={{ display: "block" }}>{franja(f.desde, f.hasta)}{f.confianza === "baja" ? " · tendencia" : ""}</span>
+                        ))}
+                        {it.franjas.length > MAX_FRANJAS && <span className="chico" style={{ display: "block" }}>y {it.franjas.length - MAX_FRANJAS} más en el detalle</span>}
                       </span>
                     </li>
                   ))}

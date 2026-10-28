@@ -171,8 +171,10 @@ export function Guia({ ctx }: { ctx: Contexto }) {
           </table>
         </div>
         <Fuente regla="wa2020_wbgt" />
+        <Fuente regla="emt_wbgt_viento_min" />
         <Tecnico>
           <p>WBGT estimado: método de Liljegren et al. (2008) con temperatura, humedad, presión, viento y radiación solar del pronóstico, hora por hora. Por la radiación, el valor de mediodía puede superar al de la tarde aunque la temperatura sea mayor después.</p>
+          <p>Piso de viento: el cálculo usa como mínimo {coma(U.wbgt_viento_min.ms_10m, 1)} m/s de viento a 10 m (alrededor de 1 m/s a la altura de las personas). Con sol fuerte, Liljegren es muy sensible a la calma: una hora de calma pronosticada sube el WBGT 3 a 4 °C, y los modelos no resuelven bien el viento débil. Las personas en actividad generan además un movimiento de aire propio de al menos ese orden. Con viento pronosticado mayor al piso, el cálculo no cambia. El WBGT medido en terreno no lleva piso.</p>
           <p>WBGT medido: con termómetro de globo negro, en el recorrido, expuesto al sol y a la altura del torso de los participantes. Cuando hay medición reciente en terreno, manda sobre el estimado.</p>
           <p>Los niveles se evalúan en toda la ventana de los participantes y se informa la franja en que se alcanza cada nivel. Un mismo WBGT pesa más en el último cuarto, por la carga térmica acumulada, y en participantes no aclimatados (primeros días de calor de la temporada).</p>
         </Tecnico>
@@ -193,6 +195,7 @@ export function Guia({ ctx }: { ctx: Contexto }) {
           </table>
         </div>
         <Fuente regla="srt30_2023_tgbh" />
+        <Fuente regla="emt_wbgt_viento_min" />
         <Tecnico>
           <p>Carga pesada: montaje de truss, vallas, pórticos y traslado manual de materiales. Carga moderada: armado de gazebos, cartelería, tareas de logística con desplazamiento constante.</p>
           <p>El régimen de trabajo y descanso, las correcciones por vestimenta y los planes de aclimatación están en el anexo de la resolución. Personal aclimatado tolera valores algo mayores; ante la duda se aplica el criterio de no aclimatado.</p>
@@ -471,7 +474,7 @@ export function Guia({ ctx }: { ctx: Contexto }) {
             <tbody>
               {Object.entries(REGLAS).map(([k, v]) => (
                 <tr key={k}>
-                  <td>{{ wa2020_wbgt: "Calor · participantes (World Athletics)", srt30_2023_tgbh: "Calor · personal", emt_viento_A: "Viento · ultralivianas", emt_viento_B: "Viento · superficies de vela", emt_viento_C: "Viento · estructuras ingenieriles", emt_tormenta_cape: "Tormenta", emt_lluvia_intensidad: "Lluvia intensa", emt_suelo_saturado: "Suelo saturado", wt_wbgt: "Calor · atletas de triatlón", aa_calor: "Calor · nadadores (medidas)", uci_wbgt: "Calor · ciclistas" }[k] ?? k}</td>
+                  <td>{{ wa2020_wbgt: "Calor · participantes (World Athletics)", srt30_2023_tgbh: "Calor · personal", emt_wbgt_viento_min: "WBGT estimado · piso de viento", emt_viento_A: "Viento · ultralivianas", emt_viento_B: "Viento · superficies de vela", emt_viento_C: "Viento · estructuras ingenieriles", emt_tormenta_cape: "Tormenta", emt_lluvia_intensidad: "Lluvia intensa", emt_suelo_saturado: "Suelo saturado", wt_wbgt: "Calor · atletas de triatlón", aa_calor: "Calor · nadadores (medidas)", uci_wbgt: "Calor · ciclistas" }[k] ?? k}</td>
                   <td style={{ whiteSpace: "nowrap" }}>{TIPO_FUENTE[v.tipo]}</td>
                   <td>{v.fuente}</td>
                 </tr>

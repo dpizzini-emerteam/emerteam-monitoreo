@@ -16,12 +16,12 @@ import { Probabilistico } from "../componentes/Probabilistico";
 import { decisionEvento, recomendacionSmnAireLibre, type FaseEvento } from "../alertasSmn";
 import { categoriaUv, consenso, FUENTE_UV, NOMBRE_FUENTE, pesosFuentes, PRIORIDAD, UV_CATEGORIAS, uvMaxPorDia } from "../serie";
 import { UvDato } from "../componentes/Uv";
-import { confDisciplina, escalaCalor, estiloCalor, nombreDisciplina, participantes, riesgoWct, wct } from "../disciplinas";
+import { confDisciplina, esVariableCalor, escalaCalor, estiloCalor, nombreDisciplina, participantes, riesgoWct, wct } from "../disciplinas";
 import {
   COLOR_SMN, estadoRayosGLM, ordenarAlertas, tituloAlerta, diaLocal, fmtDia, fmtFechaHora, fmtHora, num, supabase,
   type AlertaSMN, type Evento, type Rayo, type Nivel, type Pronostico, type Sesgo, type Uv,
 } from "../datos";
-import { fijarDisciplina, reglaDe, estiloNivel, estiloVariable, NOMBRE_CORTO, NOMBRE_FASE, NOMBRE_VARIABLE, TIPO_FUENTE, nombreNivel, recomendacion } from "../reglas";
+import { fijarDisciplina, reglaDe, REGLAS, estiloNivel, estiloVariable, NOMBRE_CORTO, NOMBRE_FASE, NOMBRE_VARIABLE, TIPO_FUENTE, nombreNivel, recomendacion } from "../reglas";
 import { calcular, fasesDeAlerta } from "../ventanas";
 
 
@@ -724,6 +724,9 @@ function TarjetaReco({ n }: { n: Nivel }) {
         <details style={{ borderTop: "1px solid var(--borde)", paddingTop: 8 }}>
           <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 14 }}>Fuente · {TIPO_FUENTE[r.tipo]}</summary>
           <p className="chico" style={{ margin: "8px 0 0" }}>{r.fuente}</p>
+          {(n.variable === "calor_personal" || esVariableCalor(n.variable)) && (
+            <p className="chico" style={{ margin: "8px 0 0" }}><b>Cálculo del WBGT · {TIPO_FUENTE[REGLAS.emt_wbgt_viento_min.tipo]}:</b> {REGLAS.emt_wbgt_viento_min.fuente}</p>
+          )}
         </details>
       )}
     </article>

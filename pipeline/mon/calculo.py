@@ -2,13 +2,22 @@
 
 from __future__ import annotations
 
+import json
 import math
 from datetime import datetime, timezone
+from pathlib import Path
 
 import numpy as np
 import thermofeel
 
 S0 = 1361.0  # constante solar [W/m2]
+
+# Piso de viento a 10 m para el WBGT estimado (criterio interno EMERTEAM, regla emt_wbgt_viento_min).
+# Los modelos no resuelven la calma y Liljegren es muy sensible al viento bajo con sol fuerte: una hora de
+# calma pronosticada sube el WBGT 3 a 4 °C. 1,3 m/s a 10 m equivale a ~1 m/s a 2 m de día, el mínimo de
+# movimiento de aire que se asume para personas en actividad (Kjellstrom et al., ClimateCHIP).
+_U = json.loads((Path(__file__).resolve().parents[2] / "config" / "umbrales.json").read_text(encoding="utf-8"))
+VIENTO_MIN_WBGT = float(_U["wbgt_viento_min"]["ms_10m"])
 
 
 def cos_cenit(lat: float, lon: float, t: datetime) -> float:
@@ -62,7 +71,7 @@ def wbgt_liljegren(t_c: float, hr: float, presion_hpa: float, viento_ms: float,
     fd = fraccion_directa(ssrd, cz, t)
     w = thermofeel.calculate_wbgt_liljegren(
         np.array([t_c + 273.15]), np.array([hr]), np.array([presion_hpa]),
-        np.array([max(viento_ms, 0.0)]), np.array([max(ssrd, 0.0)]),
+        np.array([max(viento_ms, VIENTO_MIN_WBGT)]), np.array([max(ssrd, 0.0)]),
         np.array([fd]), np.array([cz]),
     )
     v = float(w[0]) - 273.15

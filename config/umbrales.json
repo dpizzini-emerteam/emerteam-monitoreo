@@ -9,6 +9,11 @@
     ],
     "regla": "wa2020_wbgt"
   },
+  "wbgt_viento_min": {
+    "ms_10m": 1.3,
+    "regla": "emt_wbgt_viento_min",
+    "_comentario": "Piso de viento a 10 m para el WBGT estimado. 1,3 m/s a 10 m equivale a unos 1,0 m/s a 2 m de día (perfil de Liljegren en thermofeel)."
+  },
   "calor_personal": {
     "pesada": 23.0,
     "moderada": 25.0,
