@@ -16,3 +16,8 @@ Desarrollo nuevo e independiente de EMERTEAM METEO (emerteam-meteo.netlify.app),
 
 ## Acceso
 Diego Pizzini (propietario) y Agustín Astorga (colaborador).
+
+## Publicación
+
+- Web: Netlify publica automáticamente cada actualización de `main` (configuración en `netlify.toml`). Cada publicación en producción consume créditos, así que los cambios se trabajan en ramas y se pasan a `main` por tandas.
+- Funciones de Supabase y migraciones: se publican aparte; no dependen de Netlify.
