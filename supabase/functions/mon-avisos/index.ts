@@ -521,7 +521,7 @@ type AltaEvento = { id: string; email: string; nombre: string; recibe_alertas: b
 function correoAcceso(titulo: string, nombre: string, cuerpo: string[], recibeAlertas: boolean): { html: string; texto: string } {
   const pasos = `Para entrar, abrí ${WEB}, escribí este correo y tocá el enlace que te llega. No hace falta contraseña.`;
   const alertas = recibeAlertas
-    ? "Vas a recibir por correo las alertas y los avisos a corto plazo del SMN que toquen el armado, la carrera o el desarme. Los cambios del pronóstico se consultan en la web."
+    ? "Vas a recibir por correo las alertas y los avisos a corto plazo del SMN que toquen el armado, la carrera o el desarme, y los avisos que EMERTEAM active para cada evento, como rayos detectados o viento. El resto del pronóstico se consulta en la web."
     : "No vas a recibir correos de alertas; podés activarlos desde la web.";
   const html = `<!doctype html><html><body style="margin:0;background:#f2f1ef">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f2f1ef"><tr><td align="center" style="padding:20px 10px">
