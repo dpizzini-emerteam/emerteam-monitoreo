@@ -59,10 +59,21 @@ export function EventoForm() {
   const [resultados, setResultados] = useState<Resultado[] | null>(null);
   const [buscando, setBuscando] = useState(false);
   const [productoras, setProductoras] = useState<Productora[]>([]);
+  const [grupo, setGrupo] = useState<{ total: number; alertas: number } | null>(null);
 
   useEffect(() => {
     supabase.from("mon_productoras").select("id,nombre,cupo").order("nombre").then(({ data }) => setProductoras((data as Productora[]) ?? []));
   }, []);
+
+  // Quiénes van a ver el evento con la productora elegida
+  useEffect(() => {
+    setGrupo(null);
+    if (!f.productora_id || f.productora_id === "ninguna") return;
+    supabase.from("mon_productora_miembros").select("recibe_alertas").eq("productora_id", f.productora_id).then(({ data }) => {
+      const filas = (data ?? []) as { recibe_alertas: boolean }[];
+      setGrupo({ total: filas.length, alertas: filas.filter((x) => x.recibe_alertas).length });
+    });
+  }, [f.productora_id]);
 
   useEffect(() => {
     if (!id) return;
@@ -71,7 +82,7 @@ export function EventoForm() {
       const e = data as Evento;
       setF({
         nombre: e.nombre, largada: aLocal(e.largada), ubicacion: e.ubicacion, lat: String(e.lat), lon: String(e.lon),
-        organizador_email: e.organizador_email, participantes: String(e.participantes), armado_dias: String(e.armado_dias), productora_id: e.productora_id ?? "",
+        organizador_email: e.organizador_email, participantes: String(e.participantes), armado_dias: String(e.armado_dias), productora_id: e.productora_id ?? "ninguna",
         duracion_propia_min: e.duracion_propia_min ? String(e.duracion_propia_min) : "",
         demora_largada_min: e.demora_largada_min != null ? String(e.demora_largada_min) : "",
         portico: e.portico, estado: e.estado, disciplina: e.disciplina ?? "running", agua_tipo: e.agua_tipo ?? "",
@@ -153,7 +164,7 @@ export function EventoForm() {
     const fila = {
       nombre: f.nombre.trim(), largada: largada.toISOString(), ubicacion,
       lat, lon, organizador_email: f.organizador_email.trim().toLowerCase(),
-      participantes: parseInt(f.participantes, 10), armado_dias: parseInt(f.armado_dias, 10), productora_id: f.productora_id || null,
+      participantes: parseInt(f.participantes, 10), armado_dias: parseInt(f.armado_dias, 10), productora_id: f.productora_id && f.productora_id !== "ninguna" ? f.productora_id : null,
       duracion_propia_min: f.duracion_propia_min ? parseInt(f.duracion_propia_min, 10) : null,
       demora_largada_min: f.demora_largada_min ? parseInt(f.demora_largada_min, 10) : null,
       portico: f.portico, estado: f.estado, actualizado_en: new Date().toISOString(),
@@ -205,10 +216,15 @@ export function EventoForm() {
             <label>Correo del organizador<input type="email" required value={f.organizador_email} onChange={set("organizador_email")} /></label>
             <label>Días de armado<input type="number" min={1} max={10} required value={f.armado_dias} onChange={set("armado_dias")} /></label>
             <label>Productora (su equipo ve el evento)
-              <select value={f.productora_id} onChange={set("productora_id")}>
-                <option value="">Sin productora</option>
+              <select required value={f.productora_id} onChange={set("productora_id")}>
+                <option value="" disabled>Elegí la productora…</option>
                 {productoras.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+                <option value="ninguna">Evento sin productora</option>
               </select>
+              <span className="chico" style={{ fontWeight: 400 }}>
+                {f.productora_id === "ninguna" ? "Lo ven solo el organizador, los accesos adicionales y EMERTEAM."
+                  : grupo ? `${grupo.total} ${grupo.total === 1 ? "persona" : "personas"} del equipo lo van a ver, ${grupo.alertas} ${grupo.alertas === 1 ? "recibe" : "reciben"} alertas.` : ""}
+              </span>
             </label>
             <label>Pórtico<select value={f.portico} onChange={set("portico")}><option value="estructural">Estructural</option><option value="inflable">Inflable</option></select></label>
             {f.disciplina === "running"

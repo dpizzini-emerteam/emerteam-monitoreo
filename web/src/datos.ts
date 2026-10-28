@@ -24,6 +24,7 @@ export type Evento = {
   armado_dias: number;
   cupo_equipo: number;
   productora_id?: string | null;
+  mon_productoras?: { nombre: string } | null;
   creado_en?: string;
   actualizado_en?: string;
   duracion_propia_min: number | null;

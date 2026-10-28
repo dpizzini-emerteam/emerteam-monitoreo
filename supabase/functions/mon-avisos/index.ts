@@ -1,4 +1,8 @@
 // EMERTEAM Monitoreo Ambiental · correos de aviso
+// Desde el 28/10/2026 EMERTEAM enciende otros avisos por productora o por evento (mon_avisos_config): rayos
+// detectados (por defecto encendido), viento, tormenta, calor, lluvia y disparadores probabilísticos, con nivel
+// mínimo. Los de pronóstico salen solo con confianza media o alta, dentro de las 48 h previas y con un máximo de
+// dos correos por evento por día; lo que excede el tope se acumula y sale en el correo siguiente.
 // Cada 5 minutos compara el estado de cada evento con el último avisado. Por decisión de EMERTEAM (21/10/2026)
 // solo se envía correo cuando el SMN emite, modifica o levanta una alerta o un aviso a corto plazo que toca alguna
 // fase del evento. Los demás cambios (subas de nivel del pronóstico, normalizaciones, rayos satelitales y
@@ -233,7 +237,36 @@ function adaptar(texto: string, d?: string | null): string {
 }
 type Nivel = { evento_id: string; fase: string; variable: string; desde: string; hasta: string; nivel: number; confianza: string | null };
 type Alerta = { id: string; evento_id: string; fenomeno: string; color: string; desde: string | null; hasta: string | null; estado: string; tipo: string; descripcion?: string | null; instruccion?: string | null };
-type Estado = { niveles: Record<string, number>; smn: string[]; glm: number; ens?: Record<string, string> };
+type Estado = { niveles: Record<string, number>; smn: string[]; glm: number; ens?: Record<string, string>; dia?: string; n_pron?: number; pend?: Cambio[] };
+type Config = { rayos: boolean; viento: boolean; viento_nivel: number; tormenta: boolean; calor: boolean; calor_nivel: number; lluvia: boolean; probabilistico: boolean };
+const CONFIG_BASE: Config = { rayos: true, viento: false, viento_nivel: 2, tormenta: false, calor: false, calor_nivel: 2, lluvia: false, probabilistico: false };
+const TEXTO_RAYOS = "Detección satelital de rayos (GOES-19 GLM) en los últimos 30 minutos. Sirve para anticipar, no para decidir. El satélite ubica cada descarga con un margen de 8 a 10 km y no registra todas, así que no recibir este aviso no significa que no haya actividad. Se recomienda decidir la suspensión y la reanudación con detectores de rayos en terreno y con el trueno audible. Se suspende ante actividad a 13 km o menos o apenas se escucha un trueno, y se reanuda después de 30 minutos sin actividad a esa distancia.";
+const TOPE_PRONOSTICO = 2; // correos de pronóstico por evento por día
+const HORIZONTE_AVISO_MS = 48 * 3600_000;
+const PRONOSTICO = new Set(["sube", "normaliza", "ens"]);
+
+/** La configuración pide correo para esta variable y este nivel */
+function avisaVariable(cfg: Config, variable: string, nivel: number): boolean {
+  if (variable.startsWith("viento_")) return cfg.viento && nivel >= cfg.viento_nivel;
+  if (variable === "calor_personal") return cfg.calor && nivel >= 2;
+  if (variable === "wbgt" || variable === "wbgt_wt" || variable === "wbgt_uci") return cfg.calor && nivel >= cfg.calor_nivel;
+  if (variable === "tormenta") return cfg.tormenta && nivel >= 1;
+  if (variable === "lluvia") return cfg.lluvia && nivel >= 1;
+  return false;
+}
+function correoPorCambio(c: Cambio, cfg: Config, ahora: number): boolean {
+  if (c.tipo === "smn_nueva" || c.tipo === "smn_levantada") return true;
+  if (c.tipo === "rayos") return cfg.rayos;
+  if (c.tipo === "ens") return cfg.probabilistico;
+  if (c.tipo === "sube") {
+    if (c.confianza === "baja") return false;
+    if (Date.parse(c.desde) - ahora > HORIZONTE_AVISO_MS) return false;
+    return avisaVariable(cfg, c.variable, c.ahora);
+  }
+  // Vuelve bajo el umbral: solo si antes se había avisado
+  if (c.tipo === "normaliza") return avisaVariable(cfg, c.variable, c.antes);
+  return false;
+}
 type EnsProb = { evento_id: string; corrida: string; variable: string; nivel: number; ventana: string; ventana_hasta: string; umbral: number | null; prob: number; miembros: number };
 type Cambio =
   | { tipo: "sube" | "normaliza"; fase: string; variable: string; antes: number; ahora: number; desde: string; confianza: string | null }
@@ -440,11 +473,11 @@ function armarCorreo(ev: Evento, cambios: Cambio[]): { asunto: string; html: str
         <div style="font:12px Arial,sans-serif;color:#666;margin-top:6px">Disparador por probabilidad (criterio interno EMERTEAM). Las alertas del SMN tienen prioridad sobre este aviso.</div></td></tr><tr><td style="height:10px"></td></tr>`);
       lineas.push(`${titulo}. ${detalle} ${accionTxt}`);
     } else if (c.tipo === "rayos") {
-      const accion = c.nivel >= 4 ? "Suspender la actividad al aire libre y evacuar a refugio" : c.nivel === 3 ? "Preparar la evacuación o demorar la largada" : "Alerta por tormenta eléctrica";
+      const accion = c.nivel >= 4 ? "Suspender la actividad al aire libre salvo que la detección en terreno descarte actividad cercana" : c.nivel === 3 ? "Preparar la evacuación o demorar la largada" : "Alerta por tormenta eléctrica";
       partes.push(`<tr><td style="padding:14px 18px;background:${COLOR[c.nivel]};border-left:5px solid #111">
         <div style="font:800 17px Arial,sans-serif;color:${c.nivel === 4 ? "#fff" : "#111"};text-transform:uppercase">Rayos a ${Math.round(c.km)} km · ${esc(accion)}</div>
-        <div style="font:13px Arial,sans-serif;color:${c.nivel === 4 ? "#fff" : "#111"};margin-top:4px">Satélite GOES-19 (GLM), últimos 30 minutos. Reanudar con 30 min sin actividad a menos de 13 km. Confirmar con detector y trueno en terreno.</div></td></tr><tr><td style="height:10px"></td></tr>`);
-      lineas.push(`Rayos a ${Math.round(c.km)} km: ${accion}.`);
+        <div style="font:13px Arial,sans-serif;color:${c.nivel === 4 ? "#fff" : "#111"};margin-top:4px">${esc(TEXTO_RAYOS)}</div></td></tr><tr><td style="height:10px"></td></tr>`);
+      lineas.push(`Rayos a ${Math.round(c.km)} km. ${accion}. ${TEXTO_RAYOS}`);
     }
   }
   const primero = cambios[0];
@@ -596,7 +629,7 @@ Deno.serve(async (req) => {
   const ids = eventos.map((e) => e.id);
 
   const prods = [...new Set(eventos.map((e) => e.productora_id).filter(Boolean))] as string[];
-  const [{ data: nivs }, { data: alts }, { data: rays }, { data: estados }, { data: accesos }, { data: equipo }, { data: cred }, { data: grupo }] = await Promise.all([
+  const [{ data: nivs }, { data: alts }, { data: rays }, { data: estados }, { data: accesos }, { data: equipo }, { data: cred }, { data: grupo }, { data: cfgs }] = await Promise.all([
     supabase.from("mon_niveles").select("evento_id,fase,variable,desde,hasta,nivel,confianza").in("evento_id", ids)
       .gt("hasta", new Date(ahora).toISOString()).lte("desde", new Date(ahora + HORIZONTE_MS).toISOString()).limit(20000),
     supabase.from("mon_alertas_smn").select("id,evento_id,fenomeno,color,desde,hasta,estado,tipo,descripcion,instruccion").in("evento_id", ids),
@@ -608,7 +641,10 @@ Deno.serve(async (req) => {
     prods.length
       ? supabase.from("mon_productora_miembros").select("productora_id,email").in("productora_id", prods).eq("recibe_alertas", true)
       : Promise.resolve({ data: [] as { productora_id: string; email: string }[] }),
+    supabase.from("mon_avisos_config").select("*"),
   ]);
+  const cfgEvento = new Map(((cfgs ?? []) as (Config & { evento_id: string | null; productora_id: string | null })[]).filter((c) => c.evento_id).map((c) => [c.evento_id!, c]));
+  const cfgProd = new Map(((cfgs ?? []) as (Config & { evento_id: string | null; productora_id: string | null })[]).filter((c) => c.productora_id).map((c) => [c.productora_id!, c]));
   const { data: ens } = await supabase.from("mon_ens_prob").select("evento_id,corrida,variable,nivel,ventana,ventana_hasta,umbral,prob,miembros")
     .in("evento_id", ids).eq("modelo", "mezcla").gte("corrida", new Date(ahora - 3 * 86400_000).toISOString()).limit(20000);
   const smtp = cred as { usuario: string | null; clave: string | null; remitente: string } | null;
@@ -692,15 +728,35 @@ Deno.serve(async (req) => {
           if (a && enFases(a, ev, ahora)) cambios.push({ tipo: "smn_levantada", alerta: a });
         }
       }
-      if (glm >= 2 && glm > (previo.glm ?? 0) && km != null) cambios.push({ tipo: "rayos", nivel: glm, km });
+      const enVentana = enFases({ desde: new Date(ahora).toISOString(), hasta: new Date(ahora).toISOString() }, ev, ahora);
+      if (enVentana && glm >= 2 && glm > (previo.glm ?? 0) && km != null) cambios.push({ tipo: "rayos", nivel: glm, km });
     }
     // Orden: rayos y SMN primero, después subas de mayor nivel, al final normalizaciones
     const peso = (c: Cambio) => c.tipo === "rayos" ? 100 : c.tipo === "smn_nueva" ? 90 : c.tipo === "sube" ? 10 * c.ahora
       : c.tipo === "ens" ? (c.accion === "activar" ? 8 : 4) + c.nivel / 10 : c.tipo === "smn_levantada" ? 5 : 1;
     cambios.sort((a, b) => peso(b) - peso(a));
-    // Solo alertas y avisos a corto plazo oficiales del SMN generan correo
-    const CORREO = new Set(["smn_nueva", "smn_levantada"]);
-    const enviar = cambios.filter((c) => CORREO.has(c.tipo));
+    // Correo: SMN siempre; el resto según el tablero de EMERTEAM (evento, si no la productora, si no la base)
+    const cfg: Config = { ...CONFIG_BASE, ...(cfgEvento.get(ev.id) ?? (ev.productora_id ? cfgProd.get(ev.productora_id) : undefined) ?? {}) };
+    const hoy = diaAR(new Date(ahora).toISOString());
+    const nPron = previo?.dia === hoy ? previo.n_pron ?? 0 : 0;
+    const claveCambio = (c: Cambio) => c.tipo === "sube" || c.tipo === "normaliza" ? `${c.fase}|${c.variable}` : c.tipo === "ens" ? `ens|${c.ventana}|${c.variable}` : c.tipo;
+    // Pendientes por tope: se reemplazan por el cambio más reciente de la misma variable y se descartan los que ya
+    // no aplican (una suba que volvió a cero)
+    const pend = new Map<string, Cambio>();
+    for (const c of previo?.pend ?? []) pend.set(claveCambio(c), c);
+    const elegidos = cambios.filter((c) => correoPorCambio(c, cfg, ahora));
+    for (const c of elegidos.filter((x) => PRONOSTICO.has(x.tipo))) pend.set(claveCambio(c), c);
+    for (const [k, c] of pend) {
+      if (c.tipo === "sube" && (niveles[k] ?? 0) === 0) pend.delete(k);
+      if (c.tipo === "normaliza" && (niveles[k] ?? 0) > 0) pend.delete(k);
+    }
+    const urgentes = elegidos.filter((c) => !PRONOSTICO.has(c.tipo));
+    // pend solo tiene contenido si hubo cambios de pronóstico nuevos o quedaron acumulados por el tope
+    const incluyePron = pend.size > 0 && nPron < TOPE_PRONOSTICO;
+    const enviar = [...urgentes, ...(incluyePron ? [...pend.values()] : [])].sort((a, b) => peso(b) - peso(a));
+    actual.dia = hoy;
+    actual.n_pron = nPron + (incluyePron ? 1 : 0);
+    actual.pend = incluyePron ? [] : [...pend.values()];
 
     let enviados = 0;
     let avanzar = true;

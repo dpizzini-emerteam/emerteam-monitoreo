@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
 import type { Ctx } from "../main";
 import { Barra } from "../componentes/Barra";
+import { AvisosTablero } from "../componentes/AvisosTablero";
 import { fmtDia, fmtFechaHora, fmtHora, supabase, type Evento, type Miembro, type Productora, type RegistroAcceso } from "../datos";
 
 const VACIO = { nombre: "", apellido: "", email: "", rol: "", recibe_alertas: true, responsable: false };
@@ -244,6 +245,8 @@ export function ProductoraDetalle() {
             <button className="boton">Guardar</button>
           </form>
         )}
+
+        {admin && <AvisosTablero productoraId={prod.id} editor={editor} miEmail={miEmail} />}
 
         <section className="tarjeta">
           <div className="rotulo">Eventos de {prod.nombre}</div>
