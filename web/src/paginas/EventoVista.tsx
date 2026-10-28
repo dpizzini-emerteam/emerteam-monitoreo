@@ -4,6 +4,7 @@ import type { Ctx } from "../main";
 import { Barra } from "../componentes/Barra";
 import { CONDICION, Icono, iconoTiempo, type TipoIcono } from "../componentes/Icono";
 import { Accesos } from "../componentes/Accesos";
+import { AvisosTablero } from "../componentes/AvisosTablero";
 import { Comunicacion } from "../componentes/Comunicacion";
 import { TiraDias } from "../componentes/TiraDias";
 import { Guia } from "../componentes/Guia";
@@ -68,7 +69,7 @@ export function EventoVista() {
   const cargar = useCallback(async () => {
     if (!id) return;
     const [e, p, n, a, r, inf, sg, u] = await Promise.all([
-      supabase.from("mon_eventos").select("*, mon_modalidades(*)").eq("id", id).single(),
+      supabase.from("mon_eventos").select("*, mon_modalidades(*), mon_productoras(nombre)").eq("id", id).single(),
       supabase.from("mon_pronosticos").select("*").eq("evento_id", id).order("valido").limit(5000),
       supabase.from("mon_niveles").select("*").eq("evento_id", id).order("desde").limit(5000),
       supabase.from("mon_alertas_smn").select("*").eq("evento_id", id).neq("estado", "levantada"),
@@ -309,7 +310,8 @@ export function EventoVista() {
         )}
         {actual === "equipo" && (
           <>
-            <Accesos eventoId={ev.id} eventoNombre={ev.nombre} cupo={ev.cupo_equipo ?? 3} puedeGestionar={editor || ev.organizador_email.toLowerCase() === miEmail} esEditor={editor} miEmail={miEmail} />
+            <Accesos eventoId={ev.id} productoraId={ev.productora_id} esEditor={editor} esAdmin={admin} miEmail={miEmail} />
+            <AvisosTablero eventoId={ev.id} productoraDelEvento={ev.productora_id} productoraNombre={ev.mon_productoras?.nombre ?? null} editor={editor} miEmail={miEmail} />
             <DatosVigentes ultimaCorrida={ultimaCorrida} procesado={procesado} ajuste={sesgos.find((x) => x.aplicado)} />
             <AjusteLocal ev={ev} sesgos={sesgos} pron={pron} />
             <section className="seccion tarjeta" id="fuentes">

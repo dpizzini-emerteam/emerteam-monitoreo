@@ -8,6 +8,7 @@ import { Login } from "./paginas/Login";
 import { Eventos } from "./paginas/Eventos";
 import { EventoVista } from "./paginas/EventoVista";
 import { Equipo } from "./paginas/Equipo";
+import { ProductoraDetalle, Productoras } from "./paginas/Productoras";
 import { Comando } from "./paginas/Comando";
 import { Informe } from "./paginas/Informe";
 import { GuiaPagina } from "./paginas/GuiaPagina";
@@ -121,6 +122,8 @@ const crearRouter = () => createHashRouter([
       { path: "evento/:id/informe", element: <Informe /> },
       { path: "evento/:id/:pestana?", element: <EventoVista /> },
       { path: "equipo", element: <Equipo /> },
+      { path: "productoras", element: <Productoras /> },
+      { path: "productora/:id", element: <ProductoraDetalle /> },
       { path: "guia", element: <GuiaPagina /> },
       { path: "*", element: <Navigate to="/" replace /> },
     ],

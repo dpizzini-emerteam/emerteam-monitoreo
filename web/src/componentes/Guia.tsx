@@ -302,7 +302,7 @@ export function Guia({ ctx }: { ctx: Contexto }) {
       </Seccion>
 
       <Seccion id="g-smn" titulo="Alertas del SMN" icono="alerta" organizador={
-        <p>Las alertas y avisos del <b>Servicio Meteorológico Nacional</b> son la información oficial y <b>tienen prioridad sobre el pronóstico de esta web</b>. Aparecen arriba de todo, con sonido, y son lo único que genera un correo a quienes reciben alertas. Cada aviso indica a qué fase afecta, qué anuncia el SMN, qué le recomienda el SMN a la población y la <b>decisión sugerida para el evento</b> según el color.</p>
+        <p>Las alertas y avisos del <b>Servicio Meteorológico Nacional</b> son la información oficial y <b>tienen prioridad sobre el pronóstico de esta web</b>. Aparecen arriba de todo, con sonido, y siempre generan un correo a quienes reciben alertas. Además, EMERTEAM puede activar para cada productora o evento los avisos por rayos detectados, viento, tormenta, calor, lluvia y disparadores probabilísticos, con un máximo de dos correos de pronóstico por evento por día. Cada aviso indica a qué fase afecta, qué anuncia el SMN, qué le recomienda el SMN a la población y la <b>decisión sugerida para el evento</b> según el color.</p>
       }>
         {ctx && (ctx.alertas.length
           ? <p className="guia-ahora">En este evento: {ctx.alertas.length === 1 ? "hay una alerta vigente" : `hay ${ctx.alertas.length} alertas vigentes`} del SMN.</p>

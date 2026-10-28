@@ -23,6 +23,8 @@ export type Evento = {
   participantes: number;
   armado_dias: number;
   cupo_equipo: number;
+  productora_id?: string | null;
+  mon_productoras?: { nombre: string } | null;
   creado_en?: string;
   actualizado_en?: string;
   duracion_propia_min: number | null;
@@ -143,6 +145,34 @@ export type Acceso = {
   apellido: string;
   rol: string | null;
   recibe_alertas: boolean;
+  habilitado_por?: string | null;
+  creado_en?: string;
+  aviso_alta_en?: string | null;
+};
+
+export type Productora = { id: string; nombre: string; cupo: number; creado_en?: string };
+export type Miembro = {
+  id: string;
+  productora_id: string;
+  email: string;
+  nombre: string;
+  apellido: string;
+  rol: string | null;
+  responsable: boolean;
+  recibe_alertas: boolean;
+  habilitado_por: string | null;
+  creado_en: string;
+  aviso_alta_en: string | null;
+};
+export type RegistroAcceso = {
+  id: number;
+  productora_id: string | null;
+  evento_id: string | null;
+  accion: "alta" | "baja" | "responsable" | "deja_responsable" | "alertas_si" | "alertas_no" | "cupo";
+  email: string | null;
+  detalle: string | null;
+  por: string | null;
+  en: string;
 };
 
 export type RolEquipo = "editor" | "lector";
