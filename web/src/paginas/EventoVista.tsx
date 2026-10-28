@@ -309,7 +309,7 @@ export function EventoVista() {
         )}
         {actual === "equipo" && (
           <>
-            <Accesos eventoId={ev.id} eventoNombre={ev.nombre} cupo={ev.cupo_equipo ?? 3} puedeGestionar={editor || ev.organizador_email.toLowerCase() === miEmail} esEditor={editor} miEmail={miEmail} />
+            <Accesos eventoId={ev.id} productoraId={ev.productora_id} esEditor={editor} esAdmin={admin} miEmail={miEmail} />
             <DatosVigentes ultimaCorrida={ultimaCorrida} procesado={procesado} ajuste={sesgos.find((x) => x.aplicado)} />
             <AjusteLocal ev={ev} sesgos={sesgos} pron={pron} />
             <section className="seccion tarjeta" id="fuentes">

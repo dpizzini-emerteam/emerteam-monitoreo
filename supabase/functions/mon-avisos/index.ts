@@ -116,7 +116,7 @@ const CALOR_AGUAS_ABIERTAS = [
 ];
 
 type Evento = {
-  id: string; nombre: string; largada: string; organizador_email: string; disciplina?: string | null;
+  id: string; nombre: string; largada: string; organizador_email: string; disciplina?: string | null; productora_id?: string | null;
   armado_dias: number; participantes: number | null; duracion_propia_min: number | null; demora_largada_min: number | null;
   mon_modalidades: { distancia_km: number; largada: string | null }[] | null;
 };
@@ -480,22 +480,123 @@ function armarCorreo(ev: Evento, cambios: Cambio[]): { asunto: string; html: str
   return { asunto, html, texto };
 }
 
+// Correo de acceso para cada alta en un grupo de productora o en un evento puntual. Se envía una sola vez
+// (aviso_alta_en); sin credencial queda pendiente. Solo altas de los últimos 7 días, para no avisar tarde.
+type AltaGrupo = { id: string; email: string; nombre: string; recibe_alertas: boolean; responsable: boolean; mon_productoras: { id: string; nombre: string } | null };
+type AltaEvento = { id: string; email: string; nombre: string; recibe_alertas: boolean; mon_eventos: { id: string; nombre: string; largada: string } | null };
+
+function correoAcceso(titulo: string, nombre: string, cuerpo: string[], recibeAlertas: boolean): { html: string; texto: string } {
+  const pasos = `Para entrar, abrí ${WEB}, escribí este correo y tocá el enlace que te llega. No hace falta contraseña.`;
+  const alertas = recibeAlertas
+    ? "Vas a recibir por correo las alertas y los avisos a corto plazo del SMN que toquen el armado, la carrera o el desarme. Los cambios del pronóstico se consultan en la web."
+    : "No vas a recibir correos de alertas; podés activarlos desde la web.";
+  const html = `<!doctype html><html><body style="margin:0;background:#f2f1ef">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f2f1ef"><tr><td align="center" style="padding:20px 10px">
+  <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff">
+    <tr><td style="background:#111111;padding:16px 22px;border-bottom:4px solid #FF6A1A">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td style="width:160px;padding-right:16px;border-right:1px solid #3a3a3a;vertical-align:middle">
+          <img src="${WEB}/logo-correo.png" width="160" height="56" alt="EMERTEAM" style="display:block;width:160px;max-width:160px;height:auto;border:0;color:#FF6A1A;font:800 16px Arial,sans-serif"></td>
+        <td style="padding-left:16px;vertical-align:middle">
+          <div style="font:800 12px Arial,sans-serif;letter-spacing:.12em;color:#FF6A1A;text-transform:uppercase">Monitoreo ambiental · acceso habilitado</div>
+          <div style="font:800 21px Arial,sans-serif;color:#ffffff;text-transform:uppercase;margin-top:3px">${esc(titulo)}</div></td>
+      </tr></table></td></tr>
+    <tr><td style="padding:18px 22px;font:15px/1.55 Arial,sans-serif;color:#222">
+      <p style="margin:0 0 10px">Hola${nombre ? ` ${esc(nombre)}` : ""}:</p>
+      ${cuerpo.map((t) => `<p style="margin:0 0 10px">${esc(t)}</p>`).join("")}
+      <p style="margin:0 0 10px">${esc(alertas)}</p>
+      <p style="margin:0 0 14px">${esc(pasos)}</p>
+      <a href="${WEB}" style="display:inline-block;background:#FF6A1A;color:#111;font:700 15px Arial,sans-serif;text-decoration:none;padding:11px 18px;border-radius:6px">Entrar al monitoreo</a>
+      <p style="font:12px/1.5 Arial,sans-serif;color:#666;margin:16px 0 0">Si no esperabas este acceso, respondé a este correo o escribí a info@emerteam.com.ar.</p></td></tr>
+    <tr><td style="background:#111111;color:#cfcfcf;font:12px Arial,sans-serif;padding:10px 22px;border-top:3px solid #FF6A1A">EMERTEAM | Sports Risks &amp; Emergency Management</td></tr>
+  </table></td></tr></table></body></html>`;
+  const texto = `${titulo}\n\nHola${nombre ? ` ${nombre}` : ""}:\n\n${cuerpo.join("\n\n")}\n\n${alertas}\n\n${pasos}\n\nEMERTEAM | Sports Risks & Emergency Management`;
+  return { html, texto };
+}
+
+async function avisarAccesos(ahora: number): Promise<Record<string, unknown>> {
+  const desde = new Date(ahora - 7 * 86400_000).toISOString();
+  const [{ data: grupo, error: eG }, { data: puntuales, error: eE }] = await Promise.all([
+    supabase.from("mon_productora_miembros").select("id,email,nombre,recibe_alertas,responsable,mon_productoras(id,nombre)")
+      .is("aviso_alta_en", null).gte("creado_en", desde).limit(200),
+    supabase.from("mon_accesos").select("id,email,nombre,recibe_alertas,mon_eventos(id,nombre,largada)")
+      .is("aviso_alta_en", null).gte("creado_en", desde).limit(200),
+  ]);
+  if (eG || eE) return { error: (eG ?? eE)!.message };
+  const altasG = (grupo ?? []) as unknown as AltaGrupo[];
+  const altasE = (puntuales ?? []) as unknown as AltaEvento[];
+  if (!altasG.length && !altasE.length) return { pendientes: 0 };
+  const { data: cred } = await supabase.rpc("mon_credencial_smtp");
+  const smtp = cred as { usuario: string | null; clave: string | null; remitente: string } | null;
+  if (!smtp?.usuario || !smtp?.clave) return { pendientes: altasG.length + altasE.length, credencial: false };
+
+  // Próximos eventos de cada productora, para nombrarlos en el correo
+  const prods = [...new Set(altasG.map((a) => a.mon_productoras?.id).filter(Boolean))] as string[];
+  const { data: evs } = prods.length
+    ? await supabase.from("mon_eventos").select("productora_id,nombre,largada").in("productora_id", prods).eq("estado", "activo")
+        .gte("largada", new Date(ahora - 86400_000).toISOString()).order("largada")
+    : { data: [] as { productora_id: string; nombre: string; largada: string }[] };
+
+  const cliente = nodemailer.createTransport({ host: "smtp.gmail.com", port: 465, secure: true, pool: true, maxConnections: 1, auth: { user: smtp.usuario, pass: smtp.clave } });
+  const registros: Record<string, unknown>[] = [];
+  let enviados = 0;
+  const enviar = async (tabla: string, id: string, to: string, asunto: string, c: { html: string; texto: string }, eventoId: string | null) => {
+    let estado = "enviado";
+    let error: string | null = null;
+    try {
+      await cliente.sendMail({ from: { name: "EMERTEAM Monitoreo", address: smtp.remitente }, to, subject: asunto, text: c.texto, html: c.html });
+      enviados++;
+      await supabase.from(tabla).update({ aviso_alta_en: new Date().toISOString() }).eq("id", id);
+    } catch (e) {
+      estado = "error";
+      error = String(e).slice(0, 500);
+    }
+    registros.push({ evento_id: eventoId, tipo: "acceso", destinatario: to, asunto, estado, error, detalle: { tabla, id } });
+  };
+
+  for (const a of altasG) {
+    const prod = a.mon_productoras;
+    if (!prod) continue;
+    const proximos = ((evs ?? []) as { productora_id: string; nombre: string; largada: string }[]).filter((e) => e.productora_id === prod.id);
+    const cuerpo = [
+      `Se habilitó tu acceso al monitoreo ambiental de EMERTEAM como integrante del equipo de ${prod.nombre}. Vas a ver todos los eventos de ${prod.nombre}, incluidos los que se carguen más adelante.`,
+      proximos.length ? `Eventos activos: ${proximos.map((e) => `${e.nombre} (${fmtLargo(e.largada)})`).join("; ")}.` : "Todavía no hay eventos activos cargados; aparecen solos cuando EMERTEAM los carga.",
+    ];
+    if (a.responsable) cuerpo.push(`Sos responsable del equipo de ${prod.nombre}: desde la web podés sumar y quitar integrantes dentro del cupo.`);
+    await enviar("mon_productora_miembros", a.id, a.email, `${prod.nombre} · Acceso al monitoreo ambiental`, correoAcceso(prod.nombre, a.nombre, cuerpo, a.recibe_alertas), null);
+  }
+  for (const a of altasE) {
+    const ev = a.mon_eventos;
+    if (!ev) continue;
+    const cuerpo = [`EMERTEAM habilitó tu acceso al monitoreo ambiental de ${ev.nombre}, con largada el ${fmtLargo(ev.largada)}.`];
+    await enviar("mon_accesos", a.id, a.email, `${ev.nombre} · Acceso al monitoreo ambiental`, correoAcceso(ev.nombre, a.nombre, cuerpo, a.recibe_alertas), ev.id);
+  }
+  try { cliente.close(); } catch { /* conexión ya cerrada */ }
+  if (registros.length) {
+    const { error } = await supabase.from("mon_envios").insert(registros);
+    if (error) console.error("mon_envios acceso", error.message);
+  }
+  return { enviados, intentos: registros.length };
+}
+
 Deno.serve(async (req) => {
   const clave = req.headers.get("x-mon-cron") ?? "";
   const { data: ok } = clave ? await supabase.rpc("mon_validar_cron", { clave }) : { data: false };
   if (!ok) return json({ error: "no autorizado" }, 401);
   const ahora = Date.now();
   const prueba = new URL(req.url).searchParams.get("prueba") === "1"; // calcula sin enviar ni guardar estado
+  const accesosNuevos = prueba ? null : await avisarAccesos(ahora);
 
-  const { data: evs } = await supabase.from("mon_eventos").select("id,nombre,largada,organizador_email,disciplina,armado_dias,participantes,duracion_propia_min,demora_largada_min,mon_modalidades(distancia_km,largada)")
+  const { data: evs } = await supabase.from("mon_eventos").select("id,nombre,largada,organizador_email,disciplina,productora_id,armado_dias,participantes,duracion_propia_min,demora_largada_min,mon_modalidades(distancia_km,largada)")
     .eq("estado", "activo")
     .gte("largada", new Date(ahora - 2 * 86400_000).toISOString())
     .lte("largada", new Date(ahora + 16 * 86400_000).toISOString());
   const eventos = (evs ?? []) as Evento[];
-  if (!eventos.length) return json({ ok: true, eventos: 0 });
+  if (!eventos.length) return json({ ok: true, eventos: 0, accesos: accesosNuevos });
   const ids = eventos.map((e) => e.id);
 
-  const [{ data: nivs }, { data: alts }, { data: rays }, { data: estados }, { data: accesos }, { data: equipo }, { data: cred }] = await Promise.all([
+  const prods = [...new Set(eventos.map((e) => e.productora_id).filter(Boolean))] as string[];
+  const [{ data: nivs }, { data: alts }, { data: rays }, { data: estados }, { data: accesos }, { data: equipo }, { data: cred }, { data: grupo }] = await Promise.all([
     supabase.from("mon_niveles").select("evento_id,fase,variable,desde,hasta,nivel,confianza").in("evento_id", ids)
       .gt("hasta", new Date(ahora).toISOString()).lte("desde", new Date(ahora + HORIZONTE_MS).toISOString()).limit(20000),
     supabase.from("mon_alertas_smn").select("id,evento_id,fenomeno,color,desde,hasta,estado,tipo,descripcion,instruccion").in("evento_id", ids),
@@ -504,6 +605,9 @@ Deno.serve(async (req) => {
     supabase.from("mon_accesos").select("evento_id,email").in("evento_id", ids).eq("recibe_alertas", true),
     supabase.from("mon_admins").select("email").eq("rol", "editor"),
     supabase.rpc("mon_credencial_smtp"),
+    prods.length
+      ? supabase.from("mon_productora_miembros").select("productora_id,email").in("productora_id", prods).eq("recibe_alertas", true)
+      : Promise.resolve({ data: [] as { productora_id: string; email: string }[] }),
   ]);
   const { data: ens } = await supabase.from("mon_ens_prob").select("evento_id,corrida,variable,nivel,ventana,ventana_hasta,umbral,prob,miembros")
     .in("evento_id", ids).eq("modelo", "mezcla").gte("corrida", new Date(ahora - 3 * 86400_000).toISOString()).limit(20000);
@@ -605,6 +709,7 @@ Deno.serve(async (req) => {
       avanzar = false;
     } else if (enviar.length && !prueba) {
       const destinatarios = [...new Set([ev.organizador_email, ...((accesos ?? []).filter((a) => a.evento_id === ev.id).map((a) => a.email as string)),
+        ...((grupo ?? []).filter((m) => ev.productora_id && m.productora_id === ev.productora_id).map((m) => m.email as string)),
         ...((equipo ?? []).map((e) => e.email as string))].map((e) => e.trim().toLowerCase()).filter(Boolean))];
       const correo = armarCorreo(ev, enviar);
       const registros: Record<string, unknown>[] = [];
@@ -639,5 +744,5 @@ Deno.serve(async (req) => {
     }
     resultado.push({ evento: ev.nombre, cambios: cambios.length, con_correo: enviar.length, enviados, primera_vez: !previo, pendientes: !avanzar, ...(prueba && enviar.length ? { asunto: armarCorreo(ev, enviar).asunto } : {}) });
   }
-  return json({ ok: true, credencial: puedeEnviar, resultado });
+  return json({ ok: true, credencial: puedeEnviar, resultado, accesos: accesosNuevos });
 });

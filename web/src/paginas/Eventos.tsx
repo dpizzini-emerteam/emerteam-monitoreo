@@ -17,6 +17,12 @@ export function Eventos() {
   const [resumen, setResumen] = useState<Resumen>({});
   const [cubiertas, setCubiertas] = useState<Record<string, Set<string>>>({}); // evento -> fases con pronóstico
   const [verCerrados, setVerCerrados] = useState(false);
+  const [enGrupo, setEnGrupo] = useState(false); // integra el equipo de alguna productora
+
+  useEffect(() => {
+    if (admin) return;
+    supabase.from("mon_productoras").select("id", { count: "exact", head: true }).then(({ count }) => setEnGrupo((count ?? 0) > 0));
+  }, [admin]);
 
   useEffect(() => {
     (async () => {
@@ -56,6 +62,11 @@ export function Eventos() {
     <>
       <Barra titulo={admin ? "Administración" : "Mis eventos"} subtitulo={session.user.email ?? ""}>
         <Link className="boton-osc" to="/guia">Guía</Link>
+        {(admin || enGrupo) && (
+          <Link className="boton-osc" to="/productoras">
+            {admin ? "Productoras" : "Mi equipo"}
+          </Link>
+        )}
         {admin && (
           <Link className="boton-osc" to="/equipo">
             Equipo EMERTEAM
@@ -82,7 +93,7 @@ export function Eventos() {
               ? "No hay eventos cargados. Usá “Nuevo evento” para activar el monitoreo."
               : admin
               ? "No hay eventos cargados."
-              : "Todavía no tenés eventos asignados. Si esperabas ver uno, pedile a EMERTEAM que asocie tu correo al evento."}
+              : "Todavía no tenés eventos asignados. Si esperabas ver uno, pedile al responsable de tu productora o a EMERTEAM que te sume al equipo."}
           </div>
         )}
         {Object.entries(porDia).map(([dia, evs]) => (
