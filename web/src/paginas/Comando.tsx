@@ -87,26 +87,41 @@ export function Comando() {
     : t <= v.desarme[1].getTime() ? "Desarme" : "Finalizado";
   const reloj = `Hora ${new Intl.DateTimeFormat("es-AR", { timeZone: "America/Argentina/Buenos_Aires", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(t))}`;
 
-  // Hora actual del pronóstico y próximas 6 horas
-  const horas = [...serie.entries()].filter(([h]) => h >= t - 3600_000).slice(0, 7);
-  const actualP = horas[0]?.[1];
+  // Antes de la exposición del día de carrera, el dashboard muestra el pronóstico de la carrera (no el del armado).
+  // Desde la exposición en adelante, lo que pasa ahora: mediciones, rayos en tiempo real y próximas horas.
+  const previa = t < v.exposicion[0].getTime();
+  const H = 3600_000;
+  const todas = [...serie.entries()];
+  const ventana = todas.filter(([h]) => h + H > v.exposicion[0].getTime() && h < v.exposicion[1].getTime());
+  const horas = previa ? ventana.slice(0, 7) : todas.filter(([h]) => h >= t - H).slice(0, 7);
+  // Tarjeta de condiciones: en la previa, la hora más cercana a la largada; si no, la hora actual
+  const refFila = previa
+    ? ventana.reduce<(typeof ventana)[number] | undefined>((m, x) => (!m || Math.abs(x[0] - v.largada.getTime()) < Math.abs(m[0] - v.largada.getTime()) ? x : m), undefined)
+    : horas[0];
+  const actualP = refFila?.[1];
+  const maxEn = (k: "wbgt_est" | "rafaga10") => ventana.reduce<{ v: number; h: number } | null>((m, [h, p]) => (p[k] != null && (!m || Number(p[k]) > m.v) ? { v: Number(p[k]), h } : m), null);
+  const wMax = previa ? maxEn("wbgt_est") : null;
+  const rMax = previa ? maxEn("rafaga10") : null;
 
-  // Medición vigente: reemplaza al estimado
-  const medW = meds.find((m) => m.wbgt != null && t - new Date(m.tomada_en).getTime() < VIGENCIA_MEDICION);
-  const medV = meds.find((m) => m.rafaga != null && t - new Date(m.tomada_en).getTime() < VIGENCIA_MEDICION);
-  const medR = meds.find((m) => nivelRayoMedido(m) != null && t - new Date(m.tomada_en).getTime() < VIGENCIA_RAYO);
-  const wbgt = medW?.wbgt ?? actualP?.wbgt_est ?? null;
+  // Medición vigente: reemplaza al estimado (solo desde la exposición del día de carrera)
+  const medW = previa ? undefined : meds.find((m) => m.wbgt != null && t - new Date(m.tomada_en).getTime() < VIGENCIA_MEDICION);
+  const medV = previa ? undefined : meds.find((m) => m.rafaga != null && t - new Date(m.tomada_en).getTime() < VIGENCIA_MEDICION);
+  const medR = previa ? undefined : meds.find((m) => nivelRayoMedido(m) != null && t - new Date(m.tomada_en).getTime() < VIGENCIA_RAYO);
+  const wbgt = previa ? wMax?.v ?? null : medW?.wbgt ?? actualP?.wbgt_est ?? null;
   const escala = escalaCalor(ev.disciplina);
   const nW = escala.nivel(wbgt);
   const conf = confDisciplina(ev.disciplina);
   const medA = conf.agua ? meds.find((m) => m.agua_temp != null) : undefined;
   const agua = medA ? (ev.disciplina === "triatlon" ? evaluarAguaTriatlon(Number(medA.agua_temp), medA.temp != null ? Number(medA.temp) : null, ev.natacion_m ?? null) : evaluarAguaAbierta(Number(medA.agua_temp))) : null;
   const stAhora = conf.wct ? wct(actualP?.t2m, actualP?.viento10) : null;
-  const rafaga = medV?.rafaga ?? actualP?.rafaga10 ?? null;
-  const nivelesAhora = niveles.filter((n) => new Date(n.desde).getTime() <= t && new Date(n.hasta).getTime() > t);
+  const rafaga = previa ? rMax?.v ?? null : medV?.rafaga ?? actualP?.rafaga10 ?? null;
+  // Niveles que rigen la pantalla: en la previa, los del día de carrera (carrera y personal); después, los vigentes ahora
+  const nivelesAhora = previa
+    ? niveles.filter((n) => (n.fase === "carrera" || n.fase === "personal") && new Date(n.hasta).getTime() > t)
+    : niveles.filter((n) => new Date(n.desde).getTime() <= t && new Date(n.hasta).getTime() > t);
   const tormentaPron = Math.max(0, ...nivelesAhora.filter((n) => n.variable === "tormenta").map((n) => n.nivel));
   const nMed = medR ? nivelRayoMedido(medR) ?? 0 : null;
-  const glm = estadoRayosGLM(rayos, t);
+  const glm = estadoRayosGLM(previa ? [] : rayos, t);
   // Manda la fuente más conservadora entre detector/trueno en terreno y satélite
   const nR = nMed == null && glm.cantidad === 0 ? null : Math.max(nMed ?? 0, glm.nivel);
   const fuenteR = nMed != null && nMed >= glm.nivel ? "Detector en terreno" : "Satélite GLM";
@@ -127,9 +142,11 @@ export function Comando() {
 
   // Hora de las tarjetas por hora: en qué tramo del evento cae
   const tramo = (h: number): { txt: string; tipo: "" | "exp" | "uc" } => {
-    if (h < v.finUltimoCuarto.getTime() && h + 3600_000 > v.inicioUltimoCuarto.getTime()) return { txt: "Último cuarto", tipo: "uc" };
-    if (h <= v.largada.getTime() && h + 3600_000 > v.largada.getTime()) return { txt: "Largada", tipo: "exp" };
-    if (h > v.largada.getTime() && h < v.finCarrera.getTime()) return { txt: "Carrera", tipo: "exp" };
+    const L = v.largada.getTime();
+    if (h >= v.inicioUltimoCuarto.getTime() && h <= v.finUltimoCuarto.getTime()) return { txt: "Último cuarto", tipo: "uc" };
+    if (h <= L && L - h < 3600_000) return { txt: "Largada", tipo: "exp" };
+    if (h > L && h < v.finCarrera.getTime()) return { txt: "Carrera", tipo: "exp" };
+    if (h >= v.exposicion[0].getTime() && h < L) return { txt: "Convocatoria", tipo: "" };
     return { txt: "", tipo: "" };
   };
   const vientoPeor = nivelesAhora.filter((n) => n.variable.startsWith("viento_")).sort((a, b) => b.nivel - a.nivel)[0];
@@ -137,7 +154,7 @@ export function Comando() {
   const iconoAhora = actualP ? iconoTiempo(actualP, (actualP.radiacion ?? 0) < 5) : null;
   // Rayo más cercano informado (detector, trueno o satélite) para la barra de distancias
   const kmRayo = medR?.trueno ? 5 : medR?.rayo_km != null ? Number(medR.rayo_km) : glm.cantidad > 0 && glm.km != null ? glm.km : null;
-  const accionesVisibles = acciones.slice(0, meds.length ? 3 : 4);
+  const accionesVisibles = acciones.slice(0, meds.length && !previa ? 3 : 4);
 
   return (
     <div className="comando">
@@ -148,7 +165,7 @@ export function Comando() {
         </div>
         <div className="cmd-fase">
           <div>{fase}</div>
-          <span>{reloj}</span>
+          <span>{reloj}{previa ? " · vista del día de carrera" : ""}</span>
         </div>
         <div className="cmd-reloj">
           <Cuenta largada={v.largada.getTime()} fin={v.finCarrera.getTime()} />
@@ -169,7 +186,7 @@ export function Comando() {
 
       <section className="cmd-grilla">
         <div className="cmd-celda">
-          <div className="cmd-celda-cab"><Icono tipo="termometro" size={30} /><span className="cmd-rot">WBGT {medW ? "medido" : "estimado"}</span></div>
+          <div className="cmd-celda-cab"><Icono tipo="termometro" size={30} /><span className="cmd-rot">{previa ? "WBGT máximo · carrera" : `WBGT ${medW ? "medido" : "estimado"}`}</span></div>
           <div className="cmd-valor">{num(wbgt, 1)}<small>°C</small></div>
           {nW == null ? <span className="badge cmd-badge" style={ESTILO_SIN_DATOS}>Sin dato</span> : <span className="badge cmd-badge" style={estiloCalor(escala.variable, nW)}>{escala.niveles[nW]}</span>}
           <div className="cmd-escala" aria-label={`Escala ${escala.autor}`}>
@@ -179,11 +196,11 @@ export function Comando() {
               </div>
             ))}
           </div>
-          <div className="cmd-nota">{medW ? `${medW.sector} · ${fmtHora(medW.tomada_en)}` : "Modelos · sin medición en la última hora"} · escala {escala.autor}</div>
+          <div className="cmd-nota">{previa ? (wMax ? `A las ${fmtHora(new Date(wMax.h).toISOString())} · pronóstico` : "Sin pronóstico para la carrera todavía") : medW ? `${medW.sector} · ${fmtHora(medW.tomada_en)}` : "Modelos · sin medición en la última hora"} · escala {escala.autor}</div>
         </div>
 
         <div className="cmd-celda">
-          <div className="cmd-celda-cab"><Icono tipo="viento" size={30} /><span className="cmd-rot">Ráfaga {medV ? "medida" : "estimada"}</span></div>
+          <div className="cmd-celda-cab"><Icono tipo="viento" size={30} /><span className="cmd-rot">{previa ? "Ráfaga máxima · carrera" : `Ráfaga ${medV ? "medida" : "estimada"}`}</span></div>
           <div className="cmd-valor">{num(rafaga)}<small>km/h</small></div>
           {!vientoPeor && rafaga == null
             ? <span className="badge cmd-badge" style={ESTILO_SIN_DATOS}>Sin dato</span>
@@ -197,11 +214,11 @@ export function Comando() {
               <small>{actualP?.dir_viento != null ? `del ${cardinal(actualP.dir_viento)}` : "dirección sin dato"}</small>
             </span>
           </div>
-          <div className="cmd-nota">{medV ? `${medV.sector} · ${fmtHora(medV.tomada_en)} · a ${num(medV.altura_viento_m, 1)} m` : "Modelos · a 10 m"}</div>
+          <div className="cmd-nota">{previa ? (rMax ? `A las ${fmtHora(new Date(rMax.h).toISOString())} · pronóstico a 10 m` : "Sin pronóstico para la carrera todavía") : medV ? `${medV.sector} · ${fmtHora(medV.tomada_en)} · a ${num(medV.altura_viento_m, 1)} m` : "Modelos · a 10 m"}</div>
         </div>
 
         <div className="cmd-celda">
-          <div className="cmd-celda-cab"><Icono tipo="rayo" size={30} /><span className="cmd-rot">Tormenta eléctrica</span></div>
+          <div className="cmd-celda-cab"><Icono tipo="rayo" size={30} /><span className="cmd-rot">Tormenta eléctrica{previa ? " · carrera" : ""}</span></div>
           <div className="cmd-valor cmd-valor-txt">{nR != null ? NIVEL_RAYO[nR] : tormentaPron > 0 ? "Pronosticada" : "Sin señal"}</div>
           <span className="badge cmd-badge" style={estiloNivel(nR ?? tormentaPron)}>{nR != null ? fuenteR : "Pronóstico"}</span>
           <div className="cmd-rayos" aria-label="Distancias del protocolo de tormenta">
@@ -224,7 +241,7 @@ export function Comando() {
         </div>
 
         <div className="cmd-celda">
-          <div className="cmd-celda-cab"><span className="cmd-rot">Ahora</span></div>
+          <div className="cmd-celda-cab"><span className="cmd-rot">{previa ? `Largada${refFila ? ` · ${fmtHora(new Date(refFila[0]).toISOString())}` : ""}` : "Ahora"}</span></div>
           <div className="cmd-ahora">
             {iconoAhora && <Icono tipo={iconoAhora} size={64} />}
             <div>
@@ -261,8 +278,8 @@ export function Comando() {
       )}
 
       <section className="cmd-bloque">
-        <div className="cmd-rot">Próximas horas · pronóstico</div>
-        {horas.length === 0 ? <p className="cmd-nada">Sin pronóstico para las próximas horas. Se completa con la próxima actualización de los modelos.</p> : (
+        <div className="cmd-rot">{previa ? `Día de carrera · ${fmtFechaHora(v.exposicion[0].toISOString())} a ${fmtHora(v.exposicion[1].toISOString())} · pronóstico` : "Próximas horas · pronóstico"}</div>
+        {horas.length === 0 ? <p className="cmd-nada">{previa ? "El día de carrera todavía está fuera del pronóstico. Se completa solo." : "Sin pronóstico para las próximas horas. Se completa con la próxima actualización de los modelos."}</p> : (
           <div className="cmd-horas">
             {horas.map(([h, p]) => {
               const n = escala.nivel(p.wbgt_est) ?? 0;
@@ -299,17 +316,17 @@ export function Comando() {
         )}
       </section>
 
-      <div className={`cmd-abajo${meds.length ? " con-meds" : ""}`}>
+      <div className={`cmd-abajo${meds.length && !previa ? " con-meds" : ""}`}>
         <section className="cmd-bloque">
-          <div className="cmd-rot">Acciones vigentes{acciones.length > accionesVisibles.length ? ` · ${accionesVisibles.length} de ${acciones.length}` : ""}</div>
+          <div className="cmd-rot">{previa ? "Acciones previstas · día de carrera" : "Acciones vigentes"}{acciones.length > accionesVisibles.length ? ` · ${accionesVisibles.length} de ${acciones.length}` : ""}</div>
           {acciones.length === 0 ? (
-            <p className="cmd-nada">Sin acciones vigentes en este momento.</p>
+            <p className="cmd-nada">{previa ? "Con el pronóstico actual, ninguna variable supera su umbral en el día de carrera." : "Sin acciones vigentes en este momento."}</p>
           ) : (
             <ul className="cmd-acciones">
               {accionesVisibles.map((n) => (
                 <li key={n.id} style={{ borderColor: estiloVariable(n.variable, n.nivel).background }}>
                   <span className="badge" style={estiloVariable(n.variable, n.nivel)}>{nombreNivel(n.variable, n.nivel)}</span>
-                  <b>{NOMBRE_CORTO[n.variable]}</b> <span className="cmd-fasecita">{NOMBRE_FASE[n.fase]} · hasta {fmtHora(n.hasta)}</span>
+                  <b>{NOMBRE_CORTO[n.variable]}</b> <span className="cmd-fasecita">{NOMBRE_FASE[n.fase]} · {previa ? `${fmtHora(n.desde)} a ${fmtHora(n.hasta)}` : `hasta ${fmtHora(n.hasta)}`}{n.confianza === "baja" ? " · tendencia" : ""}</span>
                   <p>{recomendacion(n.variable, n.nivel, n.fase)}</p>
                 </li>
               ))}
@@ -317,7 +334,7 @@ export function Comando() {
           )}
         </section>
 
-        {meds.length > 0 && (
+        {meds.length > 0 && !previa && (
           <section className="cmd-bloque">
             <div className="cmd-rot">Últimas mediciones en terreno</div>
             <div className="cmd-meds">
