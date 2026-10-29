@@ -17,6 +17,11 @@ function aLocal(iso: string): string {
   return d.toISOString().slice(0, 16);
 }
 
+/** HH:MM local de una largada de modalidad: acepta el ISO guardado o la hora ya escrita en el campo */
+function horaLocal(v: string): string {
+  return /^\d{2}:\d{2}$/.test(v) ? v : aLocal(v).slice(11, 16);
+}
+
 type Form = {
   nombre: string;
   largada: string; // AAAA-MM-DDTHH:MM local
@@ -143,6 +148,13 @@ export function EventoForm() {
     const largada = new Date(`${f.largada}:00${OFFSET}`);
     if (!id && largada.getTime() < Date.now()) return setError("La fecha de largada ya pasó.");
     if (!mods.length || mods.some((m) => !m.nombre || !(m.distancia_km > 0))) return setError("Cargá al menos una modalidad con distancia.");
+    // Largada propia por modalidad (opcional, solo con más de una): mismo día que la largada general, nunca antes
+    const largadaMod = (m: Modalidad): string | null => {
+      if (mods.length < 2 || !m.largada) return null;
+      return new Date(`${f.largada.slice(0, 10)}T${horaLocal(m.largada)}:00${OFFSET}`).toISOString();
+    };
+    const antes = mods.find((m) => { const l = largadaMod(m); return l && new Date(l) < largada; });
+    if (antes) return setError(`La largada de ${antes.nombre} es anterior a la largada general. La largada general tiene que ser la primera del evento.`);
     // La duración por distancia solo está calibrada para running: el resto de las disciplinas la carga
     if (f.disciplina !== "running" && !f.duracion_propia_min) return setError("Cargá la duración estimada del evento: el cálculo por distancia solo vale para running.");
     if (f.duracion_propia_min && parseInt(f.duracion_propia_min, 10) < 15)
@@ -183,7 +195,7 @@ export function EventoForm() {
     const evId = res.data.id as string;
     await supabase.from("mon_modalidades").delete().eq("evento_id", evId);
     const { error: em } = await supabase.from("mon_modalidades").insert(
-      mods.map((m) => ({ evento_id: evId, nombre: m.nombre, distancia_km: m.distancia_km, participantes: m.participantes })),
+      mods.map((m) => ({ evento_id: evId, nombre: m.nombre, distancia_km: m.distancia_km, participantes: m.participantes, largada: largadaMod(m) })),
     );
     setGuardando(false);
     if (em) return setError(em.message);
@@ -241,9 +253,19 @@ export function EventoForm() {
                 <label>Nombre<input required value={m.nombre} onChange={(e) => setMods(mods.map((x, j) => (j === i ? { ...x, nombre: e.target.value } : x)))} /></label>
                 <label>Distancia (km)<input type="number" step="0.0001" min={0.1} required value={m.distancia_km} onChange={(e) => setMods(mods.map((x, j) => (j === i ? { ...x, distancia_km: parseFloat(e.target.value) } : x)))} /></label>
                 <label>Participantes<input type="number" min={0} value={m.participantes ?? ""} onChange={(e) => setMods(mods.map((x, j) => (j === i ? { ...x, participantes: e.target.value ? parseInt(e.target.value, 10) : null } : x)))} /></label>
+                {mods.length > 1 && (
+                  <label>Hora de largada (opcional)
+                    <input type="time" value={m.largada ? horaLocal(m.largada) : ""} onChange={(e) => setMods(mods.map((x, j) => (j === i ? { ...x, largada: e.target.value || null } : x)))} />
+                  </label>
+                )}
                 <button type="button" className="boton" onClick={() => setMods(mods.filter((_, j) => j !== i))} disabled={mods.length === 1}>Quitar</button>
               </div>
             ))}
+            {mods.length > 1 && (
+              <p className="chico" style={{ margin: "0 0 10px" }}>
+                Sin hora propia, la modalidad larga con la largada general{f.largada ? ` (${f.largada.slice(11, 16)} h)` : ""}. La hora propia define su llegada y su último cuarto.
+              </p>
+            )}
             <button type="button" className="boton" onClick={() => setMods([...mods, { nombre: "", distancia_km: 10, participantes: null }])}>+ Agregar modalidad</button>
           </div>
 

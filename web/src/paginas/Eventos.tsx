@@ -16,7 +16,16 @@ export function Eventos() {
   const [eventos, setEventos] = useState<Evento[] | null>(null);
   const [resumen, setResumen] = useState<Resumen>({});
   const [cubiertas, setCubiertas] = useState<Record<string, Set<string>>>({}); // evento -> fases con pronóstico
-  const [verCerrados, setVerCerrados] = useState(false);
+  // Ocultar realizados y cerrados: preferencia de cada usuario en este navegador
+  const [ocultar, setOcultar] = useState(() => {
+    try { return localStorage.getItem("mon_ocultar_realizados") === "1"; } catch { return false; }
+  });
+  const cambiarOcultar = (v: boolean) => {
+    setOcultar(v);
+    try { localStorage.setItem("mon_ocultar_realizados", v ? "1" : "0"); } catch { /* sin almacenamiento */ }
+  };
+  const hoy = diaLocal(new Date().toISOString());
+  const realizado = (e: Evento) => diaLocal(e.largada) < hoy;
   const [enGrupo, setEnGrupo] = useState(false); // integra el equipo de alguna productora
 
   useEffect(() => {
@@ -26,8 +35,10 @@ export function Eventos() {
 
   useEffect(() => {
     (async () => {
-      let q = supabase.from("mon_eventos").select("*, mon_modalidades(*)").order("largada");
-      if (!verCerrados) q = q.eq("estado", "activo");
+      // Los más próximos en el tiempo arriba: fechas de la más lejana a la más antigua
+      let q = supabase.from("mon_eventos").select("*, mon_modalidades(*)").order("largada", { ascending: false });
+      // Los cerrados solo los ve EMERTEAM, y solo si no los oculta
+      if (!admin || ocultar) q = q.eq("estado", "activo");
       const { data } = await q;
       setEventos((data as Evento[]) ?? []);
       const ids = (data ?? []).map((e) => e.id);
@@ -53,10 +64,14 @@ export function Eventos() {
         setCubiertas(c);
       }
     })();
-  }, [verCerrados]);
+  }, [ocultar, admin]);
 
+  const visibles = (eventos ?? []).filter((e) => !(ocultar && realizado(e)));
+  const ocultos = (eventos?.length ?? 0) - visibles.length;
   const porDia: Record<string, Evento[]> = {};
-  for (const e of eventos ?? []) (porDia[diaLocal(e.largada)] ??= []).push(e);
+  for (const e of visibles) (porDia[diaLocal(e.largada)] ??= []).push(e);
+  // Dentro de un mismo día, por hora de largada
+  for (const evs of Object.values(porDia)) evs.sort((a, b) => a.largada.localeCompare(b.largada));
 
   return (
     <>
@@ -79,14 +94,16 @@ export function Eventos() {
         )}
       </Barra>
       <main className="contenedor" style={{ paddingTop: 26, paddingBottom: 26 }}>
-        {admin && (
-          <label style={{ flexDirection: "row", alignItems: "center", gap: 8, fontWeight: 500, marginBottom: 12 }}>
-            <input type="checkbox" checked={verCerrados} onChange={(e) => setVerCerrados(e.target.checked)} style={{ minHeight: 0 }} />
-            Ver también eventos cerrados
-          </label>
-        )}
+        <label style={{ flexDirection: "row", alignItems: "center", gap: 8, fontWeight: 500, marginBottom: 12 }}>
+          <input type="checkbox" checked={ocultar} onChange={(e) => cambiarOcultar(e.target.checked)} style={{ minHeight: 0 }} />
+          {admin ? "Ocultar eventos realizados y cerrados" : "Ocultar eventos realizados"}
+          {ocultar && ocultos > 0 && <span className="chico" style={{ fontWeight: 400 }}>({ocultos} {ocultos === 1 ? "oculto" : "ocultos"})</span>}
+        </label>
         {!admin && <Introduccion />}
         {eventos === null && <p>Cargando…</p>}
+        {eventos !== null && visibles.length === 0 && ocultos > 0 && (
+          <div className="tarjeta">No hay eventos por realizarse. Desmarcá la opción para ver los anteriores.</div>
+        )}
         {eventos?.length === 0 && (
           <div className="tarjeta">
             {editor
@@ -111,8 +128,8 @@ export function Eventos() {
                     <div style={{ borderLeft: `5px solid ${cub?.size ? COLOR_NIVEL[max] : "var(--borde-input)"}`, paddingLeft: 12 }}>
                       <div className="condensada" style={{ fontSize: 22, fontWeight: 800, textTransform: "uppercase", lineHeight: 1.1 }}>{e.nombre}</div>
                       <div className="chico">
-                        {e.disciplina && e.disciplina !== "running" && <b>{nombreDisciplina(e.disciplina)} · </b>}{e.ubicacion} · {fmtHora(e.largada)} · {(e.mon_modalidades ?? []).map((m) => m.nombre).join(", ")} · {e.participantes.toLocaleString("es-AR")} participantes
-                        {e.estado === "cerrado" && " · cerrado"}
+                        {e.disciplina && e.disciplina !== "running" && <b>{nombreDisciplina(e.disciplina)} · </b>}{e.ubicacion} · {fmtHora(e.largada)} · {(e.mon_modalidades ?? []).map((m) => (m.largada ? `${m.nombre} ${fmtHora(m.largada)}` : m.nombre)).join(", ")} · {e.participantes.toLocaleString("es-AR")} participantes
+                        {e.estado === "cerrado" ? " · cerrado" : realizado(e) ? " · realizado" : ""}
                       </div>
                     </div>
                     {(["armado", "carrera", "desarme"] as const).map((f) => {
