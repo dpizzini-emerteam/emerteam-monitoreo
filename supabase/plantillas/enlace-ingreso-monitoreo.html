@@ -2,10 +2,14 @@
 <h2>Ingreso al Sistema de Monitoreo de Riesgo Ambiental para Eventos de EMERTEAM</h2>
 <p>Recibimos un pedido de ingreso con esta dirección de correo. Tocá el botón para entrar.</p>
 <p><a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#FF6A1A;color:#111111;font-weight:bold;text-decoration:none;padding:12px 20px;border-radius:6px">Ingresar</a></p>
-<p>El enlace vence a los pocos minutos y sirve una sola vez. Si no pediste ingresar, ignorá este correo.</p>
+<p>También podés escribir este código en la pantalla de ingreso:</p>
+<p style="font-size:28px;font-weight:bold;letter-spacing:6px;margin:8px 0 16px">{{ .Token }}</p>
+<p>El enlace y el código vencen a los pocos minutos y sirven una sola vez. Si no pediste ingresar, ignorá este correo.</p>
 {{ else }}
-<h2>Your sign-in link</h2>
-
-<p>Follow the link below to sign in. This link expires shortly and can only be used once.</p>
-<p><a href="{{ .ConfirmationURL }}">Sign in</a></p>
+<h2>Ingreso al Portal de eventos de EMERTEAM</h2>
+<p>Recibimos un pedido de ingreso con esta dirección de correo. Tocá el botón para entrar.</p>
+<p><a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#FF6A1A;color:#111111;font-weight:bold;text-decoration:none;padding:12px 20px;border-radius:6px">Ingresar</a></p>
+<p>O escribí este código en la pantalla de ingreso:</p>
+<p style="font-size:28px;font-weight:bold;letter-spacing:6px;margin:8px 0 16px">{{ .Token }}</p>
+<p>El enlace y el código vencen a los pocos minutos y sirven una sola vez. Si no pediste ingresar, ignorá este correo.</p>
 {{ end }}

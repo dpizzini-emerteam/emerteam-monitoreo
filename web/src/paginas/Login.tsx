@@ -12,6 +12,9 @@ export function Login() {
   const [estado, setEstado] = useState<"" | "enviando" | "enviado" | "error">(errorEnlace ? "error" : "");
   const [error, setError] = useState(errorEnlace);
   const [espera, setEspera] = useState(() => restante());
+  const [codigo, setCodigo] = useState("");
+  const [validando, setValidando] = useState(false);
+  const [errorCodigo, setErrorCodigo] = useState("");
   const redirect = window.location.origin + window.location.pathname;
 
   // Cuenta regresiva entre pedidos: evita que los toques repetidos agoten el cupo de correos
@@ -38,6 +41,17 @@ export function Login() {
     } else setEstado("enviado");
   }
 
+  // Mismo mail, segundo camino: el código de 6 números sirve cuando el enlace abre en otro navegador o dispositivo.
+  async function entrarConCodigo(e: React.FormEvent) {
+    e.preventDefault();
+    const token = codigo.replace(/\D/g, "");
+    if (token.length !== 6) { setErrorCodigo("El código tiene 6 números."); return; }
+    setValidando(true); setErrorCodigo("");
+    const { error } = await supabase.auth.verifyOtp({ email: email.trim().toLowerCase(), token, type: "email" });
+    setValidando(false);
+    if (error) setErrorCodigo(/expired|invalid/i.test(error.message) ? "El código no es válido o ya venció. Pedí otro mail." : "No se pudo validar el código. Probá de nuevo.");
+  }
+
   return (
     <>
       <header className="barra">
@@ -53,16 +67,25 @@ export function Login() {
       <main className="contenedor" style={{ paddingTop: 48, paddingBottom: 48 }}>
         <div className="tarjeta" style={{ maxWidth: 440, margin: "0 auto", padding: 28 }}>
           <h1 style={{ margin: "0 0 6px", fontSize: 30, fontWeight: 800, textTransform: "uppercase" }}>Ingresar</h1>
-          <p className="chico" style={{ marginTop: 0 }}>Sin contraseña: te enviamos un enlace de ingreso a tu correo.</p>
+          <p className="chico" style={{ marginTop: 0 }}>Sin contraseña: te enviamos un mail con un botón para entrar y un código.</p>
           {estado === "enviado" ? (
             <>
               <p>
-                Te enviamos un enlace a <b>{email}</b>. Abrilo en el teléfono o la computadora donde vas a usar la web. Puede tardar unos minutos;
-                revisá también la carpeta de correo no deseado.
+                Te enviamos un mail a <b>{email}</b>. Tocá el botón «Ingresar» del mail o escribí acá el código de 6 números que viene en el mismo mail.
+                Puede tardar unos minutos; revisá también la carpeta de correo no deseado.
               </p>
+              <form onSubmit={entrarConCodigo} style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 12 }}>
+                <label>
+                  Código
+                  <input inputMode="numeric" autoComplete="one-time-code" maxLength={7} value={codigo} onChange={(e) => setCodigo(e.target.value)}
+                    style={{ fontSize: 26, letterSpacing: "0.3em", textAlign: "center" }} />
+                </label>
+                <button className="boton primario" style={{ justifyContent: "center" }} disabled={validando}>{validando ? "Validando…" : "Entrar"}</button>
+                {errorCodigo && <p style={{ color: "var(--rojo)", margin: 0 }}>{errorCodigo}</p>}
+              </form>
               <button className="boton" style={{ justifyContent: "center", width: "100%" }} disabled={espera > 0}
-                onClick={() => { setEstado(""); setError(""); }}>
-                {espera > 0 ? `Podés pedir otro enlace en ${espera} s` : "No me llegó: pedir otro enlace"}
+                onClick={() => { setEstado(""); setError(""); setCodigo(""); setErrorCodigo(""); }}>
+                {espera > 0 ? `Podés pedir otro mail en ${espera} s` : "No me llegó: pedir otro mail"}
               </button>
             </>
           ) : (
@@ -72,7 +95,7 @@ export function Login() {
                 <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
               </label>
               <button className="boton primario" style={{ justifyContent: "center" }} disabled={estado === "enviando" || espera > 0}>
-                {estado === "enviando" ? "Enviando…" : espera > 0 ? `Esperá ${espera} s para pedir otro enlace` : "Enviarme el enlace"}
+                {estado === "enviando" ? "Enviando…" : espera > 0 ? `Esperá ${espera} s para pedir otro enlace` : "Enviarme el mail de ingreso"}
               </button>
               {estado === "error" && <p style={{ color: "var(--rojo)", margin: 0 }}>{error}</p>}
             </form>
