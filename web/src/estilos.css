@@ -194,6 +194,7 @@ a.resumen-fase:hover .resumen-ver { color: var(--naranja); }
 .cmd-fase { text-align: right; font-family: "Barlow Condensed"; font-weight: 800; font-size: clamp(20px, 2.2vw, 32px); text-transform: uppercase; color: var(--naranja); }
 .cmd-fase span { display: block; font-family: "Cifras", "Atkinson Hyperlegible Next", "Barlow"; font-weight: 600; font-size: 15px; color: #d0d0d0; text-transform: none; }
 .cmd-reloj { font-family: "Barlow Condensed"; font-weight: 800; font-size: clamp(40px, 5vw, 72px); line-height: 1; text-align: right; font-variant-numeric: tabular-nums; }
+.cmd-reloj-rot { display: block; font: 600 14px "Barlow Condensed"; letter-spacing: 0.12em; text-transform: uppercase; color: #a9a9a9; margin-top: 2px; }
 .cmd-reloj span { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; }
 .cmd-reloj button, .cmd-reloj a { font: 600 13px "Barlow"; color: #cfcfcf; background: none; border: 1px solid #3a3a3a; border-radius: 6px; padding: 5px 9px; cursor: pointer; text-decoration: none; }
 .cmd-alerta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 20px; color: #111; padding: 14px 20px; border-radius: 10px; font-size: clamp(18px, 2vw, 26px); }
