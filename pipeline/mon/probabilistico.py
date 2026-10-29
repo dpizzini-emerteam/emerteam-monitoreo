@@ -485,12 +485,15 @@ def procesar(eventos: list[dict], sesgos_lista: list[dict], ahora: datetime, for
     ce = ecmwf_ultima(ahora, HORIZONTE)
     if ce is None:
         log.info("ECMWF ENS: sin corrida disponible")
+        print("::notice title=Ensambles sin datos::ECMWF ENS no tiene corrida disponible hasta +%d h" % HORIZONTE, flush=True)
         return [], []
     pendientes = [e for e in eventos if forzar or ultimas.get(e["id"]) is None
                   or datetime.fromisoformat(ultimas[e["id"]]) < ce]
     if not pendientes:
         log.info("Corrida ENS %s ya procesada para todos los eventos", ce.isoformat())
+        print(f"::notice title=Ensambles sin datos::corrida {ce.isoformat()} ya procesada para todos los eventos", flush=True)
         return [], []
+    print(f"::notice title=Ensambles pendientes::corrida {ce.isoformat()} · {', '.join(e['nombre'] for e in pendientes)}", flush=True)
     cg = gefs_ultima(ahora, HORIZONTE)
     corridas = {"ecmwf": ce, **({"gefs": cg} if cg else {})}
     log.info("Corridas: %s", {k: v.isoformat() for k, v in corridas.items()})
@@ -518,6 +521,7 @@ def procesar(eventos: list[dict], sesgos_lista: list[dict], ahora: datetime, for
                           "horas": sorted(horas_todas), "horas_calor": horas_calor, "carrera": carrera}
     if not plan:
         log.info("Ningún evento con ventanas por delante")
+        print("::notice title=Ensambles sin datos::ningún evento pendiente con ventanas por delante", flush=True)
         return [], []
 
     puntos = {e: (float(p["ev"]["lat"]), float(p["ev"]["lon"])) for e, p in plan.items()}
@@ -537,7 +541,10 @@ def procesar(eventos: list[dict], sesgos_lista: list[dict], ahora: datetime, for
             datos[modelo] = descargar(modelo, corrida, pedidos, puntos)
         except Exception:  # noqa: BLE001
             log.exception("Fallo la descarga de %s", modelo)
+            tb = " | ".join(traceback.format_exc().strip().splitlines()[-4:]).replace("%", "%25")
+            print(f"::error title=Ensambles descarga {modelo}::{tb}", flush=True)
     if "ecmwf" not in datos:
+        print("::notice title=Ensambles sin datos::no se pudo descargar ECMWF ENS", flush=True)
         return [], []
 
     prob_filas, horas_filas = [], []
@@ -619,10 +626,20 @@ def main() -> int:
     try:
         prob, horas = procesar(eventos, estado.get("sesgos") or [], ahora, args.forzar, estado.get("ens_ultimas") or {})
         # En tandas: un solo envío con todas las horas supera el tiempo de escritura de la función
-        for i in range(0, len(prob), 1500):
-            log.info("ingesta prob: %s", api.ensambles(prob[i:i + 1500], []))
-        for i in range(0, len(horas), 1500):
-            log.info("ingesta horas: %s", api.ensambles([], horas[i:i + 1500]))
+        def enviar(pr: list, ho: list) -> None:
+            for intento in range(4):
+                try:
+                    log.info("ingesta: %s", api.ensambles(pr, ho))
+                    return
+                except Exception:  # noqa: BLE001
+                    if intento == 3:
+                        raise
+                    log.warning("ingesta: reintento %d", intento + 1)
+                    time.sleep(10 * (intento + 1))
+        for i in range(0, len(prob), 800):
+            enviar(prob[i:i + 800], [])
+        for i in range(0, len(horas), 800):
+            enviar([], horas[i:i + 800])
         print(f"::notice title=Ensambles filas::{len(prob)} probabilidades, {len(horas)} horas", flush=True)
     except Exception:  # noqa: BLE001
         log.exception("Fallo el pronóstico probabilístico")
