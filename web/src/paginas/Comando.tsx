@@ -159,6 +159,7 @@ export function Comando() {
   return (
     <div className="comando">
       <header className="cmd-cab">
+        <div className="cmd-marca"><img src="/logo-emerteam.png" alt="EMERTEAM · Sports Risks & Emergency Management" /></div>
         <div style={{ minWidth: 0 }}>
           <div className="cmd-evento">{ev.nombre}</div>
           <div className="cmd-sub">{ev.disciplina && ev.disciplina !== "running" ? `${nombreDisciplina(ev.disciplina)} · ` : ""}{ev.ubicacion} · largada {fmtFechaHora(ev.largada)}</div>
