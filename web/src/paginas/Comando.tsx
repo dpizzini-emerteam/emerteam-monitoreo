@@ -4,7 +4,7 @@ import { CONDICION, Icono, iconoTiempo } from "../componentes/Icono";
 import { BotonTema } from "../componentes/BotonTema";
 import {
   analizarDetector,
-  COLOR_SMN, estadoRayosGLM, fmtFechaHora, fmtHora, kmPorTrueno, nivelRayoMedido, num, ordenarAlertas, supabase, tituloAlerta,
+  COLOR_SMN, estadoRayosGLM, fmtDia, fmtFechaHora, fmtHora, kmPorTrueno, nivelRayoMedido, num, ordenarAlertas, supabase, tituloAlerta,
   type AlertaSMN, type Evento, type Medicion, type Nivel, type Pronostico, type Sesgo, type Uv, type Rayo,
 } from "../datos";
 import { fijarDisciplina, ESTILO_SIN_DATOS, estiloNivel, estiloVariable, NOMBRE_CORTO, NOMBRE_FASE, nombreNivel, recomendacion } from "../reglas";
@@ -165,8 +165,8 @@ export function Comando() {
           <div className="cmd-sub">{ev.disciplina && ev.disciplina !== "running" ? `${nombreDisciplina(ev.disciplina)} · ` : ""}{ev.ubicacion} · largada {fmtFechaHora(ev.largada)}</div>
         </div>
         <div className="cmd-fase">
-          <div>{fase}</div>
-          <span>{reloj}{previa ? " · vista del día de carrera" : ""}</span>
+          <div>{previa ? "Día de carrera" : fase}</div>
+          <span>{previa ? `${fmtDia(v.largada.toISOString())} · pronóstico · ${reloj.toLowerCase()}` : reloj}</span>
         </div>
         <div className="cmd-reloj">
           <Cuenta largada={v.largada.getTime()} fin={v.finCarrera.getTime()} />
@@ -178,7 +178,7 @@ export function Comando() {
         </div>
       </header>
 
-      {alertas.filter((a) => fasesDeAlerta(a, v).length > 0).map((a) => (
+      {alertas.filter((a) => (previa ? fasesDeAlerta(a, v).includes("Día de carrera") : fasesDeAlerta(a, v).length > 0)).map((a) => (
         <div key={a.id} className="cmd-alerta alerta" style={{ background: COLOR_SMN[a.color] }} role="alert">
           <b>{tituloAlerta(a)}</b>
           <span>{a.desde ? fmtHora(a.desde) : "ahora"} → {a.hasta ? fmtFechaHora(a.hasta) : "sin fin informado"}</span>
