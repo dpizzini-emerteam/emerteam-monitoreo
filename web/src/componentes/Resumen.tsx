@@ -101,7 +101,7 @@ export function Resumen({ vigentes, alertas, eventoId }: { vigentes: Nivel[]; al
                   : <span className="badge" style={ESTILO_SIN_DATOS}>{SIN_PRONOSTICO}</span>}
               </div>
               {b.its.length === 0 ? (
-                <p className="chico" style={{ margin: 0 }}>{b.cubierto ? "Ninguna variable supera su umbral." : "Todavía fuera del alcance de los modelos (unos 6 días antes). Se completa sola."}</p>
+                <p className="chico" style={{ margin: 0 }}>{b.cubierto ? "Ninguna variable supera su umbral." : "Todavía a más de 6 días. Los niveles se calculan desde 6 días antes y se completan solos."}</p>
               ) : (
                 <ul>
                   {b.its.slice(0, 3).map((it) => (

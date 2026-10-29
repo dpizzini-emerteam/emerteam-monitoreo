@@ -260,7 +260,7 @@ export function EventoVista() {
               {reciente
                 ? <><b>Procesando el primer pronóstico.</b> El monitoreo ya está activo; los datos aparecen solos en unos minutos, sin recargar la página.</>
                 : llega.getTime() > ahora
-                ? <><b>Monitoreo activo.</b> El evento todavía está fuera del alcance de los modelos: el pronóstico empieza a llegar alrededor del {fmtDia(llega.toISOString())}.</>
+                ? <><b>Monitoreo activo.</b> El evento todavía está a más de 6 días. Los niveles empiezan a calcularse alrededor del {fmtDia(llega.toISOString())}.</>
                 : <><b>Monitoreo activo.</b> El pronóstico se incorpora en la próxima actualización de los modelos.</>}
             </div>
           );

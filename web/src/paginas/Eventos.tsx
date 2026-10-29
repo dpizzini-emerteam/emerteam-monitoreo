@@ -35,8 +35,8 @@ export function Eventos() {
 
   useEffect(() => {
     (async () => {
-      // Los más próximos en el tiempo arriba: fechas de la más lejana a la más antigua
-      let q = supabase.from("mon_eventos").select("*, mon_modalidades(*)").order("largada", { ascending: false });
+      // Orden: primero los próximos (del más cercano al más lejano), después los realizados (del más reciente al más antiguo)
+      let q = supabase.from("mon_eventos").select("*, mon_modalidades(*)").order("largada");
       // Los cerrados solo los ve EMERTEAM, y solo si no los oculta
       if (!admin || ocultar) q = q.eq("estado", "activo");
       const { data } = await q;
@@ -68,10 +68,23 @@ export function Eventos() {
 
   const visibles = (eventos ?? []).filter((e) => !(ocultar && realizado(e)));
   const ocultos = (eventos?.length ?? 0) - visibles.length;
-  const porDia: Record<string, Evento[]> = {};
-  for (const e of visibles) (porDia[diaLocal(e.largada)] ??= []).push(e);
-  // Dentro de un mismo día, por hora de largada
-  for (const evs of Object.values(porDia)) evs.sort((a, b) => a.largada.localeCompare(b.largada));
+  const proximos = visibles.filter((e) => !realizado(e));
+  const pasados = visibles.filter(realizado).reverse();
+  const agrupar = (lista: Evento[]) => {
+    const g: [string, Evento[]][] = [];
+    for (const e of lista) {
+      const d = diaLocal(e.largada);
+      const u = g[g.length - 1];
+      if (u && u[0] === d) u[1].push(e); else g.push([d, [e]]);
+    }
+    // Dentro de un mismo día, por hora de largada
+    for (const [, evs] of g) evs.sort((a, b) => a.largada.localeCompare(b.largada));
+    return g;
+  };
+  const grupos: { titulo?: string; dias: [string, Evento[]][] }[] = [
+    { dias: agrupar(proximos) },
+    ...(pasados.length ? [{ titulo: "Realizados", dias: agrupar(pasados) }] : []),
+  ];
 
   return (
     <>
@@ -113,7 +126,10 @@ export function Eventos() {
               : "Todavía no tenés eventos asignados. Si esperabas ver uno, pedile al responsable de tu productora o a EMERTEAM que te sume al equipo."}
           </div>
         )}
-        {Object.entries(porDia).map(([dia, evs]) => (
+        {grupos.map((gr) => gr.dias.length > 0 && (
+          <div key={gr.titulo ?? "proximos"}>
+            {gr.titulo && <div className="banda" style={{ marginTop: 34 }}><h2>{gr.titulo}</h2></div>}
+        {gr.dias.map(([dia, evs]) => (
           <section key={dia} className="seccion" style={{ marginTop: 18 }}>
             <h2 style={{ fontSize: 28 }}>
               {fmtDia(evs[0].largada)} <span className="chico" style={{ fontFamily: "inherit", textTransform: "none" }}>{evs.length > 1 ? `${evs.length} eventos` : ""}</span>
@@ -142,7 +158,7 @@ export function Eventos() {
                             : <span className="badge" style={ESTILO_SIN_DATOS}>{SIN_PRONOSTICO}</span>}
                           <div className="chico">
                             {m ? `${nombreCorto(m.variable, e.disciplina)} · ${fmtDia(m.desde)} ${fmtHora(m.desde)}`
-                              : cub?.has(f) ? "Ninguna variable supera su umbral" : "Fuera del alcance de los modelos"}
+                              : cub?.has(f) ? "Ninguna variable supera su umbral" : "Se calcula desde 6 días antes"}
                           </div>
                         </div>
                       );
@@ -162,6 +178,8 @@ export function Eventos() {
               })}
             </div>
           </section>
+        ))}
+          </div>
         ))}
       </main>
     </>
