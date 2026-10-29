@@ -15,9 +15,9 @@ from datetime import datetime, timedelta, timezone
 
 from . import correccion, motor, ventanas
 from .api import Ingesta
-from .fuentes import ecmwf, gfs, metno, wrf_smn
+from .fuentes import ecmwf, gfs, icon, metno, wrf_smn
 
-FUENTES = {"gfs": gfs, "ecmwf": ecmwf, "wrf_smn": wrf_smn}
+FUENTES = {"gfs": gfs, "ecmwf": ecmwf, "wrf_smn": wrf_smn, "icon": icon}
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("mon")
@@ -33,7 +33,7 @@ def anotar(titulo: str) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--forzar", action="store_true", help="reprocesar aunque la corrida ya esté guardada")
-    ap.add_argument("--fuentes", default="gfs,ecmwf,wrf_smn")
+    ap.add_argument("--fuentes", default="gfs,ecmwf,wrf_smn,icon")
     args = ap.parse_args()
 
     ahora = datetime.now(timezone.utc)
@@ -100,6 +100,12 @@ def _niveles(api: Ingesta, ahora: datetime) -> None:
     estaciones = completo.get("estaciones_evento") or {k: [v] for k, v in (completo.get("estaciones") or {}).items()}
     observaciones = completo.get("observaciones") or {}
     por_evento, correcciones, sesgos = {}, [], []
+    verif = motor.verif_por_plazo(completo.get("verif"))
+    log.info("verificación por plazo: %d combinaciones con muestra suficiente", len(verif))
+    ens = completo.get("ens_rafaga") or {}
+    archivo = []
+    emision = ahora.replace(minute=0, second=0, microsecond=0)
+    emision -= timedelta(hours=emision.hour % 6)  # una copia del consenso cada 6 h
     for ev in completo.get("eventos") or []:
         filas_ev = [p for p in pron if p["evento_id"] == ev["id"]]
         try:
@@ -117,13 +123,28 @@ def _niveles(api: Ingesta, ahora: datetime) -> None:
             log.exception("Corrección de %s", ev["nombre"])
             anotar(f"Corrección {ev['nombre']}")
         ecm = motor.pesos_fuentes([x for x in sesgos if x["evento_id"] == ev["id"]])
-        por_evento[ev["id"]] = motor.niveles_evento(ev, filas_ev, ahora, ecm)
+        ens_ev = {datetime.fromisoformat(x["valido"]).astimezone(timezone.utc): float(x["p50"])
+                  for x in ens.get(ev["id"], []) if x.get("p50") is not None}
+        serie = motor.serie_consenso(filas_ev, ecm, verif, ens_ev)
+        por_evento[ev["id"]] = motor.niveles_evento(ev, filas_ev, ahora, serie=serie)
+        # Copia del consenso para verificarlo después contra lo observado (cada 3 h de validez)
+        for h, f in serie.items():
+            if h >= ahora - timedelta(hours=1) and h.hour % 3 == 0:
+                archivo.append({"evento_id": ev["id"], "fuente": "mezcla", "corrida": emision.isoformat(), "valido": h.isoformat(),
+                                **{k: (round(float(f[k]), 2) if f.get(k) is not None else None)
+                                   for k in ("t2m", "td2m", "viento10", "rafaga10", "precip", "wbgt_est")}})
         log.info("%s: %d tramos de nivel", ev["nombre"], len(por_evento[ev["id"]]))
     if correcciones:
         log.info("correcciones: %s", api.correcciones(correcciones))
     if sesgos:
         log.info("sesgos: %s", api.sesgos(sesgos))
     log.info("niveles: %s", api.niveles(por_evento))
+    if archivo:
+        try:
+            log.info("archivo del consenso: %s", api.archivo(archivo))
+        except Exception:  # noqa: BLE001
+            log.exception("Archivo del consenso")
+            anotar("Archivo del consenso")
 
 
 if __name__ == "__main__":

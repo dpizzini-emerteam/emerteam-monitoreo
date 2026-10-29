@@ -12,6 +12,10 @@ on:
         description: "Reprocesar aunque la corrida ya esté guardada"
         type: boolean
         default: false
+      fuentes:
+        description: "Fuentes a procesar (separadas por coma)"
+        type: string
+        default: "gfs,ecmwf,wrf_smn,icon"
 
 permissions:
   contents: read
@@ -37,4 +41,4 @@ jobs:
           cache-dependency-path: pipeline/requirements.txt
       - run: pip install -r requirements.txt
       - name: Procesar
-        run: python -m mon ${{ inputs.forzar && '--forzar' || '' }}
+        run: python -m mon ${{ inputs.forzar && '--forzar' || '' }} --fuentes "${{ inputs.fuentes || 'gfs,ecmwf,wrf_smn,icon' }}"

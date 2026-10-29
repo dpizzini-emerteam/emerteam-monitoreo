@@ -57,10 +57,53 @@ def _media_pond(vals: list[tuple[float, float]]) -> float | None:
     return sum(v * p for v, p in vals) / w if w > 0 else None
 
 
-def serie_consenso(pron: list[dict], ecm: dict[str, dict[str, float]] | None = None) -> dict[datetime, dict]:
+def _mediana(vals: list[float]) -> float | None:
+    v = sorted(vals)
+    if not v:
+        return None
+    m = len(v) // 2
+    return v[m] if len(v) % 2 else (v[m - 1] + v[m]) / 2
+
+
+# Verificación fuera de muestra por plazo de anticipación (mon_verif_modelos): errores de cada modelo contra
+# las estaciones del SMN, agrupados por plazo. Cuando todas las fuentes de una hora tienen muestra suficiente
+# en su plazo, el peso usa el desvío del error (lo que queda después de corregir el sesgo medio) en lugar del
+# error de las últimas 72 h. Ver config/umbrales.json → verificacion.
+PLAZOS = [int(x) for x in U["verificacion"]["plazos_h"]]
+MIN_PARES_VERIF = int(U["verificacion"]["min_pares"])
+
+
+def plazo(horas: float) -> str:
+    """Tramo de anticipación ("0-24", "24-48", …) al que pertenece un plazo en horas."""
+    for a, b in zip(PLAZOS, PLAZOS[1:]):
+        if horas < b:
+            return f"{a}-{b}"
+    return f"{PLAZOS[-2]}-{PLAZOS[-1]}"
+
+
+def verif_por_plazo(filas: list[dict] | None) -> dict[tuple[str, str, str], float]:
+    """{(fuente, plazo, 't'|'v'): ecm} con el cuadrado del desvío del error, solo con muestra suficiente."""
+    out = {}
+    for f in filas or []:
+        if f.get("n") is None or int(f["n"]) < MIN_PARES_VERIF or f.get("desvio") is None:
+            continue
+        fam = "t" if f["variable"] == "temp" else "v" if f["variable"] == "viento" else None
+        if fam:
+            out[(f["fuente"], f["plazo"], fam)] = float(f["desvio"]) ** 2
+    return out
+
+
+def serie_consenso(pron: list[dict], ecm: dict[str, dict[str, float]] | None = None,
+                   verif: dict[tuple[str, str, str], float] | None = None,
+                   ens_rafaga: dict[datetime, float] | None = None) -> dict[datetime, dict]:
     """Serie horaria: promedio ponderado de las fuentes disponibles (ver MEZCLA_*), variables de tormenta y
-    dirección de la fuente prioritaria, y dispersión entre fuentes."""
+    dirección de la fuente prioritaria, y dispersión entre fuentes.
+
+    Lluvia y ráfaga: con tres valores o más por hora se toma la mediana (resiste al modelo que se aparta, como
+    la lluvia débil y persistente de GFS), sumando a la ráfaga la mediana del ensamble ECMWF + GEFS cuando existe."""
     ecm = ecm or {}
+    verif = verif or {}
+    ens_rafaga = ens_rafaga or {}
     por_fuente: dict[str, dict[datetime, dict]] = {}
     for p in pron:
         por_fuente.setdefault(p["fuente"], {})[_hora(p["valido"])] = p
@@ -78,6 +121,7 @@ def serie_consenso(pron: list[dict], ecm: dict[str, dict[str, float]] | None = N
                     fila[c] = None if va is None or vb is None else float(va) + (float(vb) - float(va)) * w
                 fila["precip"] = serie[b].get("precip")  # mm/h promedio del intervalo
                 fila["fuente"] = f
+                fila["corrida"] = serie[a].get("corrida")
                 fila["interpolado"] = True
                 serie[t] = fila
     horas = sorted({h for s in por_fuente.values() for h in s})
@@ -98,6 +142,18 @@ def serie_consenso(pron: list[dict], ecm: dict[str, dict[str, float]] | None = N
                         break
         if len(disponibles) > 1:
             pt, pv = _pesos(disponibles, ecm, "t"), _pesos(disponibles, ecm, "v")
+            # Pesos por plazo de anticipación verificados fuera de muestra, si todas las fuentes los tienen
+            plazos = {f: plazo((h - _hora(por_fuente[f][h]["corrida"])).total_seconds() / 3600)
+                      for f in disponibles if por_fuente[f][h].get("corrida")}
+            for fam in ("t", "v"):
+                e = {f: verif.get((f, plazos.get(f, ""), fam)) for f in disponibles}
+                if all(x is not None for x in e.values()):
+                    w = {f: 1.0 / (e[f] + TAU[fam]) for f in disponibles}
+                    if fam == "t":
+                        pt = w
+                    else:
+                        pv = w
+                    base["pesos_por_plazo"] = True
             for c in MEZCLA_T + MEZCLA_V:
                 pp = pv if c in MEZCLA_V else pt
                 vals = [(float(por_fuente[f][h][c]), pp[f]) for f in disponibles if por_fuente[f][h].get(c) is not None]
@@ -111,7 +167,18 @@ def serie_consenso(pron: list[dict], ecm: dict[str, dict[str, float]] | None = N
                 vm = _media_pond([(float(por_fuente[f][h]["viento10"]), pv[f]) for f in con])
                 if base.get("viento10") is not None and vm and vm >= 5:
                     r = float(base["viento10"]) * min(2.5, max(1.2, r / vm))
+                # Con tres valores o más (modelos y mediana del ensamble), la mediana
+                candidatas = [float(por_fuente[f][h]["rafaga10"]) for f in con]
+                if h in ens_rafaga:
+                    candidatas.append(float(ens_rafaga[h]))
+                if len(candidatas) >= 3:
+                    r = _mediana(candidatas)
+                    base["rafaga_mediana"] = len(candidatas)
                 base["rafaga10"] = round(r, 1)
+            lluvias = [float(por_fuente[f][h]["precip"]) for f in disponibles if por_fuente[f][h].get("precip") is not None]
+            if len(lluvias) >= 3:
+                base["precip"] = round(_mediana(lluvias), 2)
+                base["precip_mediana"] = len(lluvias)
             base["fuente_principal"] = "mezcla"
             base["pesos"] = {f: round(pt[f] / sum(pt.values()), 2) for f in disponibles}
         # Ráfaga faltante en todas las fuentes que tienen la hora: no hay de dónde estimarla
@@ -147,8 +214,9 @@ def _en(t: datetime, rango: tuple[datetime, datetime]) -> bool:
     return rango[0] <= t < rango[1]
 
 
-def niveles_evento(ev: dict, pron: list[dict], ahora: datetime, ecm: dict[str, dict[str, float]] | None = None) -> list[dict]:
-    serie = serie_consenso(pron, ecm)
+def niveles_evento(ev: dict, pron: list[dict], ahora: datetime, ecm: dict[str, dict[str, float]] | None = None,
+                   verif: dict | None = None, ens_rafaga: dict | None = None, serie: dict | None = None) -> list[dict]:
+    serie = serie if serie is not None else serie_consenso(pron, ecm, verif, ens_rafaga)
     v = vt.calcular(ev)
     var_calor, nivel_calor = calor_participantes(ev.get("disciplina"))
     crudos: list[tuple] = []  # (fase, variable, hora, nivel, valor, umbral, regla, confianza)

@@ -9,7 +9,7 @@ import {
 import { fijarDisciplina, ESTILO_SIN_DATOS, estiloNivel, estiloVariable, NOMBRE_CORTO, NOMBRE_FASE, nombreNivel, recomendacion } from "../reglas";
 import { Humedad, UvDato } from "../componentes/Uv";
 import { confDisciplina, escalaCalor, estiloCalor, evaluarAguaAbierta, evaluarAguaTriatlon, nombreDisciplina, riesgoWct, wct } from "../disciplinas";
-import { consenso } from "../serie";
+import { cargarExtrasConsenso, consenso, type ExtrasConsenso } from "../serie";
 import { calcular, fasesDeAlerta } from "../ventanas";
 
 const NIVEL_RAYO = ["Sin actividad", "Vigilar", "Alerta", "Preparar / demorar", "Suspender"];
@@ -28,11 +28,12 @@ export function Comando() {
   const [rayos, setRayos] = useState<Rayo[]>([]);
   const [uv, setUv] = useState<Uv[]>([]);
   const [sesgos, setSesgos] = useState<Sesgo[]>([]);
+  const [extras, setExtras] = useState<ExtrasConsenso | undefined>(undefined);
   const [ahora, setAhora] = useState(Date.now());
 
   const cargar = useCallback(async () => {
     if (!id) return;
-    const [e, p, n, a, m, r, u, sg] = await Promise.all([
+    const [e, p, n, a, m, r, u, sg, ex] = await Promise.all([
       supabase.from("mon_eventos").select("*, mon_modalidades(*)").eq("id", id).single(),
       supabase.from("mon_pronosticos").select("*").eq("evento_id", id).order("valido").limit(5000),
       supabase.from("mon_niveles").select("*").eq("evento_id", id).order("desde").limit(5000),
@@ -41,8 +42,10 @@ export function Comando() {
       supabase.from("mon_rayos").select("*").eq("evento_id", id).gte("ocurrido_en", new Date(Date.now() - 60 * 60_000).toISOString()).limit(2000),
       supabase.from("mon_uv").select("evento_id,valido,uv,interpolado").eq("evento_id", id).order("valido").limit(1000),
       supabase.from("mon_sesgos").select("*").eq("evento_id", id),
+      cargarExtrasConsenso(id),
     ]);
     if (e.data) setEv(e.data as Evento);
+    setExtras(ex);
     setSesgos((sg.data as Sesgo[]) ?? []);
     setPron((p.data as Pronostico[]) ?? []);
     setNiveles((n.data as Nivel[]) ?? []);
@@ -68,7 +71,7 @@ export function Comando() {
     return () => { clearInterval(reloj); clearInterval(recarga); void supabase.removeChannel(canal); void bloqueo?.release(); };
   }, [cargar, id]);
 
-  const serie = useMemo(() => consenso(pron, uv, sesgos), [pron, uv, sesgos]);
+  const serie = useMemo(() => consenso(pron, uv, sesgos, extras), [pron, uv, sesgos, extras]);
   fijarDisciplina(ev?.disciplina);
   if (!ev) return <div className="comando"><p style={{ padding: 40 }}>Cargando…</p></div>;
   const v = calcular(ev);

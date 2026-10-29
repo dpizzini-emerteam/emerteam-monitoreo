@@ -15,7 +15,7 @@ import { Mediciones } from "../componentes/Mediciones";
 import { AguaPanel } from "../componentes/Agua";
 import { Probabilistico } from "../componentes/Probabilistico";
 import { decisionEvento, recomendacionSmnAireLibre, type FaseEvento } from "../alertasSmn";
-import { categoriaUv, consenso, FUENTE_UV, NOMBRE_FUENTE, pesosFuentes, PRIORIDAD, UV_CATEGORIAS, uvMaxPorDia } from "../serie";
+import { cargarExtrasConsenso, categoriaUv, consenso, type ExtrasConsenso, FUENTE_UV, type VerifModelo, NOMBRE_FUENTE, pesosFuentes, PRIORIDAD, UV_CATEGORIAS, uvMaxPorDia } from "../serie";
 import { UvDato } from "../componentes/Uv";
 import { confDisciplina, esVariableCalor, escalaCalor, estiloCalor, nombreDisciplina, participantes, riesgoWct, wct } from "../disciplinas";
 import {
@@ -61,6 +61,7 @@ export function EventoVista() {
   const [informeAprobado, setInformeAprobado] = useState(false);
   const [sesgos, setSesgos] = useState<Sesgo[]>([]);
   const [uv, setUv] = useState<Uv[]>([]);
+  const [extras, setExtras] = useState<ExtrasConsenso | undefined>(undefined);
   const [refrescoAgua, setRefrescoAgua] = useState(0);
   const [error, setError] = useState("");
   const [descarteSonido, setDescarteSonido] = useState(false);
@@ -68,7 +69,7 @@ export function EventoVista() {
 
   const cargar = useCallback(async () => {
     if (!id) return;
-    const [e, p, n, a, r, inf, sg, u] = await Promise.all([
+    const [e, p, n, a, r, inf, sg, u, ex] = await Promise.all([
       supabase.from("mon_eventos").select("*, mon_modalidades(*), mon_productoras(nombre)").eq("id", id).single(),
       supabase.from("mon_pronosticos").select("*").eq("evento_id", id).order("valido").limit(5000),
       supabase.from("mon_niveles").select("*").eq("evento_id", id).order("desde").limit(5000),
@@ -77,8 +78,10 @@ export function EventoVista() {
       supabase.from("mon_informes").select("estado").eq("evento_id", id).maybeSingle(),
       supabase.from("mon_sesgos").select("*").eq("evento_id", id),
       supabase.from("mon_uv").select("evento_id,valido,uv,interpolado").eq("evento_id", id).order("valido").limit(1000),
+      cargarExtrasConsenso(id),
     ]);
     if (e.error) return setError("No tenés acceso a este evento o no existe.");
+    setExtras(ex);
     setEv(e.data as Evento);
     setPron((p.data as Pronostico[]) ?? []);
     setNiveles((n.data as Nivel[]) ?? []);
@@ -130,7 +133,7 @@ export function EventoVista() {
 
   fijarDisciplina(ev?.disciplina);
   const v = vAlertas;
-  const serie = useMemo(() => consenso(pron, uv, sesgos), [pron, uv, sesgos]);
+  const serie = useMemo(() => consenso(pron, uv, sesgos, extras), [pron, uv, sesgos, extras]);
   const uvDia = useMemo(() => uvMaxPorDia(uv), [uv]);
   const ahora = Date.now();
   // Solo cuentan los niveles que caen dentro de las fases del evento (si se cambió la fecha o el lugar,
@@ -314,6 +317,7 @@ export function EventoVista() {
             <AvisosTablero eventoId={ev.id} productoraDelEvento={ev.productora_id} productoraNombre={ev.mon_productoras?.nombre ?? null} editor={editor} miEmail={miEmail} />
             <DatosVigentes ultimaCorrida={ultimaCorrida} procesado={procesado} ajuste={sesgos.find((x) => x.aplicado)} />
             <AjusteLocal ev={ev} sesgos={sesgos} pron={pron} />
+            {extras && <Verificacion verif={extras.verif} />}
             <section className="seccion tarjeta" id="fuentes">
               <div className="rotulo">Fuentes y metodología</div>
               <p className="chico" style={{ marginBottom: 0 }}>
@@ -745,6 +749,45 @@ function kmEntre(a: { lat: number; lon: number }, b: { lat: number; lon: number 
 }
 
 /** Punto del modelo, estación del SMN usada y error medido: lo que respalda la confianza del pronóstico */
+const NOMBRE_VERIF: Record<string, string> = { ...NOMBRE_FUENTE, mezcla: "Esta web (consenso)", smn_oficial: "SMN oficial" };
+
+/** Error verificado de cada fuente contra las estaciones del SMN por plazo de anticipación (todas las sedes, 45 días) */
+function Verificacion({ verif }: { verif: VerifModelo[] }) {
+  const temp = verif.filter((x) => x.variable === "temp" && x.n >= 24);
+  if (!temp.length) {
+    return (
+      <section className="seccion tarjeta">
+        <div className="rotulo">Precisión verificada</div>
+        <p className="chico" style={{ marginBottom: 0 }}>Cada corrida de cada modelo se guarda y se compara con lo observado en las estaciones del SMN. La tabla aparece cuando hay al menos un día de datos por modelo y plazo.</p>
+      </section>
+    );
+  }
+  const plazos = [...new Set(temp.map((x) => x.plazo))].sort((a, b) => parseInt(a) - parseInt(b));
+  const fuentes = [...new Set(temp.map((x) => x.fuente))].sort((a, b) => (a === "mezcla" ? -1 : b === "mezcla" ? 1 : a.localeCompare(b)));
+  return (
+    <section className="seccion tarjeta">
+      <div className="rotulo">Precisión verificada · temperatura</div>
+      <p className="chico" style={{ marginTop: 4 }}>Error cuadrático medio en °C contra las estaciones del SMN, por anticipación del pronóstico (últimos 45 días, todas las sedes). Menor es mejor. Entre paréntesis, la cantidad de comparaciones.</p>
+      <div className="desplaza">
+        <table className="tabla">
+          <thead><tr><th>Fuente</th>{plazos.map((pl) => <th key={pl}>{pl.replace("-", " a ")} h</th>)}</tr></thead>
+          <tbody>
+            {fuentes.map((f) => (
+              <tr key={f}>
+                <td style={{ fontWeight: f === "mezcla" ? 700 : 400 }}>{NOMBRE_VERIF[f] ?? f}</td>
+                {plazos.map((pl) => {
+                  const x = temp.find((y) => y.fuente === f && y.plazo === pl);
+                  return <td key={pl}>{x?.rmse != null ? <>{num(Number(x.rmse), 1)} <span className="chico">({x.n})</span></> : "—"}</td>;
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 function AjusteLocal({ ev, sesgos, pron }: { ev: Evento; sesgos: Sesgo[]; pron: Pronostico[] }) {
   const fuentes = [...new Set(pron.map((p) => p.fuente))].sort();
   if (!fuentes.length) return null;

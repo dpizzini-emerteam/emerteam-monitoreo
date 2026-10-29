@@ -1,5 +1,40 @@
 // Serie horaria de consenso entre modelos (misma regla que el procesamiento, pipeline/mon/motor.py)
-import type { Pronostico, Sesgo, Uv } from "./datos";
+import U from "../../config/umbrales.json";
+import { supabase, type Pronostico, type Sesgo, type Uv } from "./datos";
+
+/** Error de cada fuente por plazo de anticipación, verificado contra el SMN (mon_verif_modelos) */
+export type VerifModelo = { fuente: string; plazo: string; variable: string; n: number; sesgo: number | null; rmse: number | null; desvio: number | null };
+export type ExtrasConsenso = { verif: VerifModelo[]; ensRafaga: Map<number, number> };
+
+const PLAZOS = U.verificacion.plazos_h as number[];
+const MIN_PARES = U.verificacion.min_pares as number;
+export function plazo(horas: number): string {
+  for (let i = 0; i + 1 < PLAZOS.length; i++) if (horas < PLAZOS[i + 1]) return `${PLAZOS[i]}-${PLAZOS[i + 1]}`;
+  return `${PLAZOS[PLAZOS.length - 2]}-${PLAZOS[PLAZOS.length - 1]}`;
+}
+
+/** Verificación por plazo y mediana horaria de ráfaga del último ensamble del evento */
+export async function cargarExtrasConsenso(eventoId: string): Promise<ExtrasConsenso> {
+  const [v, u] = await Promise.all([
+    supabase.from("mon_verif_modelos").select("fuente,plazo,variable,n,sesgo,rmse,desvio"),
+    supabase.from("mon_ens_horas").select("corrida").eq("evento_id", eventoId).eq("modelo", "mezcla").eq("variable", "rafaga")
+      .order("corrida", { ascending: false }).limit(1),
+  ]);
+  const ensRafaga = new Map<number, number>();
+  const corrida = (u.data as { corrida: string }[] | null)?.[0]?.corrida;
+  if (corrida) {
+    const { data } = await supabase.from("mon_ens_horas").select("valido,p50").eq("evento_id", eventoId).eq("modelo", "mezcla")
+      .eq("variable", "rafaga").eq("corrida", corrida).limit(2000);
+    for (const h of (data as { valido: string; p50: number | null }[] | null) ?? []) if (h.p50 != null) ensRafaga.set(new Date(h.valido).getTime(), Number(h.p50));
+  }
+  return { verif: (v.data as VerifModelo[] | null) ?? [], ensRafaga };
+}
+
+const mediana = (xs: number[]) => {
+  const v = [...xs].sort((a, b) => a - b);
+  const m = Math.floor(v.length / 2);
+  return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
+};
 
 export const PRIORIDAD = ["ecmwf", "gfs", "wrf_smn", "icon"];
 export const NOMBRE_FUENTE: Record<string, string> = { ecmwf: "ECMWF", gfs: "GFS", wrf_smn: "WRF SMN 4 km", icon: "ICON" };
@@ -39,7 +74,9 @@ const media = (v: [number, number][]) => {
 };
 
 /** Serie horaria de consenso (con valores corregidos si los hay) */
-export function consenso(pron: Pronostico[], uv: Uv[] = [], sesgos: Sesgo[] = []): Map<number, Fila> {
+export function consenso(pron: Pronostico[], uv: Uv[] = [], sesgos: Sesgo[] = [], extras?: ExtrasConsenso): Map<number, Fila> {
+  const verif = new Map((extras?.verif ?? []).filter((x) => x.n >= MIN_PARES && x.desvio != null)
+    .map((x) => [`${x.fuente}|${x.plazo}|${x.variable === "temp" ? "t" : "v"}`, Number(x.desvio) ** 2]));
   const uvHora = new Map(uv.map((u) => [new Date(u.valido).getTime(), Number(u.uv)]));
   // Serie por fuente; las trihorarias se interpolan a horario
   const porFuente = new Map<string, Map<number, Pronostico>>();
@@ -79,7 +116,15 @@ export function consenso(pron: Pronostico[], uv: Uv[] = [], sesgos: Sesgo[] = []
       }
     }
     if (ps.length > 1) {
-      const pt = pesosFuentes(disp, sesgos, "t"), pv = pesosFuentes(disp, sesgos, "v");
+      let pt = pesosFuentes(disp, sesgos, "t"), pv = pesosFuentes(disp, sesgos, "v");
+      // Pesos por plazo de anticipación verificados contra el SMN, si todas las fuentes de la hora los tienen
+      for (const fam of ["t", "v"] as const) {
+        const e = ps.map((p) => verif.get(`${p.fuente}|${plazo((t - new Date(p.corrida).getTime()) / 3600_000)}|${fam}`));
+        if (e.every((x) => x != null)) {
+          const w = Object.fromEntries(ps.map((p, i) => [p.fuente, 1 / (e[i]! + TAU[fam])]));
+          if (fam === "t") pt = w; else pv = w;
+        }
+      }
       for (const c of [...MEZCLA_T, "viento10"] as const) {
         const pp = c === "viento10" ? pv : pt;
         const v = ps.filter((p) => p[c] != null).map((p) => [Number(p[c]), pp[p.fuente]] as [number, number]);
@@ -91,8 +136,16 @@ export function consenso(pron: Pronostico[], uv: Uv[] = [], sesgos: Sesgo[] = []
         let r = media(con.map((p) => [Number(p.rafaga10), pv[p.fuente]]))!;
         const vm = media(con.map((p) => [Number(p.viento10), pv[p.fuente]]));
         if (fila.viento10 != null && vm != null && vm >= 5) r = Number(fila.viento10) * Math.min(2.5, Math.max(1.2, r / vm));
+        // Con tres valores o más (modelos y mediana del ensamble), la mediana
+        const cand = con.map((p) => Number(p.rafaga10));
+        const ens = extras?.ensRafaga.get(t);
+        if (ens != null) cand.push(ens);
+        if (cand.length >= 3) r = mediana(cand);
         fila.rafaga10 = Math.round(r * 10) / 10;
       }
+      // Lluvia: mediana con tres modelos o más (resiste al modelo que se aparta)
+      const ll = ps.filter((p) => p.precip != null).map((p) => Number(p.precip));
+      if (ll.length >= 3) fila.precip = Math.round(mediana(ll) * 100) / 100;
       const tot = Object.values(pt).reduce((a, b) => a + b, 0);
       fila.pesos = Object.fromEntries(disp.map((f) => [f, pt[f] / tot]));
     }

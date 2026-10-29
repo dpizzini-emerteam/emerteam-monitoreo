@@ -1,12 +1,13 @@
 name: Ensambles (pronóstico probabilístico)
 
 # Probabilidad de alcanzar cada nivel por evento y ventana con ECMWF ENS (CC BY 4.0) y NOAA GEFS.
-# Dos veces por día, después de que ECMWF publica el ensamble de 00 y 12 UTC hasta +144 h (~07:40 y ~19:40 UTC).
+# ECMWF publica el ensamble de 00 y 12 UTC hasta +144 h (~07:40 y ~19:40 UTC); se revisa cada 3 h.
 # Si la corrida ya está procesada para todos los eventos, termina en segundos.
 on:
   schedule:
-    - cron: "47 8 * * *"
-    - cron: "47 20 * * *"
+    # Cada 3 h: si la corrida ya está procesada termina en segundos; así no depende de un único horario
+    # (GitHub demora o descarta corridas programadas y ECMWF no siempre publica a la misma hora)
+    - cron: "47 */3 * * *"
   workflow_dispatch:
     inputs:
       modo:

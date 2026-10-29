@@ -62,13 +62,14 @@ def hr_desde_rocio(t_c: float, td_c: float) -> float:
 
 
 def wbgt_liljegren(t_c: float, hr: float, presion_hpa: float, viento_ms: float,
-                   ssrd: float, lat: float, lon: float, t: datetime) -> float | None:
-    """WBGT estimado [°C] por el método de Liljegren et al. (2008), vía thermofeel (ECMWF)."""
+                   ssrd: float, lat: float, lon: float, t: datetime, fdir: float | None = None) -> float | None:
+    """WBGT estimado [°C] por el método de Liljegren et al. (2008), vía thermofeel (ECMWF).
+    `fdir`: fracción directa de la radiación si el modelo la publica (ICON); si no, se estima con Erbs."""
     vals = (t_c, hr, presion_hpa, viento_ms, ssrd)
     if any(v is None or (isinstance(v, float) and math.isnan(v)) for v in vals):
         return None
     cz = cos_cenit(lat, lon, t)
-    fd = fraccion_directa(ssrd, cz, t)
+    fd = fraccion_directa(ssrd, cz, t) if fdir is None else (float(min(max(fdir, 0.0), 0.9)) if cz > 0.02 else 0.0)
     w = thermofeel.calculate_wbgt_liljegren(
         np.array([t_c + 273.15]), np.array([hr]), np.array([presion_hpa]),
         np.array([max(viento_ms, VIENTO_MIN_WBGT)]), np.array([max(ssrd, 0.0)]),

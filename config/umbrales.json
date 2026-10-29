@@ -9,6 +9,12 @@
     ],
     "regla": "wa2020_wbgt"
   },
+  "verificacion": {
+    "_comentario": "Verificación fuera de muestra: pronóstico archivado por corrida contra las estaciones del SMN, por tramo de anticipación. Con al menos min_pares por fuente, tramo y variable, los pesos de la mezcla usan ese error.",
+    "plazos_h": [0, 24, 48, 72, 96, 120, 168],
+    "min_pares": 48,
+    "dias": 45
+  },
   "wbgt_viento_min": {
     "ms_10m": 1.3,
     "regla": "emt_wbgt_viento_min",

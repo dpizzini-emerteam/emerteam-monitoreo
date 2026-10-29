@@ -46,6 +46,15 @@ function distanciaKm(a: { lat: number; lon: number }, b: { lat: number; lon: num
 
 const FUENTES = new Set(["gfs", "ecmwf", "icon", "wrf_smn", "met_no"]);
 
+/** Fila de mon_pron_archivo con la anticipación en horas; null si queda fuera de 0 a 168 h */
+function aArchivo(f: Record<string, unknown>): Record<string, unknown> | null {
+  const h = Math.round((new Date(String(f.valido)).getTime() - new Date(String(f.corrida)).getTime()) / 3600_000);
+  if (!Number.isFinite(h) || h < 0 || h > 168) return null;
+  const n = (x: unknown) => (x == null ? null : Number(x));
+  return { evento_id: f.evento_id, fuente: f.fuente, corrida: f.corrida, valido: f.valido, anticipacion_h: h,
+    t2m: n(f.t2m), td2m: n(f.td2m), viento10: n(f.viento10), rafaga10: n(f.rafaga10), precip: n(f.precip), wbgt_est: n(f.wbgt_est) };
+}
+
 Deno.serve(async (req) => {
   if (!(await autorizado(req))) return json({ error: "no autorizado" }, 401);
   const url = new URL(req.url);
@@ -82,7 +91,7 @@ Deno.serve(async (req) => {
       const porEvento: Record<string, Record<string, string>> = {};
       for (const ev of eventos ?? []) {
         porEvento[ev.id] = {};
-        for (const fuente of ["gfs", "ecmwf", "wrf_smn"]) {
+        for (const fuente of ["gfs", "ecmwf", "wrf_smn", "icon"]) {
           const { data } = await supabase.from("mon_pronosticos").select("corrida")
             .eq("evento_id", ev.id).eq("fuente", fuente).order("corrida", { ascending: false }).limit(1);
           if (data?.[0]) porEvento[ev.id][fuente] = data[0].corrida;
@@ -147,6 +156,21 @@ Deno.serve(async (req) => {
           for (const o of obs ?? []) (observaciones[o.estacion as string] ??= []).push(o);
         }
         respuesta.observaciones = observaciones;
+
+        // Verificación por plazo de anticipación (pesos de la mezcla) y mediana horaria de ráfaga del último ensamble
+        const { data: verif, error: e5 } = await supabase.from("mon_verif_modelos").select("fuente,plazo,variable,n,sesgo,rmse,desvio");
+        if (e5) throw e5;
+        respuesta.verif = verif ?? [];
+        const ensRafaga: Record<string, unknown[]> = {};
+        for (const id of ids) {
+          const { data: ult } = await supabase.from("mon_ens_horas").select("corrida").eq("evento_id", id).eq("modelo", "mezcla")
+            .eq("variable", "rafaga").order("corrida", { ascending: false }).limit(1);
+          if (!ult?.[0]) continue;
+          const { data: hs } = await supabase.from("mon_ens_horas").select("valido,p50").eq("evento_id", id).eq("modelo", "mezcla")
+            .eq("variable", "rafaga").eq("corrida", ult[0].corrida).gte("valido", new Date(Date.now() - 3600_000).toISOString()).limit(2000);
+          ensRafaga[id] = hs ?? [];
+        }
+        respuesta.ens_rafaga = ensRafaga;
       }
       return json(respuesta);
     }
@@ -163,6 +187,24 @@ Deno.serve(async (req) => {
           const { error } = await supabase
             .from("mon_pronosticos")
             .upsert(filas.slice(i, i + 500), { onConflict: "evento_id,fuente,valido" });
+          if (error) throw error;
+        }
+        // Copia por corrida para la verificación por plazo (cada 3 h de validez); una corrida ya archivada no se pisa
+        const archivo = filas.filter((f) => new Date(String(f.valido)).getUTCHours() % 3 === 0).map(aArchivo).filter(Boolean);
+        for (let i = 0; i < archivo.length; i += 500) {
+          const { error } = await supabase.from("mon_pron_archivo")
+            .upsert(archivo.slice(i, i + 500), { onConflict: "evento_id,fuente,corrida,valido", ignoreDuplicates: true });
+          if (error) throw error;
+        }
+        return json({ ok: true, filas: filas.length, archivadas: archivo.length });
+      }
+
+      if (body.tipo === "archivo") {
+        // Consenso de la web (fuente mezcla), con la emisión como corrida
+        const filas = ((body.filas ?? []) as Record<string, unknown>[]).filter((f) => f.fuente === "mezcla").map(aArchivo).filter(Boolean);
+        for (let i = 0; i < filas.length; i += 500) {
+          const { error } = await supabase.from("mon_pron_archivo")
+            .upsert(filas.slice(i, i + 500), { onConflict: "evento_id,fuente,corrida,valido", ignoreDuplicates: true });
           if (error) throw error;
         }
         return json({ ok: true, filas: filas.length });
