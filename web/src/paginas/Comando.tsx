@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Icono, iconoTiempo } from "../componentes/Icono";
+import { CONDICION, Icono, iconoTiempo } from "../componentes/Icono";
+import { BotonTema } from "../componentes/BotonTema";
 import {
   analizarDetector,
   COLOR_SMN, estadoRayosGLM, fmtFechaHora, fmtHora, kmPorTrueno, nivelRayoMedido, num, ordenarAlertas, supabase, tituloAlerta,
   type AlertaSMN, type Evento, type Medicion, type Nivel, type Pronostico, type Sesgo, type Uv, type Rayo,
 } from "../datos";
 import { fijarDisciplina, ESTILO_SIN_DATOS, estiloNivel, estiloVariable, NOMBRE_CORTO, NOMBRE_FASE, nombreNivel, recomendacion } from "../reglas";
-import { Humedad, UvDato } from "../componentes/Uv";
 import { confDisciplina, escalaCalor, estiloCalor, evaluarAguaAbierta, evaluarAguaTriatlon, nombreDisciplina, riesgoWct, wct } from "../disciplinas";
-import { cargarExtrasConsenso, consenso, type ExtrasConsenso } from "../serie";
+import { cargarExtrasConsenso, categoriaUv, consenso, UV_CATEGORIAS, type ExtrasConsenso } from "../serie";
 import { calcular, fasesDeAlerta } from "../ventanas";
 
 const NIVEL_RAYO = ["Sin actividad", "Vigilar", "Alerta", "Preparar / demorar", "Suspender"];
@@ -125,23 +125,38 @@ export function Comando() {
     else void document.documentElement.requestFullscreen?.();
   };
 
+  // Hora de las tarjetas por hora: en qué tramo del evento cae
+  const tramo = (h: number): { txt: string; tipo: "" | "exp" | "uc" } => {
+    if (h < v.finUltimoCuarto.getTime() && h + 3600_000 > v.inicioUltimoCuarto.getTime()) return { txt: "Último cuarto", tipo: "uc" };
+    if (h <= v.largada.getTime() && h + 3600_000 > v.largada.getTime()) return { txt: "Largada", tipo: "exp" };
+    if (h > v.largada.getTime() && h < v.finCarrera.getTime()) return { txt: "Carrera", tipo: "exp" };
+    return { txt: "", tipo: "" };
+  };
+  const vientoPeor = nivelesAhora.filter((n) => n.variable.startsWith("viento_")).sort((a, b) => b.nivel - a.nivel)[0];
+  const nViento = vientoPeor?.nivel ?? 0;
+  const iconoAhora = actualP ? iconoTiempo(actualP, (actualP.radiacion ?? 0) < 5) : null;
+  // Rayo más cercano informado (detector, trueno o satélite) para la barra de distancias
+  const kmRayo = medR?.trueno ? 5 : medR?.rayo_km != null ? Number(medR.rayo_km) : glm.cantidad > 0 && glm.km != null ? glm.km : null;
+  const accionesVisibles = acciones.slice(0, meds.length ? 3 : 4);
+
   return (
     <div className="comando">
       <header className="cmd-cab">
-        <div>
+        <div style={{ minWidth: 0 }}>
           <div className="cmd-evento">{ev.nombre}</div>
           <div className="cmd-sub">{ev.disciplina && ev.disciplina !== "running" ? `${nombreDisciplina(ev.disciplina)} · ` : ""}{ev.ubicacion} · largada {fmtFechaHora(ev.largada)}</div>
         </div>
         <div className="cmd-fase">
           <div>{fase}</div>
-          {reloj && <span>{reloj}</span>}
+          <span>{reloj}</span>
         </div>
         <div className="cmd-reloj">
           <Cuenta largada={v.largada.getTime()} fin={v.finCarrera.getTime()} />
-          <span>
-            <button onClick={pantallaCompleta}>Pantalla completa</button>
-            <Link to={`/evento/${ev.id}/carrera`}>Salir</Link>
-          </span>
+        </div>
+        <div className="cmd-botones">
+          <BotonTema />
+          <button onClick={pantallaCompleta}>Pantalla completa</button>
+          <Link to={`/evento/${ev.id}/carrera`}>Salir</Link>
         </div>
       </header>
 
@@ -154,43 +169,81 @@ export function Comando() {
 
       <section className="cmd-grilla">
         <div className="cmd-celda">
-          <div className="cmd-rot">WBGT {medW ? "medido" : "estimado"}</div>
+          <div className="cmd-celda-cab"><Icono tipo="termometro" size={30} /><span className="cmd-rot">WBGT {medW ? "medido" : "estimado"}</span></div>
           <div className="cmd-valor">{num(wbgt, 1)}<small>°C</small></div>
           {nW == null ? <span className="badge cmd-badge" style={ESTILO_SIN_DATOS}>Sin dato</span> : <span className="badge cmd-badge" style={estiloCalor(escala.variable, nW)}>{escala.niveles[nW]}</span>}
+          <div className="cmd-escala" aria-label={`Escala ${escala.autor}`}>
+            {escala.rangos.map((r, i) => (
+              <div key={r} className={i === nW ? "activo" : undefined} style={estiloCalor(escala.variable, i)} title={`${escala.niveles[i]} · ${r}`}>
+                <span>{r.replace(" °C", "")}</span>
+              </div>
+            ))}
+          </div>
           <div className="cmd-nota">{medW ? `${medW.sector} · ${fmtHora(medW.tomada_en)}` : "Modelos · sin medición en la última hora"} · escala {escala.autor}</div>
         </div>
+
         <div className="cmd-celda">
-          <div className="cmd-rot">Ráfaga {medV ? "medida" : "estimada"}</div>
+          <div className="cmd-celda-cab"><Icono tipo="viento" size={30} /><span className="cmd-rot">Ráfaga {medV ? "medida" : "estimada"}</span></div>
           <div className="cmd-valor">{num(rafaga)}<small>km/h</small></div>
-          {(() => {
-            const nv = Math.max(0, ...nivelesAhora.filter((n) => n.variable.startsWith("viento_")).map((n) => n.nivel));
-            const peor = nivelesAhora.filter((n) => n.variable.startsWith("viento_")).sort((a, b) => b.nivel - a.nivel)[0];
-            if (!peor && rafaga == null) return <span className="badge cmd-badge" style={ESTILO_SIN_DATOS}>Sin dato</span>;
-            return <span className="badge cmd-badge" style={estiloNivel(nv)}>{peor && nv > 0 ? `${nombreNivel(peor.variable, nv)} · ${NOMBRE_CORTO[peor.variable].replace("Viento · ", "")}` : "Bajo umbral"}</span>;
-          })()}
-          <div className="cmd-nota">{medV ? `${medV.sector} · ${fmtHora(medV.tomada_en)} · a ${num(medV.altura_viento_m, 1)} m` : "Modelos · ráfaga a 10 m"}</div>
+          {!vientoPeor && rafaga == null
+            ? <span className="badge cmd-badge" style={ESTILO_SIN_DATOS}>Sin dato</span>
+            : <span className="badge cmd-badge" style={estiloNivel(nViento)}>{vientoPeor && nViento > 0 ? `${nombreNivel(vientoPeor.variable, nViento)} · ${NOMBRE_CORTO[vientoPeor.variable].replace("Viento · ", "")}` : "Bajo umbral"}</span>}
+          <div className="cmd-viento">
+            <span className="cmd-brujula" aria-hidden>
+              <span className="flecha" style={{ transform: `rotate(${(actualP?.dir_viento ?? 0) + 180}deg)` }}>↑</span>
+            </span>
+            <span>
+              <b>{num(actualP?.viento10)} km/h</b> viento medio
+              <small>{actualP?.dir_viento != null ? `del ${cardinal(actualP.dir_viento)}` : "dirección sin dato"}</small>
+            </span>
+          </div>
+          <div className="cmd-nota">{medV ? `${medV.sector} · ${fmtHora(medV.tomada_en)} · a ${num(medV.altura_viento_m, 1)} m` : "Modelos · a 10 m"}</div>
         </div>
+
         <div className="cmd-celda">
-          <div className="cmd-rot">Tormenta eléctrica</div>
-          <div className="cmd-valor" style={{ fontSize: "clamp(28px, 4vw, 54px)" }}>{nR != null ? NIVEL_RAYO[nR] : tormentaPron > 0 ? "Pronosticada" : "Sin señal"}</div>
+          <div className="cmd-celda-cab"><Icono tipo="rayo" size={30} /><span className="cmd-rot">Tormenta eléctrica</span></div>
+          <div className="cmd-valor cmd-valor-txt">{nR != null ? NIVEL_RAYO[nR] : tormentaPron > 0 ? "Pronosticada" : "Sin señal"}</div>
           <span className="badge cmd-badge" style={estiloNivel(nR ?? tormentaPron)}>{nR != null ? fuenteR : "Pronóstico"}</span>
+          <div className="cmd-rayos" aria-label="Distancias del protocolo de tormenta">
+            {[["> 24 km", 1], ["24–19", 2], ["19–13", 3], ["< 13 · trueno", 4]].map(([txt, n]) => {
+              const activo = kmRayo != null && (n === 1 ? kmRayo > 24 : n === 2 ? kmRayo <= 24 && kmRayo > 19 : n === 3 ? kmRayo <= 19 && kmRayo > 13 : kmRayo <= 13);
+              return (
+                <div key={String(n)} className={activo ? "activo" : undefined} style={estiloNivel(Number(n))}>
+                  <span>{txt}</span>
+                </div>
+              );
+            })}
+          </div>
           <div className="cmd-nota">
-            {glm.cantidad > 0 && <div>Satélite: {glm.cantidad} rayos en 30 min, el más cercano a {num(glm.km, 0)} km ({glm.ultimo ? fmtHora(glm.ultimo) : ""})</div>}
-            {medR && <div>Terreno: {medR.trueno ? "trueno audible" : medR.rayo_km != null ? `detector ${num(medR.rayo_km, 0)} km` : RANGO[medR.rayo_rango ?? ""] ?? ""}{medR.relampago_trueno_s != null ? ` · ≈ ${num(kmPorTrueno(medR.relampago_trueno_s), 1)} km` : ""} · {fmtHora(medR.tomada_en)}</div>}
+            {glm.cantidad > 0 && <div>Satélite · {glm.cantidad} rayos en 30 min, el más cercano a {num(glm.km, 0)} km ({glm.ultimo ? fmtHora(glm.ultimo) : ""})</div>}
+            {medR && <div>Terreno · {medR.trueno ? "trueno audible" : medR.rayo_km != null ? `detector ${num(medR.rayo_km, 0)} km` : RANGO[medR.rayo_rango ?? ""] ?? ""}{medR.relampago_trueno_s != null ? ` · ≈ ${num(kmPorTrueno(medR.relampago_trueno_s), 1)} km` : ""} · {fmtHora(medR.tomada_en)}</div>}
             {det.tendencia && det.tendencia !== "estable" && <div><b>{det.tendencia === "acerca" ? "Se acerca" : "Se aleja"}</b> a ≈ {num(Math.abs(det.velocidad ?? 0))} km/h{det.minutosA19 != null ? ` · 19 km en ≈ ${det.minutosA19} min` : ""}{det.minutosA13 != null ? ` · 13 km en ≈ ${det.minutosA13} min` : ""}</div>}
             {det.reanudar && new Date(det.reanudar).getTime() > ahora && <div><b>Reanudar no antes de las {fmtHora(det.reanudar)}</b></div>}
-            {!medR && glm.cantidad === 0 && "24 km alerta · 19 km demorar · 13 km o trueno: suspender"}
+            {!medR && glm.cantidad === 0 && "Alerta a 24 km · demorar a 19 km · suspender a 13 km o con trueno"}
           </div>
         </div>
+
         <div className="cmd-celda">
-          <div className="cmd-rot">Ahora</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            {actualP && <Icono tipo={iconoTiempo(actualP)} size={72} />}
-            <div className="cmd-valor">{num(medW?.temp ?? actualP?.t2m)}<small>°C</small></div>
+          <div className="cmd-celda-cab"><span className="cmd-rot">Ahora</span></div>
+          <div className="cmd-ahora">
+            {iconoAhora && <Icono tipo={iconoAhora} size={64} />}
+            <div>
+              <div className="cmd-valor">{num(medW?.temp ?? actualP?.t2m)}<small>°C</small></div>
+              <div className="cmd-nota">{iconoAhora ? CONDICION[iconoAhora] ?? "" : "Sin pronóstico"}</div>
+            </div>
           </div>
-          <div className="cmd-nota" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}><Humedad texto={`${num(medW?.hr ?? actualP?.hr)} %`} size={18} /> <span>lluvia {num(actualP?.precip, 1)} mm/h</span></div>
-          <div style={{ marginTop: 8 }}><UvDato uv={actualP?.uv} /></div>
-          {stAhora != null && <div className="cmd-nota">Sensación térmica {num(stAhora)} °C · riesgo {riesgoWct(stAhora).toLowerCase()} (informativo)</div>}
+          <div className="dc-datos cmd-datos">
+            <div><span className="rotulo">Humedad</span><span className="v"><Icono tipo="humedad" size={18} />{num(medW?.hr ?? actualP?.hr)} <small>%</small></span></div>
+            <div><span className="rotulo">Lluvia</span><span className="v"><Icono tipo="gota" size={18} />{num(actualP?.precip, 1)} <small>mm/h</small></span></div>
+            <div>
+              <span className="rotulo">UV</span>
+              <span className="v">{actualP?.uv != null ? Math.round(actualP.uv) : "—"} <small>{actualP?.uv != null ? (actualP.uv < 0.5 ? "Sin sol" : categoriaUv(actualP.uv).nombre) : "sin dato"}</small></span>
+              <BarraUv uv={actualP?.uv} />
+            </div>
+            {stAhora != null
+              ? <div title="Sensación térmica por viento (informativa)"><span className="rotulo">Sensación</span><span className="v">{num(stAhora)} <small>°C · {riesgoWct(stAhora).toLowerCase()}</small></span></div>
+              : <div><span className="rotulo">Nubosidad</span><span className="v">{num(actualP?.nubosidad)} <small>%</small></span></div>}
+          </div>
         </div>
       </section>
 
@@ -198,7 +251,7 @@ export function Comando() {
         <section className="cmd-bloque">
           <div className="cmd-rot">Agua</div>
           {medA && agua ? (
-            <p style={{ margin: "6px 0 0", fontSize: 18 }}>
+            <p style={{ margin: 0, fontSize: 16 }}>
               <span className="badge" style={estiloNivel(agua.estado === "ok" ? 0 : agua.estado === "reducir" ? 3 : 4)}>{agua.titulo}</span>{" "}
               Agua {num(medA.agua_temp, 1)} °C · {medA.sector} · {fmtHora(medA.tomada_en)}
               <span className="cmd-nota" style={{ display: "block" }}>{agua.detalle.join(" ")}</span>
@@ -208,66 +261,94 @@ export function Comando() {
       )}
 
       <section className="cmd-bloque">
-        <div className="cmd-rot">Acciones vigentes</div>
-        {acciones.length === 0 ? (
-          <p className="cmd-nada">Sin acciones vigentes en este momento.</p>
-        ) : (
-          <ul className="cmd-acciones">
-            {acciones.slice(0, 5).map((n) => (
-              <li key={n.id} style={{ borderColor: estiloVariable(n.variable, n.nivel).background }}>
-                <span className="badge" style={estiloVariable(n.variable, n.nivel)}>{nombreNivel(n.variable, n.nivel)}</span>
-                <b>{NOMBRE_CORTO[n.variable]}</b> <span className="cmd-fasecita">{NOMBRE_FASE[n.fase]} · hasta {fmtHora(n.hasta)}</span>
-                <p>{recomendacion(n.variable, n.nivel, n.fase)}</p>
-              </li>
-            ))}
-          </ul>
+        <div className="cmd-rot">Próximas horas · pronóstico</div>
+        {horas.length === 0 ? <p className="cmd-nada">Sin pronóstico para las próximas horas. Se completa con la próxima actualización de los modelos.</p> : (
+          <div className="cmd-horas">
+            {horas.map(([h, p]) => {
+              const n = escala.nivel(p.wbgt_est) ?? 0;
+              const tr = tramo(h);
+              const ic = iconoTiempo(p, (p.radiacion ?? 0) < 5);
+              return (
+                <article key={h} className={`dc-h ${tr.tipo}`}>
+                  <div className="dc-h-cab">
+                    <b>{fmtHora(p.valido)}</b>
+                    {tr.txt && <span className={`dc-chip ${tr.tipo}`}>{tr.txt}</span>}
+                  </div>
+                  <div className="dc-wbgt" style={estiloCalor(escala.variable, n)}>
+                    <span className="lab"><small>WBGT</small>{escala.niveles[n]}</span>
+                    <span className="val">{num(p.wbgt_est, 1)}<small>°C</small></span>
+                  </div>
+                  <div className="dc-cielo">
+                    <Icono tipo={ic} size={34} />
+                    <span className="t">{num(p.t2m)}<small>°C</small></span>
+                  </div>
+                  <div className="dc-datos">
+                    <div>
+                      <span className="rotulo">Viento</span>
+                      <span className="v"><span className="flecha" style={{ transform: `rotate(${(p.dir_viento ?? 0) + 180}deg)` }}>↑</span>{num(p.viento10)}</span>
+                      <span className="sub">ráf. {num(p.rafaga10)}</span>
+                    </div>
+                    <div><span className="rotulo">Humedad</span><span className="v">{num(p.hr)} <small>%</small></span></div>
+                    <div><span className="rotulo">UV</span><span className="v">{p.uv != null ? Math.round(p.uv) : "—"}</span><BarraUv uv={p.uv} /></div>
+                    <div><span className="rotulo">Lluvia</span><span className="v">{num(p.precip, 1)} <small>mm</small></span></div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
         )}
       </section>
 
-      <section className="cmd-bloque">
-        <div className="cmd-rot">Próximas horas · pronóstico</div>
-        <div className="cmd-horas">
-          {horas.map(([h, p]) => {
-            const n = escala.nivel(p.wbgt_est) ?? 0;
-            const uc = h < v.finUltimoCuarto.getTime() && h + 3600_000 > v.inicioUltimoCuarto.getTime();
-            return (
-              <div key={h} className="cmd-hora" style={uc ? { outline: "3px solid var(--naranja)" } : undefined}>
-                <b>{fmtHora(p.valido)}</b>
-                <Icono tipo={iconoTiempo(p, (p.radiacion ?? 0) < 5)} size={44} />
-                <span>{num(p.t2m)} °C</span>
-                <span className="cmd-wbgt" style={estiloCalor(escala.variable, n)}>WBGT {num(p.wbgt_est, 1)}</span>
-                <span className="cmd-chico">ráf. {num(p.rafaga10)}</span>
-                <span className="cmd-chico"><Humedad texto={`${num(p.hr)} %`} size={15} /></span>
-                <UvDato uv={p.uv} compacto />
-                <span className="cmd-chico">{num(p.precip, 1)} mm/h</span>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {meds.length > 0 && (
+      <div className={`cmd-abajo${meds.length ? " con-meds" : ""}`}>
         <section className="cmd-bloque">
-          <div className="cmd-rot">Últimas mediciones en terreno</div>
-          <div className="cmd-meds">
-            {meds.slice(0, 4).map((m) => (
-              <div key={m.id}>
-                <b>{fmtHora(m.tomada_en)} · {m.sector}</b>
-                <span>
-                  {[
-                    m.wbgt != null ? `WBGT ${num(m.wbgt, 1)}` : null,
-                    m.rafaga != null ? `ráf. ${num(m.rafaga)} km/h` : null,
-                    nivelRayoMedido(m) != null ? `rayos: ${NIVEL_RAYO[nivelRayoMedido(m) ?? 0].toLowerCase()}` : null,
-                  ].filter(Boolean).join(" · ")}
-                </span>
-              </div>
-            ))}
-          </div>
+          <div className="cmd-rot">Acciones vigentes{acciones.length > accionesVisibles.length ? ` · ${accionesVisibles.length} de ${acciones.length}` : ""}</div>
+          {acciones.length === 0 ? (
+            <p className="cmd-nada">Sin acciones vigentes en este momento.</p>
+          ) : (
+            <ul className="cmd-acciones">
+              {accionesVisibles.map((n) => (
+                <li key={n.id} style={{ borderColor: estiloVariable(n.variable, n.nivel).background }}>
+                  <span className="badge" style={estiloVariable(n.variable, n.nivel)}>{nombreNivel(n.variable, n.nivel)}</span>
+                  <b>{NOMBRE_CORTO[n.variable]}</b> <span className="cmd-fasecita">{NOMBRE_FASE[n.fase]} · hasta {fmtHora(n.hasta)}</span>
+                  <p>{recomendacion(n.variable, n.nivel, n.fase)}</p>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
-      )}
-      <footer className="cmd-pie">EMERTEAM · Monitoreo ambiental · se actualiza sola</footer>
+
+        {meds.length > 0 && (
+          <section className="cmd-bloque">
+            <div className="cmd-rot">Últimas mediciones en terreno</div>
+            <div className="cmd-meds">
+              {meds.slice(0, 4).map((m) => (
+                <div key={m.id}>
+                  <b>{fmtHora(m.tomada_en)} · {m.sector}</b>
+                  <span>
+                    {[
+                      m.wbgt != null ? `WBGT ${num(m.wbgt, 1)}` : null,
+                      m.rafaga != null ? `ráf. ${num(m.rafaga)} km/h` : null,
+                      nivelRayoMedido(m) != null ? `rayos ${NIVEL_RAYO[nivelRayoMedido(m) ?? 0].toLowerCase()}` : null,
+                    ].filter(Boolean).join(" · ")}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+      <footer className="cmd-pie">EMERTEAM | Sports Risks &amp; Emergency Management · se actualiza sola</footer>
     </div>
   );
+}
+
+const CARDINAL = ["N", "NE", "E", "SE", "S", "SO", "O", "NO"];
+const cardinal = (dir: number) => CARDINAL[Math.round((((dir % 360) + 360) % 360) / 45) % 8];
+
+/** Escala UV de 5 tramos (OMS) con los alcanzados pintados */
+function BarraUv({ uv }: { uv: number | null | undefined }) {
+  const i = uv != null && uv >= 0.5 ? UV_CATEGORIAS.indexOf(categoriaUv(uv)) : -1;
+  return <span className="dc-uvb" aria-hidden>{UV_CATEGORIAS.map((c, k) => <i key={c.nombre} style={k <= i ? { background: c.oms } : undefined} />)}</span>;
 }
 
 /** Cuenta regresiva a la largada; durante la carrera, tiempo transcurrido; después, la hora. Se actualiza cada segundo. */

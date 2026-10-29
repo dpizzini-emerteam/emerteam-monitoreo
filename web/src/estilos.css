@@ -186,57 +186,105 @@ a.resumen-fase:hover .resumen-ver { color: var(--naranja); }
 }
 .form-med { grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); }
 
-/* Pantalla de comando (siempre oscura, letra grande) */
-.comando { --c-fondo: #0c0c0c; --c-celda: #181818; --c-borde: #2a2a2a; min-height: 100vh; background: var(--c-fondo); color: #f2f2f2; padding: 18px clamp(14px, 2.5vw, 36px) 24px; display: flex; flex-direction: column; gap: 16px; --tinta: #e6e6e6; }
-.cmd-cab { display: grid; grid-template-columns: 1fr auto auto; gap: 18px; align-items: center; border-bottom: 3px solid var(--naranja); padding-bottom: 12px; }
-.cmd-evento { font-family: "Barlow Condensed"; font-weight: 800; font-size: clamp(22px, 2.6vw, 38px); text-transform: uppercase; line-height: 1.05; }
-.cmd-sub { color: #a9a9a9; font-size: 15px; }
-.cmd-fase { text-align: right; font-family: "Barlow Condensed"; font-weight: 800; font-size: clamp(20px, 2.2vw, 32px); text-transform: uppercase; color: var(--naranja); }
-.cmd-fase span { display: block; font-family: "Cifras", "Atkinson Hyperlegible Next", "Barlow"; font-weight: 600; font-size: 15px; color: #d0d0d0; text-transform: none; }
-.cmd-reloj { font-family: "Barlow Condensed"; font-weight: 800; font-size: clamp(40px, 5vw, 72px); line-height: 1; text-align: right; font-variant-numeric: tabular-nums; }
-.cmd-reloj-rot { display: block; font: 600 14px "Barlow Condensed"; letter-spacing: 0.12em; text-transform: uppercase; color: #a9a9a9; margin-top: 2px; }
-.cmd-reloj span { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; }
-.cmd-reloj button, .cmd-reloj a { font: 600 13px "Barlow"; color: #cfcfcf; background: none; border: 1px solid #3a3a3a; border-radius: 6px; padding: 5px 9px; cursor: pointer; text-decoration: none; }
-.cmd-alerta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 20px; color: #111; padding: 14px 20px; border-radius: 10px; font-size: clamp(18px, 2vw, 26px); }
+/* Pantalla de comando: claro u oscuro según el tema elegido; en pantallas grandes entra completa sin desplazamiento */
+.comando { min-height: 100vh; background: var(--fondo); color: var(--texto); padding: 1.6vh clamp(12px, 2vw, 32px); display: flex; flex-direction: column; gap: 1.4vh; }
+.cmd-cab { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 18px; align-items: center; border-bottom: 3px solid var(--naranja); padding-bottom: 1vh; }
+.cmd-evento { font-family: "Barlow Condensed"; font-weight: 800; font-size: clamp(20px, 3.4vh, 34px); text-transform: uppercase; line-height: 1.05; }
+.cmd-sub { color: var(--texto2); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cmd-fase { text-align: right; font-family: "Barlow Condensed"; font-weight: 800; font-size: clamp(18px, 3vh, 28px); text-transform: uppercase; color: var(--naranja); line-height: 1.05; }
+.cmd-fase span { display: block; font-family: "Cifras", "Atkinson Hyperlegible Next", "Barlow"; font-weight: 600; font-size: 14px; color: var(--texto2); text-transform: none; }
+.cmd-reloj { font-family: "Barlow Condensed"; font-weight: 800; font-size: clamp(34px, 6.4vh, 64px); line-height: 0.95; text-align: right; font-variant-numeric: tabular-nums; }
+.cmd-reloj-rot { display: block; font: 700 13px "Barlow Condensed"; letter-spacing: 0.12em; text-transform: uppercase; color: var(--texto3); margin-top: 2px; }
+.cmd-botones { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+.cmd-botones button, .cmd-botones a { font: 600 13px "Barlow"; color: var(--texto2); background: var(--superficie); border: 1px solid var(--borde-input); border-radius: 6px; padding: 4px 9px; cursor: pointer; text-decoration: none; text-align: center; }
+.cmd-botones .boton-tema { display: inline-flex; justify-content: center; align-items: center; padding: 3px; }
+.cmd-botones .boton-tema svg { width: 18px; height: 18px; }
+.cmd-alerta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 20px; color: #111; padding: 1vh 18px; border-radius: 10px; font-size: clamp(16px, 2.4vh, 22px); }
 .cmd-alerta b { font-family: "Barlow Condensed"; text-transform: uppercase; font-weight: 800; }
-.cmd-grilla { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
-.cmd-celda { background: var(--c-celda); border: 1px solid var(--c-borde); border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; }
-.cmd-rot { font-family: "Barlow Condensed"; font-weight: 700; font-size: 15px; letter-spacing: 0.12em; text-transform: uppercase; color: #a9a9a9; }
-.cmd-valor { font-family: "Barlow Condensed"; font-weight: 800; font-size: clamp(44px, 6vw, 92px); line-height: 0.95; font-variant-numeric: tabular-nums; }
-.cmd-valor small { font-size: 0.4em; margin-left: 6px; color: #bdbdbd; }
-.cmd-badge { align-self: flex-start; font-size: 18px; }
-.cmd-nota { font-size: 14px; color: #bdbdbd; }
-.cmd-bloque { background: var(--c-celda); border: 1px solid var(--c-borde); border-radius: 12px; padding: 14px 18px; display: flex; flex-direction: column; gap: 10px; }
-.cmd-nada { margin: 0; font-size: 18px; color: #cfcfcf; }
-.cmd-acciones { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-.cmd-acciones li { border-left: 6px solid; padding: 4px 0 4px 14px; font-size: 18px; }
-.cmd-acciones li .badge { margin-right: 10px; }
-.cmd-acciones li p { margin: 6px 0 0; font-size: 17px; color: #e0e0e0; line-height: 1.4; }
-.cmd-fasecita { color: #a9a9a9; font-size: 15px; }
+.cmd-grilla { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.cmd-celda { background: var(--superficie); border: 1px solid var(--borde); border-radius: 12px; padding: 1.4vh 16px; display: flex; flex-direction: column; gap: 0.8vh; min-width: 0; }
+.cmd-celda-cab { display: flex; align-items: center; gap: 8px; min-height: 30px; }
+.cmd-rot { font-family: "Barlow Condensed"; font-weight: 700; font-size: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--texto3); }
+.cmd-valor { font-family: "Barlow Condensed"; font-weight: 800; font-size: clamp(34px, 6.6vh, 68px); line-height: 0.95; font-variant-numeric: tabular-nums; }
+.cmd-valor small { font-size: 0.42em; margin-left: 5px; color: var(--texto2); }
+.cmd-valor-txt { font-size: clamp(26px, 4.6vh, 46px); }
+.cmd-badge { align-self: flex-start; font-size: 15px; }
+.cmd-nota { font-size: 13px; color: var(--texto2); line-height: 1.35; }
+.cmd-escala, .cmd-rayos { display: flex; border-radius: 6px; overflow: hidden; box-shadow: 0 0 0 1px var(--borde-input); }
+.cmd-escala > div, .cmd-rayos > div { flex: 1; padding: 4px 3px; font-size: 11px; font-weight: 700; text-align: center; opacity: 0.45; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cmd-escala > div.activo, .cmd-rayos > div.activo { opacity: 1; box-shadow: inset 0 0 0 3px var(--naranja); }
+.cmd-viento { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.cmd-viento small { display: block; color: var(--texto2); font-size: 12px; }
+.cmd-brujula { width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--borde-input); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.cmd-brujula .flecha { display: inline-block; font-weight: 800; font-size: 20px; color: var(--naranja); }
+.cmd-ahora { display: flex; align-items: center; gap: 12px; }
+.cmd-datos { margin-top: auto; border: 1px solid var(--borde); border-radius: 8px; }
+.cmd-datos > div:nth-last-child(-n+2) { border-bottom: 0; }
+.cmd-datos .v svg { flex: none; }
+.cmd-bloque { background: var(--superficie); border: 1px solid var(--borde); border-radius: 12px; padding: 1.2vh 16px; display: flex; flex-direction: column; gap: 0.9vh; min-height: 0; }
+.cmd-nada { margin: 0; font-size: 16px; color: var(--texto2); }
 .cmd-horas { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; }
-.cmd-hora { background: #222; border-radius: 10px; padding: 10px 6px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; font-size: 18px; }
-.cmd-hora b { font-family: "Barlow Condensed"; font-size: 24px; }
-.cmd-wbgt { font-weight: 700; font-size: 15px; padding: 3px 8px; border-radius: 4px; align-self: stretch; }
-.cmd-chico { font-size: 14px; color: #bdbdbd; }
-.cmd-meds { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
-.cmd-meds div { display: flex; flex-direction: column; font-size: 16px; }
-.cmd-meds span { color: #cfcfcf; font-size: 15px; }
-.cmd-pie { margin-top: auto; color: #6f6f6f; font-size: 13px; text-align: center; }
-@media (max-width: 900px) {
-  .cmd-cab { grid-template-columns: 1fr auto; }
+.comando .dc-h { min-width: 0; }
+.comando .dc-h-cab { padding: 0.8vh 10px 0.6vh; flex-wrap: wrap; gap: 4px; }
+.comando .dc-h-cab b { font-size: clamp(18px, 3vh, 26px); }
+.comando .dc-chip { font-size: 11px; padding: 2px 6px; }
+.comando .dc-wbgt { margin: 0 10px; padding: 0.6vh 8px; }
+.comando .dc-wbgt .lab { font-size: 12px; }
+.comando .dc-wbgt .val, .comando .dc-cielo .t { font-size: clamp(20px, 3.2vh, 28px); }
+.comando .dc-cielo { padding: 0.6vh 10px 0; }
+.comando .dc-datos { margin-top: 0.6vh; }
+.comando .dc-datos > div { padding: 0.5vh 10px; }
+.comando .dc-datos .rotulo { font-size: 11px; }
+.comando .dc-datos .v { font-size: 15px; }
+.comando .cmd-horas .dc-datos > div:nth-last-child(-n+2) { border-bottom: 0; }
+.cmd-abajo { display: grid; grid-template-columns: 1fr; gap: 12px; min-height: 0; }
+.cmd-abajo.con-meds { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+.cmd-acciones { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; }
+.cmd-acciones li { border-left: 6px solid; padding: 2px 0 2px 12px; font-size: 16px; }
+.cmd-acciones li .badge { margin-right: 8px; }
+.cmd-acciones li p { margin: 4px 0 0; font-size: 14px; color: var(--texto2); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.cmd-fasecita { color: var(--texto3); font-size: 13px; }
+.cmd-meds { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.cmd-meds div { display: flex; flex-direction: column; font-size: 14px; }
+.cmd-meds span { color: var(--texto2); font-size: 13px; }
+.cmd-pie { margin-top: auto; color: var(--texto3); font-size: 12px; text-align: center; }
+.comando .dc-wbgt { flex-wrap: wrap; row-gap: 2px; }
+.comando .dc-wbgt .val { font-size: clamp(18px, 2.8vh, 26px); }
+/* Escritorio o pantalla proyectada: todo en el alto de la ventana */
+@media (min-width: 1000px) and (min-height: 600px) {
+  .comando { height: 100vh; overflow: hidden; }
+  .cmd-abajo { flex: 1 1 0; }
+  .cmd-abajo .cmd-bloque { overflow: hidden; }
+}
+/* Pantallas bajas (notebook 768 px): por hora quedan WBGT, cielo, viento y lluvia; humedad y UV siguen en la tarjeta Ahora */
+@media (min-width: 1000px) and (max-height: 860px) {
+  .comando { gap: 1vh; padding-top: 1.2vh; padding-bottom: 1vh; }
+  .cmd-valor { font-size: clamp(30px, 5.4vh, 52px); }
+  .cmd-celda { gap: 0.6vh; padding: 1vh 14px; }
+  .cmd-celda-cab { min-height: 24px; }
+  .cmd-celda-cab svg { width: 24px; height: 24px; }
+  .cmd-ahora svg { width: 48px; height: 48px; }
+  .cmd-horas .dc-datos > div:nth-child(2), .cmd-horas .dc-datos > div:nth-child(3) { display: none; }
+  .comando .cmd-horas .dc-datos > div { border-bottom: 0; }
+  .comando .dc-cielo svg { width: 28px; height: 28px; }
+  .cmd-acciones li p { -webkit-line-clamp: 2; }
+}
+@media (max-width: 999px) {
+  .cmd-cab { grid-template-columns: minmax(0, 1fr) auto; }
   .cmd-fase { grid-column: 1 / -1; text-align: left; order: 3; }
+  .cmd-botones { flex-direction: row; grid-column: 1 / -1; order: 4; }
   .cmd-grilla { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .cmd-horas { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .cmd-abajo.con-meds { grid-template-columns: 1fr; }
 }
 @media (max-width: 600px) {
-  .comando { padding: 12px 12px 20px; }
+  .comando { padding: 12px; }
   .cmd-cab { gap: 10px; }
-  .cmd-reloj { font-size: 40px; }
-  .cmd-grilla { gap: 8px; }
-  .cmd-celda { padding: 12px; min-width: 0; }
-  .cmd-horas { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .cmd-grilla { grid-template-columns: 1fr; gap: 8px; }
+  .cmd-horas { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
   .cmd-alerta { font-size: 16px; }
   .cmd-badge { font-size: 14px; white-space: normal; }
+  .cmd-sub { white-space: normal; }
 }
 
 textarea { font: inherit; font-size: 15px; padding: 10px; border: 1px solid var(--borde-input); border-radius: 6px; background: var(--superficie); color: var(--texto); resize: vertical; }
