@@ -381,7 +381,16 @@ function Cuenta({ largada, fin }: { largada: number; fin: number }) {
     const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60;
     return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(x).padStart(2, "0")}`;
   };
-  const [valor, rotulo] = t < largada ? [hms(largada - t), "para la largada"]
+  // Cuenta regresiva en días, horas y minutos; en la última hora, minutos y segundos
+  const regresiva = (ms: number) => {
+    const seg = Math.floor(ms / 1000);
+    const d = Math.floor(seg / 86400), h = Math.floor((seg % 86400) / 3600), m = Math.floor((seg % 3600) / 60), x = seg % 60;
+    const u = (n: number, unidad: string) => <>{n}<small className="cmd-unidad">{unidad}</small></>;
+    if (d > 0) return <>{u(d, "d")} {u(h, "h")} {u(m, "min")}</>;
+    if (h > 0) return <>{u(h, "h")} {u(m, "min")}</>;
+    return <>{u(m, "min")} {u(x, "s")}</>;
+  };
+  const [valor, rotulo] = t < largada ? [regresiva(largada - t), "para la largada"]
     : t <= fin ? [hms(t - largada), "de carrera"]
     : [new Intl.DateTimeFormat("es-AR", { timeZone: "America/Argentina/Buenos_Aires", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(t)), "hora"];
   return (
