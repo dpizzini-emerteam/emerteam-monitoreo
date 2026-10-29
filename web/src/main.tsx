@@ -1,4 +1,4 @@
-// EMERTEAM Monitoreo Ambiental · web. Se publica sola desde main (Netlify vinculado al repositorio).
+// EMERTEAM Monitoreo Ambiental · web. Se publica sola desde main (Netlify vinculado al repositorio el 29/10/2026).
 import { lazy, StrictMode, Suspense, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { createHashRouter, Navigate, Outlet, RouterProvider, useLocation, useParams, useRouteError } from "react-router-dom";
