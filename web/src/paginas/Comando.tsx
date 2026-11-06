@@ -6,6 +6,7 @@ import {
   analizarDetector,
   COLOR_SMN, estadoRayosGLM, fmtDia, fmtFechaHora, fmtHora, kmPorTrueno, nivelRayoMedido, num, ordenarAlertas, supabase, tituloAlerta,
   type AlertaSMN, type Evento, type Medicion, type Nivel, type Pronostico, type Sesgo, type Uv, type Rayo,
+  traerTodo,
 } from "../datos";
 import { fijarDisciplina, ESTILO_SIN_DATOS, estiloNivel, estiloVariable, NOMBRE_CORTO, NOMBRE_FASE, nombreNivel, recomendacion } from "../reglas";
 import { confDisciplina, escalaCalor, estiloCalor, evaluarAguaAbierta, evaluarAguaTriatlon, nombreDisciplina, riesgoWct, wct } from "../disciplinas";
@@ -35,8 +36,8 @@ export function Comando() {
     if (!id) return;
     const [e, p, n, a, m, r, u, sg, ex] = await Promise.all([
       supabase.from("mon_eventos").select("*, mon_modalidades(*)").eq("id", id).single(),
-      supabase.from("mon_pronosticos").select("*").eq("evento_id", id).order("valido").limit(5000),
-      supabase.from("mon_niveles").select("*").eq("evento_id", id).order("desde").limit(5000),
+      traerTodo<Pronostico>(() => supabase.from("mon_pronosticos").select("*").eq("evento_id", id).order("valido").order("fuente")),
+      traerTodo<Nivel>(() => supabase.from("mon_niveles").select("*").eq("evento_id", id).order("desde").order("id")),
       supabase.from("mon_alertas_smn").select("*").eq("evento_id", id).neq("estado", "levantada"),
       supabase.from("mon_mediciones").select("*").eq("evento_id", id).order("tomada_en", { ascending: false }).limit(50),
       supabase.from("mon_rayos").select("*").eq("evento_id", id).gte("ocurrido_en", new Date(Date.now() - 60 * 60_000).toISOString()).limit(2000),

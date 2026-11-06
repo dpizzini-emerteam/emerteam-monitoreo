@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useOutletContext, useParams } from "react-router-dom";
 import type { Ctx } from "../main";
 import { Barra } from "../componentes/Barra";
-import { fmtDia, fmtFechaHora, fmtHora, num, supabase, type AlertaSMN, type Evento, type Medicion, type Pronostico, type Rayo, type Sesgo, type Uv } from "../datos";
+import { fmtDia, fmtFechaHora, fmtHora, num, supabase, traerTodo, type AlertaSMN, type Evento, type Medicion, type Pronostico, type Rayo, type Sesgo, type Uv } from "../datos";
 import { armarInforme, type FaseInforme, type FilaHistorial, type Informe as TInforme, type Pico, type RecoInforme } from "../informe";
 import { fijarDisciplina, estiloVariable, NOMBRE_VARIABLE, nombreNivel } from "../reglas";
 import { categoriaUv } from "../serie";
@@ -179,12 +179,12 @@ export function Informe() {
     setNotasT(registro?.notas_trabajadores ?? "");
     if (admin) {
       const [p, h, m, ry, a, u, sg] = await Promise.all([
-        supabase.from("mon_pronosticos").select("*").eq("evento_id", id).order("valido").limit(5000),
-        supabase.from("mon_niveles_historial").select("*").eq("evento_id", id).limit(10000),
+        traerTodo<Pronostico>(() => supabase.from("mon_pronosticos").select("*").eq("evento_id", id).order("valido").order("fuente")),
+        traerTodo<FilaHistorial>(() => supabase.from("mon_niveles_historial").select("*").eq("evento_id", id).order("id")),
         supabase.from("mon_mediciones").select("*").eq("evento_id", id).limit(1000),
-        supabase.from("mon_rayos").select("*").eq("evento_id", id).limit(10000),
+        traerTodo<Rayo>(() => supabase.from("mon_rayos").select("*").eq("evento_id", id).order("id")),
         supabase.from("mon_alertas_smn").select("*").eq("evento_id", id),
-        supabase.from("mon_uv").select("evento_id,valido,uv,interpolado").eq("evento_id", id).order("valido").limit(2000),
+        traerTodo<Uv>(() => supabase.from("mon_uv").select("evento_id,valido,uv,interpolado").eq("evento_id", id).order("valido")),
         supabase.from("mon_sesgos").select("*").eq("evento_id", id),
       ]);
       setVivo(armarInforme(e.data as Evento, (p.data as Pronostico[]) ?? [], (h.data as FilaHistorial[]) ?? [],

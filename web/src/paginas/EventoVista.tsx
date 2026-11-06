@@ -21,6 +21,7 @@ import { confDisciplina, esVariableCalor, escalaCalor, estiloCalor, nombreDiscip
 import {
   COLOR_SMN, estadoRayosGLM, ordenarAlertas, tituloAlerta, diaLocal, fmtDia, fmtFechaHora, fmtHora, num, supabase,
   type AlertaSMN, type Evento, type Rayo, type Nivel, type Pronostico, type Sesgo, type Uv,
+  traerTodo,
 } from "../datos";
 import { fijarDisciplina, reglaDe, REGLAS, estiloNivel, estiloVariable, NOMBRE_CORTO, NOMBRE_FASE, NOMBRE_VARIABLE, TIPO_FUENTE, nombreNivel, recomendacion } from "../reglas";
 import { calcular, fasesDeAlerta } from "../ventanas";
@@ -71,8 +72,8 @@ export function EventoVista() {
     if (!id) return;
     const [e, p, n, a, r, inf, sg, u, ex] = await Promise.all([
       supabase.from("mon_eventos").select("*, mon_modalidades(*), mon_productoras(nombre)").eq("id", id).single(),
-      supabase.from("mon_pronosticos").select("*").eq("evento_id", id).order("valido").limit(5000),
-      supabase.from("mon_niveles").select("*").eq("evento_id", id).order("desde").limit(5000),
+      traerTodo<Pronostico>(() => supabase.from("mon_pronosticos").select("*").eq("evento_id", id).order("valido").order("fuente")),
+      traerTodo<Nivel>(() => supabase.from("mon_niveles").select("*").eq("evento_id", id).order("desde").order("id")),
       supabase.from("mon_alertas_smn").select("*").eq("evento_id", id).neq("estado", "levantada"),
       supabase.from("mon_rayos").select("*").eq("evento_id", id).gte("ocurrido_en", new Date(Date.now() - 60 * 60_000).toISOString()).limit(2000),
       supabase.from("mon_informes").select("estado").eq("evento_id", id).maybeSingle(),

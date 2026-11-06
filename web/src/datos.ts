@@ -328,3 +328,20 @@ export function estadoRayosGLM(rayos: Rayo[], ahora = Date.now()): { nivel: numb
   const ultimo = recientes.map((r) => r.ocurrido_en).sort().at(-1) ?? null;
   return { nivel, km, cantidad: recientes.length, ultimo };
 }
+
+// La API de Supabase devuelve como máximo 1000 filas por consulta aunque se pida un limit mayor.
+// Un evento cargado con semanas de anticipación acumula más de 1000 horas de pronóstico entre las
+// cuatro fuentes, y al ordenar por fecha se perdían las últimas (el día de carrera). Esta función
+// trae todas las filas por tandas. La consulta tiene que llevar un orden único para que las tandas no se pisen.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function traerTodo<T>(armar: () => any, tanda = 1000): Promise<{ data: T[]; error: unknown }> {
+  const filas: T[] = [];
+  for (let desde = 0; desde < 100_000; desde += tanda) {
+    const { data, error } = await armar().range(desde, desde + tanda - 1);
+    if (error) return { data: filas, error };
+    const lote = (data as T[] | null) ?? [];
+    filas.push(...lote);
+    if (lote.length < tanda) break;
+  }
+  return { data: filas, error: null };
+}
